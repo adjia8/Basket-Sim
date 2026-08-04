@@ -1,0 +1,179 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  career       Career?
+}
+
+model Career {
+  id           String        @id @default(cuid())
+  userId       String        @unique
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leagueId     String
+  league       League        @relation(fields: [leagueId], references: [id])
+  teamId       String
+  team         Team          @relation(fields: [teamId], references: [id])
+  season       String
+  createdAt    DateTime      @default(now())
+  games        Game[]
+  contracts    Contract[]
+  playerStates PlayerState[]
+  prospects    Prospect[]
+}
+
+model League {
+  id          String       @id
+  code        String       @unique
+  name        String
+  season      String
+  salaryCap   Int
+  conferences Conference[]
+  teams       Team[]
+  careers     Career[]
+  games       Game[]
+  prospects   Prospect[]
+}
+
+model Conference {
+  id       String @id
+  leagueId String
+  league   League @relation(fields: [leagueId], references: [id])
+  name     String
+  teams    Team[]
+
+  @@index([leagueId])
+}
+
+model Team {
+  id             String     @id
+  leagueId       String
+  league         League     @relation(fields: [leagueId], references: [id])
+  conferenceId   String
+  conference     Conference @relation(fields: [conferenceId], references: [id])
+  city           String
+  name           String
+  abbreviation   String
+  primaryColor   String
+  secondaryColor String
+  players        Player[]
+  careers        Career[]
+  homeGames      Game[]     @relation("HomeTeam")
+  awayGames      Game[]     @relation("AwayTeam")
+  contracts      Contract[]
+
+  @@index([leagueId])
+  @@index([conferenceId])
+}
+
+model Player {
+  id            String     @id
+  teamId        String
+  team          Team       @relation(fields: [teamId], references: [id])
+  leagueId      String
+  firstName     String
+  lastName      String
+  position      String
+  jerseyNumber  Int
+  heightCm      Int
+  age           Int
+  overallRating Int
+  scoring       Int
+  playmaking    Int
+  rebounding    Int
+  defense       Int
+  athleticism   Int
+  contracts     Contract[]
+  playerStates  PlayerState[]
+
+  @@index([teamId])
+}
+
+model Game {
+  id         String   @id @default(cuid())
+  careerId   String
+  career     Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  leagueId   String
+  league     League   @relation(fields: [leagueId], references: [id])
+  season     String
+  gameDate   DateTime
+  homeTeamId String
+  homeTeam   Team     @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeamId String
+  awayTeam   Team     @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  status     String   @default("scheduled")
+  homeScore  Int?
+  awayScore  Int?
+  boxScore   String?
+
+  @@index([careerId])
+}
+
+model Contract {
+  id             String   @id @default(cuid())
+  careerId       String
+  career         Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  playerId       String
+  player         Player   @relation(fields: [playerId], references: [id])
+  teamId         String
+  team           Team     @relation(fields: [teamId], references: [id])
+  salary         Int
+  yearsRemaining Int
+  createdAt      DateTime @default(now())
+
+  @@unique([careerId, playerId])
+  @@index([careerId])
+  @@index([careerId, teamId])
+}
+
+model PlayerState {
+  id            String   @id @default(cuid())
+  careerId      String
+  career        Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  playerId      String
+  player        Player   @relation(fields: [playerId], references: [id])
+  age           Int
+  overallRating Int
+  scoring       Int
+  playmaking    Int
+  rebounding    Int
+  defense       Int
+  athleticism   Int
+  retired       Boolean  @default(false)
+
+  @@unique([careerId, playerId])
+  @@index([careerId])
+}
+
+model Prospect {
+  id            String   @id @default(cuid())
+  careerId      String
+  career        Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  leagueId      String
+  league        League   @relation(fields: [leagueId], references: [id])
+  firstName     String
+  lastName      String
+  position      String
+  heightCm      Int
+  age           Int
+  overallRating Int
+  scoring       Int
+  playmaking    Int
+  rebounding    Int
+  defense       Int
+  athleticism   Int
+
+  @@index([careerId])
+}
