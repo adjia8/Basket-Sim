@@ -27,6 +27,28 @@ export async function getContractForPlayer(
   return row ? toDomainContract(row) : undefined;
 }
 
+// Masse salariale réelle d'une équipe : contrats actifs + argent mort restant
+// des contrats garantis coupés avant terme (DeadCap.yearsRemaining > 0).
+export async function getPayrollForTeam(
+  careerId: string,
+  teamId: string
+): Promise<number> {
+  const [contracts, deadCap] = await Promise.all([
+    prisma.contract.findMany({
+      where: { careerId, teamId },
+      select: { salary: true },
+    }),
+    prisma.deadCap.findMany({
+      where: { careerId, teamId },
+      select: { salary: true },
+    }),
+  ]);
+  return (
+    contracts.reduce((sum, c) => sum + c.salary, 0) +
+    deadCap.reduce((sum, d) => sum + d.salary, 0)
+  );
+}
+
 // Agent libre = joueur de la ligue sans Contract dans cette Career (et pas retraité).
 export async function getFreeAgents(
   careerId: string,

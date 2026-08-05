@@ -1,64 +1,86 @@
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getProspectsForCareer } from "@/lib/data-access/prospects";
 import { getLeagueById } from "@/lib/data-access/leagues";
+import { getCurrentDraftPick } from "@/lib/data-access/draft-picks";
+import { getMembershipForTeam } from "@/lib/data-access/memberships";
+import { getTeamById, getTeamsByLeague } from "@/lib/data-access/teams";
 import { prisma } from "@/lib/prisma";
-import { draftProspect } from "@/app/actions/draft";
-import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
-import { formatSalary } from "@/lib/utils";
+import { draftForAiTeam, draftProspect } from "@/app/actions/draft";
+import { rookieScaleContract } from "@/lib/careers/rookie-scale";
+import { formatSalary, teamFullName } from "@/lib/utils";
 
 export default async function DraftPage() {
   const membership = await getCurrentMembership();
 
-  const [prospects, teamContracts, league] = await Promise.all([
+  const [prospects, teams, league] = await Promise.all([
     getProspectsForCareer(membership.careerId),
-    prisma.contract.findMany({
-      where: { careerId: membership.careerId, teamId: membership.teamId },
-      select: { salary: true },
-    }),
+    getTeamsByLeague(membership.leagueId),
     getLeagueById(membership.leagueId),
   ]);
-
-  const rosterSize = teamContracts.length;
-  const rosterFull = rosterSize >= MAX_ROSTER_SIZE;
-  const payroll = teamContracts.reduce((sum, c) => sum + c.salary, 0);
+  const picksPerRound = teams.length;
   const salaryCap = league?.salaryCap ?? Infinity;
-  // Un contrat a toujours un salaire strictement positif : si la masse
-  // salariale actuelle atteint déjà le plafond, aucun rookie ne peut plus
-  // être drafté, quel que soit le montant (aléatoire) qui serait proposé.
-  const capReached = payroll >= salaryCap;
-  const canDraft = !rosterFull && !capReached;
+
+  const currentPick = await getCurrentDraftPick(
+    membership.careerId,
+    membership.season,
+    salaryCap,
+    picksPerRound,
+    membership.leagueId
+  );
+
+  if (!currentPick) {
+    const hasDraftPicks = await prisma.draftPick.count({
+      where: { careerId: membership.careerId, season: membership.season },
+    });
+    return (
+      <div className="mx-auto max-w-5xl px-4 py-8">
+        <h1 className="text-2xl font-bold">Draft</h1>
+        <p className="mt-4 text-sm text-black/50 dark:text-white/50">
+          {hasDraftPicks > 0
+            ? "Draft terminé pour cette saison."
+            : "Aucun draft en cours pour l'instant — termine la saison en cours pour ouvrir le prochain."}
+        </p>
+      </div>
+    );
+  }
+
+  const [pickTeam, manager] = await Promise.all([
+    getTeamById(currentPick.teamId),
+    getMembershipForTeam(membership.careerId, currentPick.teamId),
+  ]);
+
+  const isMyTurn = currentPick.teamId === membership.teamId;
+  const pickTerms = rookieScaleContract(currentPick.pickNumber, picksPerRound, membership.leagueId);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <h1 className="text-2xl font-bold">Draft</h1>
       <p className="mt-1 text-black/60 dark:text-white/60">
-        Prospects disponibles pour ta ligue cette saison.
+        Pick {currentPick.pickNumber} (Tour {currentPick.round}) —{" "}
+        {pickTeam ? teamFullName(pickTeam) : "?"} · {formatSalary(pickTerms.salary)} ·{" "}
+        {pickTerms.guaranteed ? "contrat garanti" : "contrat non garanti"}
       </p>
 
-      <p className="mt-4 text-sm text-black/60 dark:text-white/60">
-        Masse salariale :{" "}
-        <span className={capReached ? "font-semibold text-red-500" : "font-semibold"}>
-          {formatSalary(payroll)} / {formatSalary(salaryCap)}
-        </span>
-      </p>
-
-      {rosterFull && prospects.length > 0 && (
-        <p className="mt-2 text-sm text-red-500">
-          Effectif complet ({rosterSize} / {MAX_ROSTER_SIZE}) — libère un joueur
-          pour pouvoir en drafter un autre.
+      {isMyTurn ? (
+        <p className="mt-3 text-sm font-medium">C&apos;est à toi de choisir !</p>
+      ) : manager ? (
+        <p className="mt-3 text-sm text-black/50 dark:text-white/50">
+          En attente de {manager.email}…
         </p>
-      )}
-      {capReached && prospects.length > 0 && (
-        <p className="mt-2 text-sm text-red-500">
-          Plafond salarial atteint — libère un joueur pour dégager de la marge
-          avant de drafter.
-        </p>
+      ) : (
+        <form action={draftForAiTeam} className="mt-4">
+          <button
+            type="submit"
+            className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+          >
+            Faire drafter {pickTeam ? teamFullName(pickTeam) : "l'IA"}
+          </button>
+        </form>
       )}
 
       {prospects.length === 0 ? (
         <p className="mt-6 text-sm text-black/50 dark:text-white/50">
-          Aucun prospect disponible pour l&apos;instant — termine la saison en
-          cours pour ouvrir un nouveau draft.
+          Aucun prospect disponible pour l&apos;instant.
         </p>
       ) : (
         <div className="mt-6 overflow-x-auto">
@@ -69,7 +91,7 @@ export default async function DraftPage() {
                 <th className="py-2 pr-4">Poste</th>
                 <th className="py-2 pr-4">Overall</th>
                 <th className="py-2 pr-4">Âge</th>
-                {canDraft && <th className="py-2">Action</th>}
+                {isMyTurn && <th className="py-2">Action</th>}
               </tr>
             </thead>
             <tbody>
@@ -81,7 +103,7 @@ export default async function DraftPage() {
                   <td className="py-2 pr-4">{prospect.position}</td>
                   <td className="py-2 pr-4 font-semibold">{prospect.overallRating}</td>
                   <td className="py-2 pr-4">{prospect.age}</td>
-                  {canDraft && (
+                  {isMyTurn && (
                     <td className="py-2">
                       <form action={draftProspect}>
                         <input type="hidden" name="prospectId" value={prospect.id} />

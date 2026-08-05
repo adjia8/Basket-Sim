@@ -87,6 +87,7 @@ export interface Contract {
   teamId: string;
   salary: number; // dollars
   yearsRemaining: number;
+  guaranteed: boolean;
 }
 
 // --- Prospect (draft) ---

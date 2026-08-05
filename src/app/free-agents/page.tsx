@@ -1,5 +1,5 @@
 import { getCurrentMembership } from "@/lib/auth/dal";
-import { getFreeAgents } from "@/lib/data-access/contracts";
+import { getFreeAgents, getPayrollForTeam } from "@/lib/data-access/contracts";
 import { getLeagueById } from "@/lib/data-access/leagues";
 import { prisma } from "@/lib/prisma";
 import { signFreeAgent } from "@/app/actions/roster";
@@ -9,18 +9,16 @@ import { formatSalary } from "@/lib/utils";
 export default async function FreeAgentsPage() {
   const membership = await getCurrentMembership();
 
-  const [freeAgents, teamContracts, league] = await Promise.all([
+  const [freeAgents, rosterSize, payroll, league] = await Promise.all([
     getFreeAgents(membership.careerId, membership.leagueId),
-    prisma.contract.findMany({
+    prisma.contract.count({
       where: { careerId: membership.careerId, teamId: membership.teamId },
-      select: { salary: true },
     }),
+    getPayrollForTeam(membership.careerId, membership.teamId),
     getLeagueById(membership.leagueId),
   ]);
 
-  const rosterSize = teamContracts.length;
   const rosterFull = rosterSize >= MAX_ROSTER_SIZE;
-  const payroll = teamContracts.reduce((sum, c) => sum + c.salary, 0);
   const salaryCap = league?.salaryCap ?? Infinity;
   // Un contrat a toujours un salaire strictement positif : si la masse
   // salariale actuelle atteint déjà le plafond, aucune signature ne peut plus

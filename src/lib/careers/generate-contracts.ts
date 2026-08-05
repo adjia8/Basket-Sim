@@ -35,11 +35,12 @@ function salaryForRating(
 export function generateContractTerms(
   overallRating: number,
   leagueId: string
-): { salary: number; yearsRemaining: number } {
+): { salary: number; yearsRemaining: number; guaranteed: boolean } {
   const range = SALARY_RANGES[leagueId] ?? SALARY_RANGES.nba;
   return {
     salary: salaryForRating(overallRating, range),
     yearsRemaining: 1 + Math.floor(Math.random() * 4), // 1 à 4
+    guaranteed: true, // contrats vétérans toujours garantis dans ce modèle simplifié
   };
 }
 

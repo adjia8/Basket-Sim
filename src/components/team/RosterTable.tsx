@@ -5,7 +5,11 @@ import type { Player, PlayerRatings } from "@/lib/types";
 import { formatSalary } from "@/lib/utils";
 import { releasePlayer } from "@/app/actions/roster";
 
-export type RosterPlayer = Player & { salary: number; yearsRemaining: number };
+export type RosterPlayer = Player & {
+  salary: number;
+  yearsRemaining: number;
+  guaranteed: boolean;
+};
 
 type SortKey =
   | "overallRating"
@@ -104,7 +108,14 @@ export function RosterTable({
               <td className="py-2 pr-4">{player.position}</td>
               <td className="py-2 pr-4 font-semibold">{player.overallRating}</td>
               <td className="py-2 pr-4">{player.age}</td>
-              <td className="py-2 pr-4">{formatSalary(player.salary)}</td>
+              <td className="py-2 pr-4">
+                {formatSalary(player.salary)}
+                {!player.guaranteed && (
+                  <span className="ml-1 text-xs text-black/40 dark:text-white/40">
+                    (non garanti)
+                  </span>
+                )}
+              </td>
               <td className="py-2 pr-4">{player.yearsRemaining}</td>
               <td className="py-2 pr-4">{player.ratings.scoring}</td>
               <td className="py-2 pr-4">{player.ratings.playmaking}</td>

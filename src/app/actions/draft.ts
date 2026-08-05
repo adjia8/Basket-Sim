@@ -2,46 +2,36 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import type { DraftPick, Prospect } from "@prisma/client";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
-import { generateContractTerms } from "@/lib/careers/generate-contracts";
+import { getCurrentDraftPick } from "@/lib/data-access/draft-picks";
 import { getLeagueById } from "@/lib/data-access/leagues";
-import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import { getMembershipForTeam } from "@/lib/data-access/memberships";
+import { getTeamsByLeague } from "@/lib/data-access/teams";
+import { rookieScaleContract } from "@/lib/careers/rookie-scale";
 
-export async function draftProspect(formData: FormData): Promise<void> {
-  const { userId } = await verifySession();
-  const prospectId = String(formData.get("prospectId") ?? "");
-
-  const membership = await prisma.membership.findUnique({ where: { userId } });
-  if (!membership) return;
-
-  const [prospect, teamContracts] = await Promise.all([
-    prisma.prospect.findUnique({ where: { id: prospectId } }),
-    prisma.contract.findMany({
-      where: { careerId: membership.careerId, teamId: membership.teamId },
-      select: { salary: true },
-    }),
-  ]);
-  if (!prospect || prospect.careerId !== membership.careerId) return;
-  if (teamContracts.length >= MAX_ROSTER_SIZE) return;
-
-  // Calculée une seule fois : generateContractTerms tire un salaire aléatoire,
-  // la réutiliser pour la vérification du cap ET l'insertion évite un montant
-  // vérifié différent du montant réellement facturé.
-  const terms = generateContractTerms(prospect.overallRating, prospect.leagueId);
-  const league = await getLeagueById(prospect.leagueId);
-  const currentPayroll = teamContracts.reduce((sum, c) => sum + c.salary, 0);
-  const salaryCap = league?.salaryCap ?? Infinity;
-  if (currentPayroll + terms.salary > salaryCap) return;
-
+async function performDraftPick(
+  currentPick: DraftPick,
+  prospect: Prospect,
+  picksPerRound: number,
+  leagueId: string
+): Promise<boolean> {
+  const terms = rookieScaleContract(currentPick.pickNumber, picksPerRound, leagueId);
   const newPlayerId = randomUUID();
 
   try {
-    await prisma.$transaction([
-      prisma.player.create({
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.draftPick.updateMany({
+        where: { id: currentPick.id, status: "pending" },
+        data: { status: "completed", draftedPlayerId: newPlayerId },
+      });
+      if (claimed.count === 0) throw new Error("PICK_ALREADY_TAKEN");
+
+      await tx.player.create({
         data: {
           id: newPlayerId,
-          teamId: membership.teamId,
+          teamId: currentPick.teamId,
           leagueId: prospect.leagueId,
           firstName: prospect.firstName,
           lastName: prospect.lastName,
@@ -56,18 +46,18 @@ export async function draftProspect(formData: FormData): Promise<void> {
           defense: prospect.defense,
           athleticism: prospect.athleticism,
         },
-      }),
-      prisma.contract.create({
+      });
+      await tx.contract.create({
         data: {
-          careerId: membership.careerId,
+          careerId: currentPick.careerId,
           playerId: newPlayerId,
-          teamId: membership.teamId,
+          teamId: currentPick.teamId,
           ...terms,
         },
-      }),
-      prisma.playerState.create({
+      });
+      await tx.playerState.create({
         data: {
-          careerId: membership.careerId,
+          careerId: currentPick.careerId,
           playerId: newPlayerId,
           age: prospect.age,
           overallRating: prospect.overallRating,
@@ -78,16 +68,86 @@ export async function draftProspect(formData: FormData): Promise<void> {
           athleticism: prospect.athleticism,
           retired: false,
         },
-      }),
-      prisma.prospect.delete({ where: { id: prospect.id } }),
-    ]);
+      });
+
+      const deleted = await tx.prospect.deleteMany({ where: { id: prospect.id } });
+      if (deleted.count === 0) throw new Error("PROSPECT_ALREADY_TAKEN");
+    });
   } catch (err) {
-    // P2025 : un autre manager a déjà drafté ce prospect entre-temps.
-    if (err instanceof Error && "code" in err && err.code === "P2025") return;
+    if (err instanceof Error && (err.message === "PICK_ALREADY_TAKEN" || err.message === "PROSPECT_ALREADY_TAKEN")) {
+      return false;
+    }
     throw err;
   }
 
   revalidatePath("/");
-  revalidatePath(`/teams/${membership.teamId}`);
+  revalidatePath(`/teams/${currentPick.teamId}`);
   revalidatePath("/draft");
+  return true;
+}
+
+export async function draftProspect(formData: FormData): Promise<void> {
+  const { userId } = await verifySession();
+  const prospectId = String(formData.get("prospectId") ?? "");
+
+  const membership = await prisma.membership.findUnique({
+    where: { userId },
+    include: { career: true },
+  });
+  if (!membership) return;
+
+  const [league, teams, prospect] = await Promise.all([
+    getLeagueById(membership.career.leagueId),
+    getTeamsByLeague(membership.career.leagueId),
+    prisma.prospect.findUnique({ where: { id: prospectId } }),
+  ]);
+  if (!league || !prospect || prospect.careerId !== membership.careerId) return;
+
+  const currentPick = await getCurrentDraftPick(
+    membership.careerId,
+    membership.career.season,
+    league.salaryCap,
+    teams.length,
+    membership.career.leagueId
+  );
+  if (!currentPick || currentPick.teamId !== membership.teamId) return; // pas mon tour
+
+  await performDraftPick(currentPick, prospect, teams.length, membership.career.leagueId);
+}
+
+// Fait drafter une équipe gérée par l'IA — n'importe quel membre humain de la
+// ligue peut déclencher ce pick (comme pour un match IA-vs-IA), sinon le
+// draft resterait bloqué en l'absence de manager pour cette équipe.
+export async function draftForAiTeam(): Promise<void> {
+  const { userId } = await verifySession();
+
+  const membership = await prisma.membership.findUnique({
+    where: { userId },
+    include: { career: true },
+  });
+  if (!membership) return;
+
+  const [league, teams] = await Promise.all([
+    getLeagueById(membership.career.leagueId),
+    getTeamsByLeague(membership.career.leagueId),
+  ]);
+  if (!league) return;
+
+  const currentPick = await getCurrentDraftPick(
+    membership.careerId,
+    membership.career.season,
+    league.salaryCap,
+    teams.length,
+    membership.career.leagueId
+  );
+  if (!currentPick) return;
+
+  const manager = await getMembershipForTeam(membership.careerId, currentPick.teamId);
+  if (manager) return; // équipe gérée par un autre humain, pas à toi de jouer pour elle
+
+  const prospects = await prisma.prospect.findMany({ where: { careerId: membership.careerId } });
+  const best = [...prospects].sort((a, b) => b.overallRating - a.overallRating)[0];
+  if (!best) return;
+
+  await performDraftPick(currentPick, best, teams.length, membership.career.leagueId);
 }

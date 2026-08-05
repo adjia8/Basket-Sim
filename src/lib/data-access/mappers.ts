@@ -121,6 +121,7 @@ export function toDomainContract(row: PrismaContract): Contract {
     teamId: row.teamId,
     salary: row.salary,
     yearsRemaining: row.yearsRemaining,
+    guaranteed: row.guaranteed,
   };
 }
 

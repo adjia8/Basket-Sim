@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
 import { getCurrentMembership } from "@/lib/auth/dal";
-import { getContractsForTeam } from "@/lib/data-access/contracts";
+import { getContractsForTeam, getPayrollForTeam } from "@/lib/data-access/contracts";
 import { getLeagueById } from "@/lib/data-access/leagues";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getRosterForTeam } from "@/lib/data-access/players";
 import { getTeamById } from "@/lib/data-access/teams";
+import { prisma } from "@/lib/prisma";
 import { RosterTable, type RosterPlayer } from "@/components/team/RosterTable";
 import { TradeProposalForm } from "@/components/team/TradeProposalForm";
 import { MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
@@ -20,11 +21,13 @@ export default async function TeamRosterPage({
   const team = await getTeamById(teamId);
   if (!team) notFound();
 
-  const [roster, contracts, league, manager] = await Promise.all([
+  const [roster, contracts, league, manager, totalPayroll, deadCap] = await Promise.all([
     getRosterForTeam(membership.careerId, teamId),
     getContractsForTeam(membership.careerId, teamId),
     getLeagueById(team.leagueId),
     getMembershipForTeam(membership.careerId, teamId),
+    getPayrollForTeam(membership.careerId, teamId),
+    prisma.deadCap.findMany({ where: { careerId: membership.careerId, teamId } }),
   ]);
 
   const contractByPlayerId = new Map(contracts.map((c) => [c.playerId, c]));
@@ -34,10 +37,11 @@ export default async function TeamRosterPage({
       ...player,
       salary: contract?.salary ?? 0,
       yearsRemaining: contract?.yearsRemaining ?? 0,
+      guaranteed: contract?.guaranteed ?? true,
     };
   });
 
-  const totalPayroll = contracts.reduce((sum, c) => sum + c.salary, 0);
+  const deadCapTotal = deadCap.reduce((sum, d) => sum + d.salary, 0);
   const salaryCap = league?.salaryCap ?? 0;
   const overCap = totalPayroll > salaryCap;
   const isMyTeam = team.id === membership.teamId;
@@ -58,6 +62,7 @@ export default async function TeamRosterPage({
         ...player,
         salary: contract?.salary ?? 0,
         yearsRemaining: contract?.yearsRemaining ?? 0,
+        guaranteed: contract?.guaranteed ?? true,
       };
     });
   }
@@ -86,6 +91,11 @@ export default async function TeamRosterPage({
               <span className="ml-2 text-sm font-normal">au-dessus du plafond</span>
             )}
           </p>
+          {deadCapTotal > 0 && (
+            <p className="mt-1 text-xs text-black/50 dark:text-white/50">
+              (dont {formatSalary(deadCapTotal)} d&apos;argent mort)
+            </p>
+          )}
         </div>
         <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
           <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">

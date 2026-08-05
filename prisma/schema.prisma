@@ -32,6 +32,8 @@ model Career {
   playerStates PlayerState[]
   prospects    Prospect[]
   tradeOffers  TradeOffer[]
+  draftPicks   DraftPick[]
+  deadCap      DeadCap[]
 }
 
 // Qui gère quelle équipe dans une Career (ligue) partagée. Un compte n'est
@@ -91,6 +93,8 @@ model Team {
   homeGames      Game[]       @relation("HomeTeam")
   awayGames      Game[]       @relation("AwayTeam")
   contracts      Contract[]
+  draftPicks     DraftPick[]
+  deadCap        DeadCap[]
 
   @@index([leagueId])
   @@index([conferenceId])
@@ -151,6 +155,7 @@ model Contract {
   team           Team     @relation(fields: [teamId], references: [id])
   salary         Int
   yearsRemaining Int
+  guaranteed     Boolean  @default(true)
   createdAt      DateTime @default(now())
 
   @@unique([careerId, playerId])
@@ -224,4 +229,42 @@ model TradeOfferItem {
   side         String // "from" | "to"
 
   @@index([tradeOfferId])
+}
+
+// Ordre du draft d'une saison donnée : une ligne par pick, dans l'ordre
+// inverse du classement de la saison qui vient de se terminer (la pire
+// équipe choisit en premier). "skipped" = l'équipe ne pouvait pas
+// légalement drafter à ce pick (effectif complet ou plafond dépassé).
+model DraftPick {
+  id              String  @id @default(cuid())
+  careerId        String
+  career          Career  @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  season          String
+  round           Int
+  pickNumber      Int
+  teamId          String
+  team            Team    @relation(fields: [teamId], references: [id])
+  status          String  @default("pending") // pending | completed | skipped
+  draftedPlayerId String?
+
+  @@unique([careerId, season, pickNumber])
+  @@index([careerId, season, status])
+}
+
+// Argent mort : reste d'un contrat garanti coupé avant terme, qui continue de
+// compter dans la masse salariale de l'équipe jusqu'à expiration. Un joueur
+// libéré redevient un vrai agent libre signable ailleurs (donc distinct de
+// Contract, protégé par @@unique([careerId, playerId]) — les deux doivent
+// pouvoir coexister pour le même joueur).
+model DeadCap {
+  id             String @id @default(cuid())
+  careerId       String
+  career         Career @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  teamId         String
+  team           Team   @relation(fields: [teamId], references: [id])
+  playerId       String
+  salary         Int
+  yearsRemaining Int
+
+  @@index([careerId, teamId])
 }

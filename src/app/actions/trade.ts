@@ -5,6 +5,7 @@ import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getLeagueById } from "@/lib/data-access/leagues";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
+import { getPayrollForTeam } from "@/lib/data-access/contracts";
 import {
   MAX_ROSTER_SIZE,
   MIN_ROSTER_SIZE,
@@ -68,19 +69,19 @@ export async function proposeTrade(
     return { error: "Sélection invalide." };
   }
 
-  const [myAllContracts, theirAllContracts, league] = await Promise.all([
-    prisma.contract.findMany({
+  const [myRosterSize, theirRosterSize, league, myCurrentPayroll, theirCurrentPayroll] = await Promise.all([
+    prisma.contract.count({
       where: { careerId: membership.careerId, teamId: membership.teamId },
-      select: { salary: true },
     }),
-    prisma.contract.findMany({
+    prisma.contract.count({
       where: { careerId: membership.careerId, teamId: opponentTeamId },
-      select: { salary: true },
     }),
     getLeagueById(membership.career.leagueId),
+    getPayrollForTeam(membership.careerId, membership.teamId),
+    getPayrollForTeam(membership.careerId, opponentTeamId),
   ]);
-  const myNewSize = myAllContracts.length - myPlayerIds.length + theirPlayerIds.length;
-  const theirNewSize = theirAllContracts.length - theirPlayerIds.length + myPlayerIds.length;
+  const myNewSize = myRosterSize - myPlayerIds.length + theirPlayerIds.length;
+  const theirNewSize = theirRosterSize - theirPlayerIds.length + myPlayerIds.length;
   if (
     myNewSize < MIN_ROSTER_SIZE ||
     myNewSize > MAX_ROSTER_SIZE ||
@@ -95,8 +96,6 @@ export async function proposeTrade(
   const salaryCap = league?.salaryCap ?? Infinity;
   const mySalaryOut = myContracts.reduce((sum, c) => sum + c.salary, 0);
   const theirSalaryOut = theirContracts.reduce((sum, c) => sum + c.salary, 0);
-  const myCurrentPayroll = myAllContracts.reduce((sum, c) => sum + c.salary, 0);
-  const theirCurrentPayroll = theirAllContracts.reduce((sum, c) => sum + c.salary, 0);
   const myNewPayroll = myCurrentPayroll - mySalaryOut + theirSalaryOut;
   const theirNewPayroll = theirCurrentPayroll - theirSalaryOut + mySalaryOut;
   if (myNewPayroll > salaryCap || theirNewPayroll > salaryCap) {
@@ -194,23 +193,24 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
   // L'état peut avoir changé depuis la proposition (joueur libéré/échangé
   // entre-temps, effectif désormais plein) : on revérifie tout au moment de
   // l'acceptation plutôt que de faire confiance à l'offre telle que créée.
-  const [fromContracts, toContracts, fromTeamContracts, toTeamContracts, league] = await Promise.all([
-    prisma.contract.findMany({
-      where: { careerId: membership.careerId, playerId: { in: fromPlayerIds } },
-    }),
-    prisma.contract.findMany({
-      where: { careerId: membership.careerId, playerId: { in: toPlayerIds } },
-    }),
-    prisma.contract.findMany({
-      where: { careerId: membership.careerId, teamId: offer.fromTeamId },
-      select: { salary: true },
-    }),
-    prisma.contract.findMany({
-      where: { careerId: membership.careerId, teamId: offer.toTeamId },
-      select: { salary: true },
-    }),
-    getLeagueById(membership.career.leagueId),
-  ]);
+  const [fromContracts, toContracts, fromRosterSize, toRosterSize, league, fromCurrentPayroll, toCurrentPayroll] =
+    await Promise.all([
+      prisma.contract.findMany({
+        where: { careerId: membership.careerId, playerId: { in: fromPlayerIds } },
+      }),
+      prisma.contract.findMany({
+        where: { careerId: membership.careerId, playerId: { in: toPlayerIds } },
+      }),
+      prisma.contract.count({
+        where: { careerId: membership.careerId, teamId: offer.fromTeamId },
+      }),
+      prisma.contract.count({
+        where: { careerId: membership.careerId, teamId: offer.toTeamId },
+      }),
+      getLeagueById(membership.career.leagueId),
+      getPayrollForTeam(membership.careerId, offer.fromTeamId),
+      getPayrollForTeam(membership.careerId, offer.toTeamId),
+    ]);
 
   const fromValid =
     fromContracts.length === fromPlayerIds.length &&
@@ -218,14 +218,12 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
   const toValid =
     toContracts.length === toPlayerIds.length &&
     toContracts.every((c) => c.teamId === offer.toTeamId);
-  const newFromSize = fromTeamContracts.length - fromPlayerIds.length + toPlayerIds.length;
-  const newToSize = toTeamContracts.length - toPlayerIds.length + fromPlayerIds.length;
+  const newFromSize = fromRosterSize - fromPlayerIds.length + toPlayerIds.length;
+  const newToSize = toRosterSize - toPlayerIds.length + fromPlayerIds.length;
 
   const salaryCap = league?.salaryCap ?? Infinity;
   const fromSalaryOut = fromContracts.reduce((sum, c) => sum + c.salary, 0);
   const toSalaryOut = toContracts.reduce((sum, c) => sum + c.salary, 0);
-  const fromCurrentPayroll = fromTeamContracts.reduce((sum, c) => sum + c.salary, 0);
-  const toCurrentPayroll = toTeamContracts.reduce((sum, c) => sum + c.salary, 0);
   const fromNewPayroll = fromCurrentPayroll - fromSalaryOut + toSalaryOut;
   const toNewPayroll = toCurrentPayroll - toSalaryOut + fromSalaryOut;
 
