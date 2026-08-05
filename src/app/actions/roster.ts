@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { generateContractTerms } from "@/lib/careers/generate-contracts";
+import { getLeagueById } from "@/lib/data-access/leagues";
 import { MAX_ROSTER_SIZE, MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 
 function revalidateRosterPaths(teamId: string) {
@@ -47,19 +48,29 @@ export async function signFreeAgent(formData: FormData): Promise<void> {
   });
   if (!membership) return;
 
-  const [player, existingContract, rosterSize] = await Promise.all([
+  const [player, existingContract, teamContracts, league] = await Promise.all([
     prisma.player.findUnique({ where: { id: playerId } }),
     prisma.contract.findUnique({
       where: { careerId_playerId: { careerId: membership.careerId, playerId } },
     }),
-    prisma.contract.count({
+    prisma.contract.findMany({
       where: { careerId: membership.careerId, teamId: membership.teamId },
+      select: { salary: true },
     }),
+    getLeagueById(membership.career.leagueId),
   ]);
 
   if (!player || player.leagueId !== membership.career.leagueId) return;
   if (existingContract) return; // déjà sous contrat dans cette Career
-  if (rosterSize >= MAX_ROSTER_SIZE) return;
+  if (teamContracts.length >= MAX_ROSTER_SIZE) return;
+
+  // Calculée une seule fois : generateContractTerms tire un salaire aléatoire,
+  // la réutiliser pour la vérification du cap ET l'insertion évite un montant
+  // vérifié différent du montant réellement facturé.
+  const terms = generateContractTerms(player.overallRating, membership.career.leagueId);
+  const currentPayroll = teamContracts.reduce((sum, c) => sum + c.salary, 0);
+  const salaryCap = league?.salaryCap ?? Infinity;
+  if (currentPayroll + terms.salary > salaryCap) return;
 
   try {
     await prisma.contract.create({
@@ -67,7 +78,7 @@ export async function signFreeAgent(formData: FormData): Promise<void> {
         careerId: membership.careerId,
         playerId,
         teamId: membership.teamId,
-        ...generateContractTerms(player.overallRating, membership.career.leagueId),
+        ...terms,
       },
     });
   } catch (err) {

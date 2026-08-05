@@ -1,20 +1,32 @@
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getFreeAgents } from "@/lib/data-access/contracts";
+import { getLeagueById } from "@/lib/data-access/leagues";
 import { prisma } from "@/lib/prisma";
 import { signFreeAgent } from "@/app/actions/roster";
 import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import { formatSalary } from "@/lib/utils";
 
 export default async function FreeAgentsPage() {
   const membership = await getCurrentMembership();
 
-  const [freeAgents, rosterSize] = await Promise.all([
+  const [freeAgents, teamContracts, league] = await Promise.all([
     getFreeAgents(membership.careerId, membership.leagueId),
-    prisma.contract.count({
+    prisma.contract.findMany({
       where: { careerId: membership.careerId, teamId: membership.teamId },
+      select: { salary: true },
     }),
+    getLeagueById(membership.leagueId),
   ]);
 
+  const rosterSize = teamContracts.length;
   const rosterFull = rosterSize >= MAX_ROSTER_SIZE;
+  const payroll = teamContracts.reduce((sum, c) => sum + c.salary, 0);
+  const salaryCap = league?.salaryCap ?? Infinity;
+  // Un contrat a toujours un salaire strictement positif : si la masse
+  // salariale actuelle atteint déjà le plafond, aucune signature ne peut plus
+  // passer, quel que soit le montant (aléatoire) qui serait proposé.
+  const capReached = payroll >= salaryCap;
+  const canSign = !rosterFull && !capReached;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
@@ -23,10 +35,23 @@ export default async function FreeAgentsPage() {
         Joueurs de ta ligue actuellement sans contrat.
       </p>
 
+      <p className="mt-4 text-sm text-black/60 dark:text-white/60">
+        Masse salariale :{" "}
+        <span className={capReached ? "font-semibold text-red-500" : "font-semibold"}>
+          {formatSalary(payroll)} / {formatSalary(salaryCap)}
+        </span>
+      </p>
+
       {rosterFull && (
-        <p className="mt-4 text-sm text-red-500">
+        <p className="mt-2 text-sm text-red-500">
           Effectif complet ({rosterSize} / {MAX_ROSTER_SIZE}) — libère un joueur
           pour pouvoir en signer un autre.
+        </p>
+      )}
+      {capReached && (
+        <p className="mt-2 text-sm text-red-500">
+          Plafond salarial atteint — libère un joueur pour dégager de la marge
+          avant de signer.
         </p>
       )}
 
@@ -38,7 +63,7 @@ export default async function FreeAgentsPage() {
               <th className="py-2 pr-4">Poste</th>
               <th className="py-2 pr-4">Overall</th>
               <th className="py-2 pr-4">Âge</th>
-              {!rosterFull && <th className="py-2">Action</th>}
+              {canSign && <th className="py-2">Action</th>}
             </tr>
           </thead>
           <tbody>
@@ -50,7 +75,7 @@ export default async function FreeAgentsPage() {
                 <td className="py-2 pr-4">{player.position}</td>
                 <td className="py-2 pr-4 font-semibold">{player.overallRating}</td>
                 <td className="py-2 pr-4">{player.age}</td>
-                {!rosterFull && (
+                {canSign && (
                   <td className="py-2">
                     <form action={signFreeAgent}>
                       <input type="hidden" name="playerId" value={player.id} />

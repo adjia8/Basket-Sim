@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { generateContractTerms } from "@/lib/careers/generate-contracts";
+import { getLeagueById } from "@/lib/data-access/leagues";
 import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 
 export async function draftProspect(formData: FormData): Promise<void> {
@@ -14,14 +15,24 @@ export async function draftProspect(formData: FormData): Promise<void> {
   const membership = await prisma.membership.findUnique({ where: { userId } });
   if (!membership) return;
 
-  const [prospect, rosterSize] = await Promise.all([
+  const [prospect, teamContracts] = await Promise.all([
     prisma.prospect.findUnique({ where: { id: prospectId } }),
-    prisma.contract.count({
+    prisma.contract.findMany({
       where: { careerId: membership.careerId, teamId: membership.teamId },
+      select: { salary: true },
     }),
   ]);
   if (!prospect || prospect.careerId !== membership.careerId) return;
-  if (rosterSize >= MAX_ROSTER_SIZE) return;
+  if (teamContracts.length >= MAX_ROSTER_SIZE) return;
+
+  // Calculée une seule fois : generateContractTerms tire un salaire aléatoire,
+  // la réutiliser pour la vérification du cap ET l'insertion évite un montant
+  // vérifié différent du montant réellement facturé.
+  const terms = generateContractTerms(prospect.overallRating, prospect.leagueId);
+  const league = await getLeagueById(prospect.leagueId);
+  const currentPayroll = teamContracts.reduce((sum, c) => sum + c.salary, 0);
+  const salaryCap = league?.salaryCap ?? Infinity;
+  if (currentPayroll + terms.salary > salaryCap) return;
 
   const newPlayerId = randomUUID();
 
@@ -51,7 +62,7 @@ export async function draftProspect(formData: FormData): Promise<void> {
           careerId: membership.careerId,
           playerId: newPlayerId,
           teamId: membership.teamId,
-          ...generateContractTerms(prospect.overallRating, prospect.leagueId),
+          ...terms,
         },
       }),
       prisma.playerState.create({

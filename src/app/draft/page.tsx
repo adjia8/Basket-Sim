@@ -1,20 +1,32 @@
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getProspectsForCareer } from "@/lib/data-access/prospects";
+import { getLeagueById } from "@/lib/data-access/leagues";
 import { prisma } from "@/lib/prisma";
 import { draftProspect } from "@/app/actions/draft";
 import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import { formatSalary } from "@/lib/utils";
 
 export default async function DraftPage() {
   const membership = await getCurrentMembership();
 
-  const [prospects, rosterSize] = await Promise.all([
+  const [prospects, teamContracts, league] = await Promise.all([
     getProspectsForCareer(membership.careerId),
-    prisma.contract.count({
+    prisma.contract.findMany({
       where: { careerId: membership.careerId, teamId: membership.teamId },
+      select: { salary: true },
     }),
+    getLeagueById(membership.leagueId),
   ]);
 
+  const rosterSize = teamContracts.length;
   const rosterFull = rosterSize >= MAX_ROSTER_SIZE;
+  const payroll = teamContracts.reduce((sum, c) => sum + c.salary, 0);
+  const salaryCap = league?.salaryCap ?? Infinity;
+  // Un contrat a toujours un salaire strictement positif : si la masse
+  // salariale actuelle atteint déjà le plafond, aucun rookie ne peut plus
+  // être drafté, quel que soit le montant (aléatoire) qui serait proposé.
+  const capReached = payroll >= salaryCap;
+  const canDraft = !rosterFull && !capReached;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
@@ -23,10 +35,23 @@ export default async function DraftPage() {
         Prospects disponibles pour ta ligue cette saison.
       </p>
 
+      <p className="mt-4 text-sm text-black/60 dark:text-white/60">
+        Masse salariale :{" "}
+        <span className={capReached ? "font-semibold text-red-500" : "font-semibold"}>
+          {formatSalary(payroll)} / {formatSalary(salaryCap)}
+        </span>
+      </p>
+
       {rosterFull && prospects.length > 0 && (
-        <p className="mt-4 text-sm text-red-500">
+        <p className="mt-2 text-sm text-red-500">
           Effectif complet ({rosterSize} / {MAX_ROSTER_SIZE}) — libère un joueur
           pour pouvoir en drafter un autre.
+        </p>
+      )}
+      {capReached && prospects.length > 0 && (
+        <p className="mt-2 text-sm text-red-500">
+          Plafond salarial atteint — libère un joueur pour dégager de la marge
+          avant de drafter.
         </p>
       )}
 
@@ -44,7 +69,7 @@ export default async function DraftPage() {
                 <th className="py-2 pr-4">Poste</th>
                 <th className="py-2 pr-4">Overall</th>
                 <th className="py-2 pr-4">Âge</th>
-                {!rosterFull && <th className="py-2">Action</th>}
+                {canDraft && <th className="py-2">Action</th>}
               </tr>
             </thead>
             <tbody>
@@ -56,7 +81,7 @@ export default async function DraftPage() {
                   <td className="py-2 pr-4">{prospect.position}</td>
                   <td className="py-2 pr-4 font-semibold">{prospect.overallRating}</td>
                   <td className="py-2 pr-4">{prospect.age}</td>
-                  {!rosterFull && (
+                  {canDraft && (
                     <td className="py-2">
                       <form action={draftProspect}>
                         <input type="hidden" name="prospectId" value={prospect.id} />
