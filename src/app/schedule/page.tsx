@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCurrentCareer } from "@/lib/auth/dal";
+import { getCurrentMembership } from "@/lib/auth/dal";
 import { getScheduleForCareer, getScheduleForTeam } from "@/lib/data-access/schedule";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { formatGameDate, teamFullName } from "@/lib/utils";
@@ -11,13 +11,13 @@ export default async function SchedulePage({
 }) {
   const { all } = await searchParams;
   const showAll = all === "1";
-  const career = await getCurrentCareer();
+  const membership = await getCurrentMembership();
 
   const [teams, games] = await Promise.all([
-    getTeamsByLeague(career.leagueId),
+    getTeamsByLeague(membership.leagueId),
     showAll
-      ? getScheduleForCareer(career.id, career.season)
-      : getScheduleForTeam(career.id, career.teamId, career.season),
+      ? getScheduleForCareer(membership.careerId, membership.season)
+      : getScheduleForTeam(membership.careerId, membership.teamId, membership.season),
   ]);
 
   const teamById = new Map(teams.map((t) => [t.id, t]));

@@ -40,6 +40,19 @@ export async function getGameById(
   return row ? toDomainGame(row) : undefined;
 }
 
+export async function setGameReady(
+  careerId: string,
+  gameId: string,
+  side: "home" | "away"
+): Promise<Game | undefined> {
+  const { count } = await prisma.game.updateMany({
+    where: { id: gameId, careerId },
+    data: side === "home" ? { homeReady: true } : { awayReady: true },
+  });
+  if (count === 0) return undefined;
+  return getGameById(careerId, gameId);
+}
+
 export async function updateGameResult(
   careerId: string,
   gameId: string,

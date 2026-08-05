@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
+import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import {
   MAX_ROSTER_SIZE,
   MIN_ROSTER_SIZE,
@@ -23,8 +24,11 @@ export async function proposeTrade(
   const myPlayerIds = formData.getAll("myPlayerIds").map(String);
   const theirPlayerIds = formData.getAll("theirPlayerIds").map(String);
 
-  const career = await prisma.career.findUnique({ where: { userId } });
-  if (!career) return { error: "Aucune carrière." };
+  const membership = await prisma.membership.findUnique({
+    where: { userId },
+    include: { career: true },
+  });
+  if (!membership) return { error: "Aucune carrière." };
 
   if (myPlayerIds.length === 0 || theirPlayerIds.length === 0) {
     return { error: "Sélectionne au moins un joueur de chaque côté." };
@@ -35,26 +39,26 @@ export async function proposeTrade(
   });
   if (
     !opponentTeam ||
-    opponentTeam.leagueId !== career.leagueId ||
-    opponentTeamId === career.teamId
+    opponentTeam.leagueId !== membership.career.leagueId ||
+    opponentTeamId === membership.teamId
   ) {
     return { error: "Équipe adverse invalide." };
   }
 
   const [myContracts, theirContracts] = await Promise.all([
     prisma.contract.findMany({
-      where: { careerId: career.id, playerId: { in: myPlayerIds } },
+      where: { careerId: membership.careerId, playerId: { in: myPlayerIds } },
       include: { player: true },
     }),
     prisma.contract.findMany({
-      where: { careerId: career.id, playerId: { in: theirPlayerIds } },
+      where: { careerId: membership.careerId, playerId: { in: theirPlayerIds } },
       include: { player: true },
     }),
   ]);
 
   const myValid =
     myContracts.length === myPlayerIds.length &&
-    myContracts.every((c) => c.teamId === career.teamId);
+    myContracts.every((c) => c.teamId === membership.teamId);
   const theirValid =
     theirContracts.length === theirPlayerIds.length &&
     theirContracts.every((c) => c.teamId === opponentTeamId);
@@ -64,10 +68,10 @@ export async function proposeTrade(
 
   const [myRosterSize, theirRosterSize] = await Promise.all([
     prisma.contract.count({
-      where: { careerId: career.id, teamId: career.teamId },
+      where: { careerId: membership.careerId, teamId: membership.teamId },
     }),
     prisma.contract.count({
-      where: { careerId: career.id, teamId: opponentTeamId },
+      where: { careerId: membership.careerId, teamId: opponentTeamId },
     }),
   ]);
   const myNewSize = myRosterSize - myPlayerIds.length + theirPlayerIds.length;
@@ -83,36 +87,163 @@ export async function proposeTrade(
     };
   }
 
-  const valueGivenByAi = theirContracts.reduce(
-    (sum, c) => sum + tradeValue(c.player.overallRating),
-    0
-  );
-  const valueReceivedByAi = myContracts.reduce(
-    (sum, c) => sum + tradeValue(c.player.overallRating),
-    0
-  );
-  if (valueReceivedByAi < valueGivenByAi * TRADE_ACCEPT_TOLERANCE) {
-    return { error: "L'IA refuse : échange trop déséquilibré en ta faveur." };
+  const opponentManager = await getMembershipForTeam(membership.careerId, opponentTeamId);
+
+  if (!opponentManager) {
+    // Adversaire IA : comportement inchangé, heuristique de tolérance + exécution immédiate.
+    const valueGivenByAi = theirContracts.reduce(
+      (sum, c) => sum + tradeValue(c.player.overallRating),
+      0
+    );
+    const valueReceivedByAi = myContracts.reduce(
+      (sum, c) => sum + tradeValue(c.player.overallRating),
+      0
+    );
+    if (valueReceivedByAi < valueGivenByAi * TRADE_ACCEPT_TOLERANCE) {
+      return { error: "L'IA refuse : échange trop déséquilibré en ta faveur." };
+    }
+
+    await prisma.$transaction([
+      ...myPlayerIds.map((playerId) =>
+        prisma.contract.update({
+          where: { careerId_playerId: { careerId: membership.careerId, playerId } },
+          data: { teamId: opponentTeamId },
+        })
+      ),
+      ...theirPlayerIds.map((playerId) =>
+        prisma.contract.update({
+          where: { careerId_playerId: { careerId: membership.careerId, playerId } },
+          data: { teamId: membership.teamId },
+        })
+      ),
+    ]);
+
+    revalidatePath("/");
+    revalidatePath(`/teams/${membership.teamId}`);
+    revalidatePath(`/teams/${opponentTeamId}`);
+
+    return { success: "Échange accepté !" };
+  }
+
+  // Adversaire humain : l'échange doit être confirmé par lui, pas exécuté immédiatement.
+  await prisma.tradeOffer.create({
+    data: {
+      careerId: membership.careerId,
+      fromTeamId: membership.teamId,
+      toTeamId: opponentTeamId,
+      items: {
+        create: [
+          ...myPlayerIds.map((playerId) => ({ playerId, side: "from" })),
+          ...theirPlayerIds.map((playerId) => ({ playerId, side: "to" })),
+        ],
+      },
+    },
+  });
+
+  revalidatePath("/trades");
+  return { success: `Proposition envoyée à ${opponentManager.email}, en attente de réponse.` };
+}
+
+export async function respondToTradeOffer(formData: FormData): Promise<void> {
+  const { userId } = await verifySession();
+  const tradeOfferId = String(formData.get("tradeOfferId") ?? "");
+  const decision = String(formData.get("decision") ?? "");
+
+  const membership = await prisma.membership.findUnique({ where: { userId } });
+  if (!membership) return;
+
+  const offer = await prisma.tradeOffer.findUnique({
+    where: { id: tradeOfferId },
+    include: { items: true },
+  });
+  if (!offer || offer.careerId !== membership.careerId) return;
+  if (offer.toTeamId !== membership.teamId) return; // seul le destinataire peut répondre
+  if (offer.status !== "pending") return;
+
+  if (decision === "reject") {
+    await prisma.tradeOffer.update({ where: { id: offer.id }, data: { status: "rejected" } });
+    revalidatePath("/trades");
+    return;
+  }
+  if (decision !== "accept") return;
+
+  const fromPlayerIds = offer.items.filter((i) => i.side === "from").map((i) => i.playerId);
+  const toPlayerIds = offer.items.filter((i) => i.side === "to").map((i) => i.playerId);
+
+  // L'état peut avoir changé depuis la proposition (joueur libéré/échangé
+  // entre-temps, effectif désormais plein) : on revérifie tout au moment de
+  // l'acceptation plutôt que de faire confiance à l'offre telle que créée.
+  const [fromContracts, toContracts, fromRosterSize, toRosterSize] = await Promise.all([
+    prisma.contract.findMany({
+      where: { careerId: membership.careerId, playerId: { in: fromPlayerIds } },
+    }),
+    prisma.contract.findMany({
+      where: { careerId: membership.careerId, playerId: { in: toPlayerIds } },
+    }),
+    prisma.contract.count({
+      where: { careerId: membership.careerId, teamId: offer.fromTeamId },
+    }),
+    prisma.contract.count({
+      where: { careerId: membership.careerId, teamId: offer.toTeamId },
+    }),
+  ]);
+
+  const fromValid =
+    fromContracts.length === fromPlayerIds.length &&
+    fromContracts.every((c) => c.teamId === offer.fromTeamId);
+  const toValid =
+    toContracts.length === toPlayerIds.length &&
+    toContracts.every((c) => c.teamId === offer.toTeamId);
+  const newFromSize = fromRosterSize - fromPlayerIds.length + toPlayerIds.length;
+  const newToSize = toRosterSize - toPlayerIds.length + fromPlayerIds.length;
+  const stillValid =
+    fromValid &&
+    toValid &&
+    newFromSize >= MIN_ROSTER_SIZE &&
+    newFromSize <= MAX_ROSTER_SIZE &&
+    newToSize >= MIN_ROSTER_SIZE &&
+    newToSize <= MAX_ROSTER_SIZE;
+
+  if (!stillValid) {
+    await prisma.tradeOffer.update({ where: { id: offer.id }, data: { status: "cancelled" } });
+    revalidatePath("/trades");
+    return;
   }
 
   await prisma.$transaction([
-    ...myPlayerIds.map((playerId) =>
+    prisma.tradeOffer.update({ where: { id: offer.id }, data: { status: "accepted" } }),
+    ...fromPlayerIds.map((playerId) =>
       prisma.contract.update({
-        where: { careerId_playerId: { careerId: career.id, playerId } },
-        data: { teamId: opponentTeamId },
+        where: { careerId_playerId: { careerId: membership.careerId, playerId } },
+        data: { teamId: offer.toTeamId },
       })
     ),
-    ...theirPlayerIds.map((playerId) =>
+    ...toPlayerIds.map((playerId) =>
       prisma.contract.update({
-        where: { careerId_playerId: { careerId: career.id, playerId } },
-        data: { teamId: career.teamId },
+        where: { careerId_playerId: { careerId: membership.careerId, playerId } },
+        data: { teamId: offer.fromTeamId },
       })
     ),
   ]);
 
   revalidatePath("/");
-  revalidatePath(`/teams/${career.teamId}`);
-  revalidatePath(`/teams/${opponentTeamId}`);
+  revalidatePath(`/teams/${offer.fromTeamId}`);
+  revalidatePath(`/teams/${offer.toTeamId}`);
+  revalidatePath("/trades");
+}
 
-  return { success: "Échange accepté !" };
+export async function cancelTradeOffer(formData: FormData): Promise<void> {
+  const { userId } = await verifySession();
+  const tradeOfferId = String(formData.get("tradeOfferId") ?? "");
+
+  const membership = await prisma.membership.findUnique({ where: { userId } });
+  if (!membership) return;
+
+  const offer = await prisma.tradeOffer.findUnique({ where: { id: tradeOfferId } });
+  if (!offer || offer.careerId !== membership.careerId) return;
+  if (offer.fromTeamId !== membership.teamId) return; // seul l'auteur peut annuler
+  if (offer.status !== "pending") return;
+
+  await prisma.tradeOffer.update({ where: { id: offer.id }, data: { status: "cancelled" } });
+  revalidatePath("/trades");
 }

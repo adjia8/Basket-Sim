@@ -76,6 +76,8 @@ export interface Game {
   homeScore?: number;
   awayScore?: number;
   boxScore?: BoxScoreEntry[];
+  homeReady: boolean;
+  awayReady: boolean;
 }
 
 // --- Contrat ---

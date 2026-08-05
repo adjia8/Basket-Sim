@@ -138,5 +138,7 @@ export function toDomainGame(row: PrismaGame): Game {
     boxScore: row.boxScore
       ? (JSON.parse(row.boxScore) as BoxScoreEntry[])
       : undefined,
+    homeReady: row.homeReady,
+    awayReady: row.awayReady,
   };
 }

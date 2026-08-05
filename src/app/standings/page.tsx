@@ -1,16 +1,16 @@
-import { getCurrentCareer } from "@/lib/auth/dal";
+import { getCurrentMembership } from "@/lib/auth/dal";
 import { getConferencesByLeague } from "@/lib/data-access/leagues";
 import { getStandings } from "@/lib/data-access/standings";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { teamFullName } from "@/lib/utils";
 
 export default async function StandingsPage() {
-  const career = await getCurrentCareer();
+  const membership = await getCurrentMembership();
 
   const [conferences, teams, standings] = await Promise.all([
-    getConferencesByLeague(career.leagueId),
-    getTeamsByLeague(career.leagueId),
-    getStandings(career.id, career.leagueId, career.season),
+    getConferencesByLeague(membership.leagueId),
+    getTeamsByLeague(membership.leagueId),
+    getStandings(membership.careerId, membership.leagueId, membership.season),
   ]);
 
   const teamById = new Map(teams.map((t) => [t.id, t]));

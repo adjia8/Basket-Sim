@@ -1,16 +1,16 @@
-import { getCurrentCareer } from "@/lib/auth/dal";
+import { getCurrentMembership } from "@/lib/auth/dal";
 import { getProspectsForCareer } from "@/lib/data-access/prospects";
 import { prisma } from "@/lib/prisma";
 import { draftProspect } from "@/app/actions/draft";
 import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 
 export default async function DraftPage() {
-  const career = await getCurrentCareer();
+  const membership = await getCurrentMembership();
 
   const [prospects, rosterSize] = await Promise.all([
-    getProspectsForCareer(career.id),
+    getProspectsForCareer(membership.careerId),
     prisma.contract.count({
-      where: { careerId: career.id, teamId: career.teamId },
+      where: { careerId: membership.careerId, teamId: membership.teamId },
     }),
   ]);
 

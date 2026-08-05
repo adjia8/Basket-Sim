@@ -12,27 +12,44 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String      @id @default(cuid())
+  email        String      @unique
   passwordHash String
-  createdAt    DateTime @default(now())
-  career       Career?
+  createdAt    DateTime    @default(now())
+  membership   Membership?
 }
 
 model Career {
   id           String        @id @default(cuid())
-  userId       String        @unique
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inviteCode   String        @unique
   leagueId     String
   league       League        @relation(fields: [leagueId], references: [id])
-  teamId       String
-  team         Team          @relation(fields: [teamId], references: [id])
   season       String
   createdAt    DateTime      @default(now())
+  memberships  Membership[]
   games        Game[]
   contracts    Contract[]
   playerStates PlayerState[]
   prospects    Prospect[]
+  tradeOffers  TradeOffer[]
+}
+
+// Qui gère quelle équipe dans une Career (ligue) partagée. Un compte n'est
+// membre que d'une seule ligue à la fois (userId @unique) ; une équipe ne
+// peut être prise que par un seul membre (@@unique([careerId, teamId])).
+// Une équipe sans Membership est gérée par l'IA.
+model Membership {
+  id       String   @id @default(cuid())
+  careerId String
+  career   Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  userId   String   @unique
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamId   String
+  team     Team     @relation(fields: [teamId], references: [id])
+  joinedAt DateTime @default(now())
+
+  @@unique([careerId, teamId])
+  @@index([careerId])
 }
 
 model League {
@@ -59,20 +76,20 @@ model Conference {
 }
 
 model Team {
-  id             String     @id
+  id             String       @id
   leagueId       String
-  league         League     @relation(fields: [leagueId], references: [id])
+  league         League       @relation(fields: [leagueId], references: [id])
   conferenceId   String
-  conference     Conference @relation(fields: [conferenceId], references: [id])
+  conference     Conference   @relation(fields: [conferenceId], references: [id])
   city           String
   name           String
   abbreviation   String
   primaryColor   String
   secondaryColor String
   players        Player[]
-  careers        Career[]
-  homeGames      Game[]     @relation("HomeTeam")
-  awayGames      Game[]     @relation("AwayTeam")
+  memberships    Membership[]
+  homeGames      Game[]       @relation("HomeTeam")
+  awayGames      Game[]       @relation("AwayTeam")
   contracts      Contract[]
 
   @@index([leagueId])
@@ -80,9 +97,9 @@ model Team {
 }
 
 model Player {
-  id            String     @id
+  id            String        @id
   teamId        String
-  team          Team       @relation(fields: [teamId], references: [id])
+  team          Team          @relation(fields: [teamId], references: [id])
   leagueId      String
   firstName     String
   lastName      String
@@ -118,6 +135,8 @@ model Game {
   homeScore  Int?
   awayScore  Int?
   boxScore   String?
+  homeReady  Boolean  @default(false)
+  awayReady  Boolean  @default(false)
 
   @@index([careerId])
 }
@@ -140,11 +159,11 @@ model Contract {
 }
 
 model PlayerState {
-  id            String   @id @default(cuid())
+  id            String  @id @default(cuid())
   careerId      String
-  career        Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  career        Career  @relation(fields: [careerId], references: [id], onDelete: Cascade)
   playerId      String
-  player        Player   @relation(fields: [playerId], references: [id])
+  player        Player  @relation(fields: [playerId], references: [id])
   age           Int
   overallRating Int
   scoring       Int
@@ -152,18 +171,18 @@ model PlayerState {
   rebounding    Int
   defense       Int
   athleticism   Int
-  retired       Boolean  @default(false)
+  retired       Boolean @default(false)
 
   @@unique([careerId, playerId])
   @@index([careerId])
 }
 
 model Prospect {
-  id            String   @id @default(cuid())
+  id            String @id @default(cuid())
   careerId      String
-  career        Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  career        Career @relation(fields: [careerId], references: [id], onDelete: Cascade)
   leagueId      String
-  league        League   @relation(fields: [leagueId], references: [id])
+  league        League @relation(fields: [leagueId], references: [id])
   firstName     String
   lastName      String
   position      String
@@ -177,4 +196,32 @@ model Prospect {
   athleticism   Int
 
   @@index([careerId])
+}
+
+// Proposition d'échange en attente entre deux managers humains. Un adversaire
+// géré par l'IA n'en crée jamais : proposeTrade exécute l'échange
+// immédiatement dans ce cas (heuristique de tolérance, comportement solo
+// inchangé).
+model TradeOffer {
+  id         String           @id @default(cuid())
+  careerId   String
+  career     Career           @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  fromTeamId String
+  toTeamId   String
+  status     String           @default("pending") // pending | accepted | rejected | cancelled
+  createdAt  DateTime         @default(now())
+  items      TradeOfferItem[]
+
+  @@index([careerId])
+  @@index([toTeamId])
+}
+
+model TradeOfferItem {
+  id           String     @id @default(cuid())
+  tradeOfferId String
+  tradeOffer   TradeOffer @relation(fields: [tradeOfferId], references: [id], onDelete: Cascade)
+  playerId     String
+  side         String // "from" | "to"
+
+  @@index([tradeOfferId])
 }

@@ -3,9 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function SimulateButton({ gameId }: { gameId: string }) {
+export function SimulateButton({
+  gameId,
+  initialWaitingFor,
+}: {
+  gameId: string;
+  initialWaitingFor?: string | null;
+}) {
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [waitingFor, setWaitingFor] = useState<string | null>(initialWaitingFor ?? null);
   const router = useRouter();
 
   async function handleClick() {
@@ -17,16 +24,28 @@ export function SimulateButton({ gameId }: { gameId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gameId }),
       });
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
         throw new Error(data?.error ?? "La simulation a échoué");
       }
-      router.refresh();
+      if (data?.simulated) {
+        router.refresh();
+      } else {
+        setWaitingFor(data?.waitingFor ?? "l'autre manager");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue");
     } finally {
       setIsPending(false);
     }
+  }
+
+  if (waitingFor) {
+    return (
+      <p className="text-sm text-black/50 dark:text-white/50">
+        En attente de {waitingFor}…
+      </p>
+    );
   }
 
   return (

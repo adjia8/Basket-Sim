@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { logout } from "@/app/actions/auth";
-import { getOptionalCurrentCareer } from "@/lib/auth/dal";
+import { getOptionalCurrentMembership } from "@/lib/auth/dal";
 
 const NAV_LINKS = [
   { href: "/", label: "Dashboard" },
@@ -9,10 +9,11 @@ const NAV_LINKS = [
   { href: "/standings", label: "Classement" },
   { href: "/free-agents", label: "Agents libres" },
   { href: "/draft", label: "Draft" },
+  { href: "/trades", label: "Échanges" },
 ];
 
 export async function NavBar() {
-  const career = await getOptionalCurrentCareer();
+  const membership = await getOptionalCurrentMembership();
 
   return (
     <header className="border-b border-black/10 dark:border-white/10">
@@ -21,7 +22,7 @@ export async function NavBar() {
           🏀 Hoops Manager
         </Link>
 
-        {career && (
+        {membership && (
           <nav className="flex items-center gap-4 text-sm">
             {NAV_LINKS.map((link) => (
               <Link
@@ -35,7 +36,7 @@ export async function NavBar() {
           </nav>
         )}
 
-        {career ? (
+        {membership ? (
           <form action={logout}>
             <button
               type="submit"

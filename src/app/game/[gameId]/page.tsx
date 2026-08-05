@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { BoxScoreTable } from "@/components/game/BoxScoreTable";
 import { SimulateButton } from "@/components/game/SimulateButton";
-import { getCurrentCareer } from "@/lib/auth/dal";
+import { getCurrentMembership } from "@/lib/auth/dal";
+import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getPlayerById } from "@/lib/data-access/players";
 import { getGameById } from "@/lib/data-access/schedule";
 import { getTeamById } from "@/lib/data-access/teams";
@@ -13,14 +14,16 @@ export default async function GamePage({
 }: {
   params: Promise<{ gameId: string }>;
 }) {
-  const career = await getCurrentCareer();
+  const membership = await getCurrentMembership();
   const { gameId } = await params;
-  const game = await getGameById(career.id, gameId);
+  const game = await getGameById(membership.careerId, gameId);
   if (!game) notFound();
 
-  const [homeTeam, awayTeam] = await Promise.all([
+  const [homeTeam, awayTeam, homeManager, awayManager] = await Promise.all([
     getTeamById(game.homeTeamId),
     getTeamById(game.awayTeamId),
+    getMembershipForTeam(membership.careerId, game.homeTeamId),
+    getMembershipForTeam(membership.careerId, game.awayTeamId),
   ]);
   if (!homeTeam || !awayTeam) notFound();
 
@@ -32,6 +35,25 @@ export default async function GamePage({
         }))
       )
     : [];
+
+  const mySide: "home" | "away" | null =
+    game.homeTeamId === membership.teamId
+      ? "home"
+      : game.awayTeamId === membership.teamId
+        ? "away"
+        : null;
+
+  let initialWaitingFor: string | null = null;
+  if (mySide === "home" && game.homeReady && awayManager && !game.awayReady) {
+    initialWaitingFor = awayManager.email;
+  } else if (mySide === "away" && game.awayReady && homeManager && !game.homeReady) {
+    initialWaitingFor = homeManager.email;
+  }
+
+  // Un match opposant deux équipes IA n'a pas de "propriétaire" : n'importe
+  // quel membre de la ligue peut le déclencher (nécessaire pour pouvoir
+  // terminer la saison), même s'il ne gère ni l'une ni l'autre équipe.
+  const canAct = mySide !== null || (!homeManager && !awayManager);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -49,8 +71,14 @@ export default async function GamePage({
       </div>
 
       {game.status === "scheduled" ? (
-        <div className="mt-6 flex justify-center">
-          <SimulateButton gameId={game.id} />
+        <div className="mt-6 flex flex-col items-center gap-2">
+          {canAct ? (
+            <SimulateButton gameId={game.id} initialWaitingFor={initialWaitingFor} />
+          ) : (
+            <p className="text-sm text-black/50 dark:text-white/50">
+              {readinessLine(awayTeam, game.awayReady, awayManager)} · {readinessLine(homeTeam, game.homeReady, homeManager)}
+            </p>
+          )}
         </div>
       ) : (
         <div className="mt-10">
@@ -64,6 +92,15 @@ export default async function GamePage({
       )}
     </div>
   );
+}
+
+function readinessLine(
+  team: Team,
+  ready: boolean,
+  manager: { email: string } | null
+): string {
+  if (!manager) return `${teamFullName(team)} : IA`;
+  return `${teamFullName(team)} : ${ready ? "prêt" : "en attente"}`;
 }
 
 function TeamScore({ team, score }: { team: Team; score?: number }) {

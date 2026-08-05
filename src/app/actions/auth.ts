@@ -56,8 +56,8 @@ export async function login(
 
   await createSession(user.id);
   revalidatePath("/", "layout");
-  const career = await prisma.career.findUnique({ where: { userId: user.id } });
-  redirect(career ? "/" : "/onboarding");
+  const membership = await prisma.membership.findUnique({ where: { userId: user.id } });
+  redirect(membership ? "/" : "/onboarding");
 }
 
 export async function logout(): Promise<void> {

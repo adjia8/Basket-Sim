@@ -12,6 +12,7 @@ export function DashboardClient({
   payroll,
   salaryCap,
   seasonComplete,
+  inviteCode,
 }: {
   teamId: string;
   teams: Team[];
@@ -21,6 +22,7 @@ export function DashboardClient({
   payroll: number;
   salaryCap: number;
   seasonComplete: boolean;
+  inviteCode: string;
 }) {
   const myTeam = teams.find((t) => t.id === teamId);
   if (!myTeam) return null;
@@ -66,12 +68,20 @@ export function DashboardClient({
         </div>
       )}
 
-      <div className="flex items-center gap-3">
-        <span
-          className="h-3 w-3 rounded-full"
-          style={{ backgroundColor: myTeam.primaryColor }}
-        />
-        <h1 className="text-2xl font-bold">{teamFullName(myTeam)}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span
+            className="h-3 w-3 rounded-full"
+            style={{ backgroundColor: myTeam.primaryColor }}
+          />
+          <h1 className="text-2xl font-bold">{teamFullName(myTeam)}</h1>
+        </div>
+        <p className="text-sm text-black/50 dark:text-white/50">
+          Code d&apos;invitation :{" "}
+          <span className="font-mono font-semibold tracking-widest text-black dark:text-white">
+            {inviteCode}
+          </span>
+        </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-4">

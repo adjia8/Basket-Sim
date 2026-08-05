@@ -16,23 +16,54 @@ export const verifySession = cache(async () => {
   return { userId: session.userId };
 });
 
-export const getCurrentCareer = cache(async () => {
+export interface CurrentMembership {
+  id: string;
+  userId: string;
+  teamId: string;
+  careerId: string;
+  leagueId: string;
+  season: string;
+  inviteCode: string;
+}
+
+function flattenMembership(membership: {
+  id: string;
+  userId: string;
+  teamId: string;
+  careerId: string;
+  career: { leagueId: string; season: string; inviteCode: string };
+}): CurrentMembership {
+  return {
+    id: membership.id,
+    userId: membership.userId,
+    teamId: membership.teamId,
+    careerId: membership.careerId,
+    leagueId: membership.career.leagueId,
+    season: membership.career.season,
+    inviteCode: membership.career.inviteCode,
+  };
+}
+
+export const getCurrentMembership = cache(async (): Promise<CurrentMembership> => {
   const { userId } = await verifySession();
-  const career = await prisma.career.findUnique({
+  const membership = await prisma.membership.findUnique({
     where: { userId },
-    include: { league: true, team: true },
+    include: { career: true },
   });
-  if (!career) {
+  if (!membership) {
     redirect("/onboarding");
   }
-  return career;
+  return flattenMembership(membership);
 });
 
-export const getOptionalCurrentCareer = cache(async () => {
-  const session = await getSession();
-  if (!session?.userId) return null;
-  return prisma.career.findUnique({
-    where: { userId: session.userId },
-    include: { league: true, team: true },
-  });
-});
+export const getOptionalCurrentMembership = cache(
+  async (): Promise<CurrentMembership | null> => {
+    const session = await getSession();
+    if (!session?.userId) return null;
+    const membership = await prisma.membership.findUnique({
+      where: { userId: session.userId },
+      include: { career: true },
+    });
+    return membership ? flattenMembership(membership) : null;
+  }
+);

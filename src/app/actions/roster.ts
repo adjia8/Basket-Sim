@@ -16,56 +16,65 @@ export async function releasePlayer(formData: FormData): Promise<void> {
   const { userId } = await verifySession();
   const playerId = String(formData.get("playerId") ?? "");
 
-  const career = await prisma.career.findUnique({ where: { userId } });
-  if (!career) return;
+  const membership = await prisma.membership.findUnique({ where: { userId } });
+  if (!membership) return;
 
   const contract = await prisma.contract.findUnique({
-    where: { careerId_playerId: { careerId: career.id, playerId } },
+    where: { careerId_playerId: { careerId: membership.careerId, playerId } },
   });
   // On ne peut libérer qu'un joueur sous contrat avec SON PROPRE effectif.
-  if (!contract || contract.teamId !== career.teamId) return;
+  if (!contract || contract.teamId !== membership.teamId) return;
 
   const rosterSize = await prisma.contract.count({
-    where: { careerId: career.id, teamId: career.teamId },
+    where: { careerId: membership.careerId, teamId: membership.teamId },
   });
   if (rosterSize <= MIN_ROSTER_SIZE) return;
 
   await prisma.contract.delete({
-    where: { careerId_playerId: { careerId: career.id, playerId } },
+    where: { careerId_playerId: { careerId: membership.careerId, playerId } },
   });
 
-  revalidateRosterPaths(career.teamId);
+  revalidateRosterPaths(membership.teamId);
 }
 
 export async function signFreeAgent(formData: FormData): Promise<void> {
   const { userId } = await verifySession();
   const playerId = String(formData.get("playerId") ?? "");
 
-  const career = await prisma.career.findUnique({ where: { userId } });
-  if (!career) return;
+  const membership = await prisma.membership.findUnique({
+    where: { userId },
+    include: { career: true },
+  });
+  if (!membership) return;
 
   const [player, existingContract, rosterSize] = await Promise.all([
     prisma.player.findUnique({ where: { id: playerId } }),
     prisma.contract.findUnique({
-      where: { careerId_playerId: { careerId: career.id, playerId } },
+      where: { careerId_playerId: { careerId: membership.careerId, playerId } },
     }),
     prisma.contract.count({
-      where: { careerId: career.id, teamId: career.teamId },
+      where: { careerId: membership.careerId, teamId: membership.teamId },
     }),
   ]);
 
-  if (!player || player.leagueId !== career.leagueId) return;
+  if (!player || player.leagueId !== membership.career.leagueId) return;
   if (existingContract) return; // déjà sous contrat dans cette Career
   if (rosterSize >= MAX_ROSTER_SIZE) return;
 
-  await prisma.contract.create({
-    data: {
-      careerId: career.id,
-      playerId,
-      teamId: career.teamId,
-      ...generateContractTerms(player.overallRating, career.leagueId),
-    },
-  });
+  try {
+    await prisma.contract.create({
+      data: {
+        careerId: membership.careerId,
+        playerId,
+        teamId: membership.teamId,
+        ...generateContractTerms(player.overallRating, membership.career.leagueId),
+      },
+    });
+  } catch (err) {
+    // P2002 : un autre manager a signé ce joueur entre-temps (@@unique([careerId, playerId])).
+    if (err instanceof Error && "code" in err && err.code === "P2002") return;
+    throw err;
+  }
 
-  revalidateRosterPaths(career.teamId);
+  revalidateRosterPaths(membership.teamId);
 }

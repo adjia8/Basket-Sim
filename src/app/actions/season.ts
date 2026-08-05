@@ -12,11 +12,12 @@ import { toDomainLeague } from "@/lib/data-access/mappers";
 
 export async function advanceSeason(): Promise<void> {
   const { userId } = await verifySession();
-  const career = await prisma.career.findUnique({
+  const membership = await prisma.membership.findUnique({
     where: { userId },
-    include: { league: { include: { conferences: true } } },
+    include: { career: { include: { league: { include: { conferences: true } } } } },
   });
-  if (!career) return;
+  if (!membership) return;
+  const career = membership.career;
 
   // Vérification côté serveur : ne fait pas confiance au bandeau affiché côté UI.
   const currentSeasonGames = await getScheduleForCareer(career.id, career.season);

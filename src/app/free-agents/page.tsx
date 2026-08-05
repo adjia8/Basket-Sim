@@ -1,16 +1,16 @@
-import { getCurrentCareer } from "@/lib/auth/dal";
+import { getCurrentMembership } from "@/lib/auth/dal";
 import { getFreeAgents } from "@/lib/data-access/contracts";
 import { prisma } from "@/lib/prisma";
 import { signFreeAgent } from "@/app/actions/roster";
 import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 
 export default async function FreeAgentsPage() {
-  const career = await getCurrentCareer();
+  const membership = await getCurrentMembership();
 
   const [freeAgents, rosterSize] = await Promise.all([
-    getFreeAgents(career.id, career.leagueId),
+    getFreeAgents(membership.careerId, membership.leagueId),
     prisma.contract.count({
-      where: { careerId: career.id, teamId: career.teamId },
+      where: { careerId: membership.careerId, teamId: membership.teamId },
     }),
   ]);
 
