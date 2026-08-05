@@ -5,13 +5,27 @@ import { proposeTrade } from "@/app/actions/trade";
 import { formatSalary } from "@/lib/utils";
 import type { RosterPlayer } from "./RosterTable";
 
+export interface TradePick {
+  id: string;
+  season: string;
+  round: number;
+  pickNumber: number | null;
+  originalTeamId: string;
+  teamId: string;
+  originalTeamAbbreviation: string;
+}
+
 export function TradeProposalForm({
   myRoster,
   theirRoster,
+  myPicks,
+  theirPicks,
   opponentTeamId,
 }: {
   myRoster: RosterPlayer[];
   theirRoster: RosterPlayer[];
+  myPicks: TradePick[];
+  theirPicks: TradePick[];
   opponentTeamId: string;
 }) {
   const [state, action, pending] = useActionState(proposeTrade, undefined);
@@ -24,16 +38,14 @@ export function TradeProposalForm({
         <input type="hidden" name="opponentTeamId" value={opponentTeamId} />
 
         <div className="grid gap-6 sm:grid-cols-2">
-          <PlayerCheckboxList
-            title="Mes joueurs à offrir"
-            name="myPlayerIds"
-            roster={myRoster}
-          />
-          <PlayerCheckboxList
-            title="Leurs joueurs à recevoir"
-            name="theirPlayerIds"
-            roster={theirRoster}
-          />
+          <div className="space-y-6">
+            <PlayerCheckboxList title="Mes joueurs à offrir" name="myPlayerIds" roster={myRoster} />
+            <PickCheckboxList title="Mes picks à offrir" name="myPickIds" picks={myPicks} />
+          </div>
+          <div className="space-y-6">
+            <PlayerCheckboxList title="Leurs joueurs à recevoir" name="theirPlayerIds" roster={theirRoster} />
+            <PickCheckboxList title="Leurs picks à recevoir" name="theirPickIds" picks={theirPicks} />
+          </div>
         </div>
 
         {state?.error && (
@@ -85,6 +97,43 @@ function PlayerCheckboxList({
               <span className="text-black/50 dark:text-white/50">
                 {formatSalary(player.salary)}
               </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function pickLabel(pick: TradePick): string {
+  const base =
+    pick.pickNumber !== null
+      ? `Pick ${pick.pickNumber} (Tour ${pick.round}, ${pick.season})`
+      : `Tour ${pick.round} ${pick.season}`;
+  return pick.originalTeamId !== pick.teamId ? `${base} (via ${pick.originalTeamAbbreviation})` : base;
+}
+
+function PickCheckboxList({
+  title,
+  name,
+  picks,
+}: {
+  title: string;
+  name: "myPickIds" | "theirPickIds";
+  picks: TradePick[];
+}) {
+  if (picks.length === 0) return null;
+  return (
+    <div>
+      <h3 className="mb-2 text-sm font-medium text-black/60 dark:text-white/60">
+        {title}
+      </h3>
+      <ul className="space-y-1">
+        {picks.map((pick) => (
+          <li key={pick.id}>
+            <label className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-black/5 dark:hover:bg-white/5">
+              <input type="checkbox" name={name} value={pick.id} />
+              <span className="flex-1">{pickLabel(pick)}</span>
             </label>
           </li>
         ))}

@@ -6,11 +6,12 @@ import { prisma } from "@/lib/prisma";
 import { getLeagueById } from "@/lib/data-access/leagues";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getPayrollForTeam } from "@/lib/data-access/contracts";
+import { getTeamsByLeague } from "@/lib/data-access/teams";
 import {
   MAX_ROSTER_SIZE,
   MIN_ROSTER_SIZE,
 } from "@/lib/careers/roster-rules";
-import { TRADE_ACCEPT_TOLERANCE, tradeValue } from "@/lib/careers/trade-rules";
+import { draftPickTradeValue, TRADE_ACCEPT_TOLERANCE, tradeValue } from "@/lib/careers/trade-rules";
 import { formatSalary } from "@/lib/utils";
 
 export interface TradeFormState {
@@ -26,6 +27,8 @@ export async function proposeTrade(
   const opponentTeamId = String(formData.get("opponentTeamId") ?? "");
   const myPlayerIds = formData.getAll("myPlayerIds").map(String);
   const theirPlayerIds = formData.getAll("theirPlayerIds").map(String);
+  const myPickIds = formData.getAll("myPickIds").map(String);
+  const theirPickIds = formData.getAll("theirPickIds").map(String);
 
   const membership = await prisma.membership.findUnique({
     where: { userId },
@@ -33,8 +36,11 @@ export async function proposeTrade(
   });
   if (!membership) return { error: "Aucune carrière." };
 
-  if (myPlayerIds.length === 0 || theirPlayerIds.length === 0) {
-    return { error: "Sélectionne au moins un joueur de chaque côté." };
+  if (
+    myPlayerIds.length + myPickIds.length === 0 ||
+    theirPlayerIds.length + theirPickIds.length === 0
+  ) {
+    return { error: "Sélectionne au moins un actif de chaque côté." };
   }
 
   const opponentTeam = await prisma.team.findUnique({
@@ -48,7 +54,7 @@ export async function proposeTrade(
     return { error: "Équipe adverse invalide." };
   }
 
-  const [myContracts, theirContracts] = await Promise.all([
+  const [myContracts, theirContracts, myPicks, theirPicks] = await Promise.all([
     prisma.contract.findMany({
       where: { careerId: membership.careerId, playerId: { in: myPlayerIds } },
       include: { player: true },
@@ -57,15 +63,27 @@ export async function proposeTrade(
       where: { careerId: membership.careerId, playerId: { in: theirPlayerIds } },
       include: { player: true },
     }),
+    prisma.draftPick.findMany({ where: { id: { in: myPickIds } } }),
+    prisma.draftPick.findMany({ where: { id: { in: theirPickIds } } }),
   ]);
 
-  const myValid =
+  const myPlayersValid =
     myContracts.length === myPlayerIds.length &&
     myContracts.every((c) => c.teamId === membership.teamId);
-  const theirValid =
+  const theirPlayersValid =
     theirContracts.length === theirPlayerIds.length &&
     theirContracts.every((c) => c.teamId === opponentTeamId);
-  if (!myValid || !theirValid) {
+  const myPicksValid =
+    myPicks.length === myPickIds.length &&
+    myPicks.every(
+      (p) => p.careerId === membership.careerId && p.teamId === membership.teamId && p.status === "pending"
+    );
+  const theirPicksValid =
+    theirPicks.length === theirPickIds.length &&
+    theirPicks.every(
+      (p) => p.careerId === membership.careerId && p.teamId === opponentTeamId && p.status === "pending"
+    );
+  if (!myPlayersValid || !theirPlayersValid || !myPicksValid || !theirPicksValid) {
     return { error: "Sélection invalide." };
   }
 
@@ -80,6 +98,9 @@ export async function proposeTrade(
     getPayrollForTeam(membership.careerId, membership.teamId),
     getPayrollForTeam(membership.careerId, opponentTeamId),
   ]);
+  // Les picks n'affectent ni l'effectif ni la masse salariale tant qu'ils
+  // n'ont pas été utilisés pour drafter un joueur : seuls les joueurs
+  // comptent dans ces deux vérifications.
   const myNewSize = myRosterSize - myPlayerIds.length + theirPlayerIds.length;
   const theirNewSize = theirRosterSize - theirPlayerIds.length + myPlayerIds.length;
   if (
@@ -108,14 +129,13 @@ export async function proposeTrade(
 
   if (!opponentManager) {
     // Adversaire IA : comportement inchangé, heuristique de tolérance + exécution immédiate.
-    const valueGivenByAi = theirContracts.reduce(
-      (sum, c) => sum + tradeValue(c.player.overallRating),
-      0
-    );
-    const valueReceivedByAi = myContracts.reduce(
-      (sum, c) => sum + tradeValue(c.player.overallRating),
-      0
-    );
+    const picksPerRound = (await getTeamsByLeague(membership.career.leagueId)).length;
+    const valueGivenByAi =
+      theirContracts.reduce((sum, c) => sum + tradeValue(c.player.overallRating), 0) +
+      theirPicks.reduce((sum, p) => sum + draftPickTradeValue(p.round, p.pickNumber, picksPerRound), 0);
+    const valueReceivedByAi =
+      myContracts.reduce((sum, c) => sum + tradeValue(c.player.overallRating), 0) +
+      myPicks.reduce((sum, p) => sum + draftPickTradeValue(p.round, p.pickNumber, picksPerRound), 0);
     if (valueReceivedByAi < valueGivenByAi * TRADE_ACCEPT_TOLERANCE) {
       return { error: "L'IA refuse : échange trop déséquilibré en ta faveur." };
     }
@@ -133,11 +153,18 @@ export async function proposeTrade(
           data: { teamId: membership.teamId },
         })
       ),
+      ...myPickIds.map((id) =>
+        prisma.draftPick.updateMany({ where: { id, status: "pending" }, data: { teamId: opponentTeamId } })
+      ),
+      ...theirPickIds.map((id) =>
+        prisma.draftPick.updateMany({ where: { id, status: "pending" }, data: { teamId: membership.teamId } })
+      ),
     ]);
 
     revalidatePath("/");
     revalidatePath(`/teams/${membership.teamId}`);
     revalidatePath(`/teams/${opponentTeamId}`);
+    revalidatePath("/draft");
 
     return { success: "Échange accepté !" };
   }
@@ -152,6 +179,8 @@ export async function proposeTrade(
         create: [
           ...myPlayerIds.map((playerId) => ({ playerId, side: "from" })),
           ...theirPlayerIds.map((playerId) => ({ playerId, side: "to" })),
+          ...myPickIds.map((draftPickId) => ({ draftPickId, side: "from" })),
+          ...theirPickIds.map((draftPickId) => ({ draftPickId, side: "to" })),
         ],
       },
     },
@@ -187,37 +216,58 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
   }
   if (decision !== "accept") return;
 
-  const fromPlayerIds = offer.items.filter((i) => i.side === "from").map((i) => i.playerId);
-  const toPlayerIds = offer.items.filter((i) => i.side === "to").map((i) => i.playerId);
+  const fromPlayerIds = offer.items.filter((i) => i.side === "from" && i.playerId).map((i) => i.playerId!);
+  const toPlayerIds = offer.items.filter((i) => i.side === "to" && i.playerId).map((i) => i.playerId!);
+  const fromPickIds = offer.items.filter((i) => i.side === "from" && i.draftPickId).map((i) => i.draftPickId!);
+  const toPickIds = offer.items.filter((i) => i.side === "to" && i.draftPickId).map((i) => i.draftPickId!);
 
-  // L'état peut avoir changé depuis la proposition (joueur libéré/échangé
-  // entre-temps, effectif désormais plein) : on revérifie tout au moment de
-  // l'acceptation plutôt que de faire confiance à l'offre telle que créée.
-  const [fromContracts, toContracts, fromRosterSize, toRosterSize, league, fromCurrentPayroll, toCurrentPayroll] =
-    await Promise.all([
-      prisma.contract.findMany({
-        where: { careerId: membership.careerId, playerId: { in: fromPlayerIds } },
-      }),
-      prisma.contract.findMany({
-        where: { careerId: membership.careerId, playerId: { in: toPlayerIds } },
-      }),
-      prisma.contract.count({
-        where: { careerId: membership.careerId, teamId: offer.fromTeamId },
-      }),
-      prisma.contract.count({
-        where: { careerId: membership.careerId, teamId: offer.toTeamId },
-      }),
-      getLeagueById(membership.career.leagueId),
-      getPayrollForTeam(membership.careerId, offer.fromTeamId),
-      getPayrollForTeam(membership.careerId, offer.toTeamId),
-    ]);
+  // L'état peut avoir changé depuis la proposition (joueur libéré/échangé,
+  // pick déjà utilisé ou échangé ailleurs, effectif désormais plein) : on
+  // revérifie tout au moment de l'acceptation plutôt que de faire confiance
+  // à l'offre telle que créée.
+  const [
+    fromContracts,
+    toContracts,
+    fromPicks,
+    toPicks,
+    fromRosterSize,
+    toRosterSize,
+    league,
+    fromCurrentPayroll,
+    toCurrentPayroll,
+  ] = await Promise.all([
+    prisma.contract.findMany({
+      where: { careerId: membership.careerId, playerId: { in: fromPlayerIds } },
+    }),
+    prisma.contract.findMany({
+      where: { careerId: membership.careerId, playerId: { in: toPlayerIds } },
+    }),
+    prisma.draftPick.findMany({ where: { id: { in: fromPickIds } } }),
+    prisma.draftPick.findMany({ where: { id: { in: toPickIds } } }),
+    prisma.contract.count({
+      where: { careerId: membership.careerId, teamId: offer.fromTeamId },
+    }),
+    prisma.contract.count({
+      where: { careerId: membership.careerId, teamId: offer.toTeamId },
+    }),
+    getLeagueById(membership.career.leagueId),
+    getPayrollForTeam(membership.careerId, offer.fromTeamId),
+    getPayrollForTeam(membership.careerId, offer.toTeamId),
+  ]);
 
-  const fromValid =
+  const fromPlayersValid =
     fromContracts.length === fromPlayerIds.length &&
     fromContracts.every((c) => c.teamId === offer.fromTeamId);
-  const toValid =
+  const toPlayersValid =
     toContracts.length === toPlayerIds.length &&
     toContracts.every((c) => c.teamId === offer.toTeamId);
+  const fromPicksValid =
+    fromPicks.length === fromPickIds.length &&
+    fromPicks.every((p) => p.teamId === offer.fromTeamId && p.status === "pending");
+  const toPicksValid =
+    toPicks.length === toPickIds.length &&
+    toPicks.every((p) => p.teamId === offer.toTeamId && p.status === "pending");
+
   const newFromSize = fromRosterSize - fromPlayerIds.length + toPlayerIds.length;
   const newToSize = toRosterSize - toPlayerIds.length + fromPlayerIds.length;
 
@@ -228,8 +278,10 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
   const toNewPayroll = toCurrentPayroll - toSalaryOut + fromSalaryOut;
 
   const stillValid =
-    fromValid &&
-    toValid &&
+    fromPlayersValid &&
+    toPlayersValid &&
+    fromPicksValid &&
+    toPicksValid &&
     newFromSize >= MIN_ROSTER_SIZE &&
     newFromSize <= MAX_ROSTER_SIZE &&
     newToSize >= MIN_ROSTER_SIZE &&
@@ -257,12 +309,19 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
         data: { teamId: offer.fromTeamId },
       })
     ),
+    ...fromPickIds.map((id) =>
+      prisma.draftPick.updateMany({ where: { id, status: "pending" }, data: { teamId: offer.toTeamId } })
+    ),
+    ...toPickIds.map((id) =>
+      prisma.draftPick.updateMany({ where: { id, status: "pending" }, data: { teamId: offer.fromTeamId } })
+    ),
   ]);
 
   revalidatePath("/");
   revalidatePath(`/teams/${offer.fromTeamId}`);
   revalidatePath(`/teams/${offer.toTeamId}`);
   revalidatePath("/trades");
+  revalidatePath("/draft");
 }
 
 export async function cancelTradeOffer(formData: FormData): Promise<void> {

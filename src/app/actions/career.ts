@@ -8,7 +8,13 @@ import { generateCareerSchedule } from "@/lib/careers/generate-schedule";
 import { generateCareerContracts } from "@/lib/careers/generate-contracts";
 import { generateCareerPlayerStates } from "@/lib/careers/generate-player-states";
 import { generateInviteCode } from "@/lib/careers/invite-code";
+import {
+  createUnresolvedPicksForSeason,
+  FUTURE_PICK_WINDOW,
+  futureSeasonsAfter,
+} from "@/lib/careers/generate-draft-picks";
 import { toDomainLeague, toDomainPlayer } from "@/lib/data-access/mappers";
+import { getTeamsByLeague } from "@/lib/data-access/teams";
 
 export interface CreateCareerState {
   error?: string;
@@ -70,6 +76,14 @@ export async function createCareer(
     seasonLabel: league.season,
     presimulatePast: true,
   });
+
+  // Chaque équipe possède déjà ses picks des prochaines saisons, échangeables
+  // avant même que ces saisons n'existent (comme en vraie NBA).
+  const leagueTeams = await getTeamsByLeague(leagueId);
+  const leagueTeamIds = leagueTeams.map((t) => t.id);
+  for (const futureSeason of futureSeasonsAfter(league.season, FUTURE_PICK_WINDOW)) {
+    await createUnresolvedPicksForSeason(career.id, futureSeason, leagueTeamIds);
+  }
 
   revalidatePath("/", "layout");
   redirect("/");

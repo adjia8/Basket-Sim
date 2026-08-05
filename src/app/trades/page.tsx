@@ -22,25 +22,42 @@ export default async function TradesPage() {
   ]);
 
   const allOffers = [...received, ...sent];
-  const playerIds = [...new Set(allOffers.flatMap((o) => o.items.map((i) => i.playerId)))];
+  const playerIds = [
+    ...new Set(allOffers.flatMap((o) => o.items.map((i) => i.playerId).filter((id): id is string => Boolean(id)))),
+  ];
+  const pickIds = [
+    ...new Set(
+      allOffers.flatMap((o) => o.items.map((i) => i.draftPickId).filter((id): id is string => Boolean(id)))
+    ),
+  ];
   const teamIds = [...new Set(allOffers.flatMap((o) => [o.fromTeamId, o.toTeamId]))];
 
-  const [players, teamRows] = await Promise.all([
+  const [players, picks, teamRows] = await Promise.all([
     prisma.player.findMany({ where: { id: { in: playerIds } } }),
+    prisma.draftPick.findMany({ where: { id: { in: pickIds } }, include: { originalTeam: true } }),
     Promise.all(teamIds.map((id) => getTeamById(id))),
   ]);
   const playerById = new Map(players.map((p) => [p.id, p]));
+  const pickById = new Map(picks.map((p) => [p.id, p]));
   const teamById = new Map<string, Team>(
     teamRows.filter((t): t is Team => Boolean(t)).map((t) => [t.id, t])
   );
 
-  function playerNames(offer: (typeof allOffers)[number], side: "from" | "to") {
-    return offer.items
-      .filter((i) => i.side === side)
-      .map((i) => playerById.get(i.playerId))
+  function assetLabels(offer: (typeof allOffers)[number], side: "from" | "to") {
+    const items = offer.items.filter((i) => i.side === side);
+    const playerLabels = items
+      .map((i) => (i.playerId ? playerById.get(i.playerId) : undefined))
       .filter((p): p is NonNullable<typeof p> => Boolean(p))
-      .map((p) => `${p.firstName} ${p.lastName}`)
-      .join(", ");
+      .map((p) => `${p.firstName} ${p.lastName}`);
+    const pickLabels = items
+      .map((i) => (i.draftPickId ? pickById.get(i.draftPickId) : undefined))
+      .filter((p): p is NonNullable<typeof p> => Boolean(p))
+      .map((p) =>
+        p.pickNumber !== null
+          ? `Pick ${p.pickNumber} (Tour ${p.round}, ${p.season})`
+          : `Tour ${p.round} ${p.season} (${p.originalTeam.abbreviation})`
+      );
+    return [...playerLabels, ...pickLabels].join(", ");
   }
 
   return (
@@ -61,8 +78,8 @@ export default async function TradesPage() {
                 <div key={offer.id} className="rounded-lg border border-black/10 p-4 dark:border-white/10">
                   <p className="text-sm">
                     <span className="font-medium">{fromTeam ? teamFullName(fromTeam) : "?"}</span>{" "}
-                    propose <strong>{playerNames(offer, "from")}</strong> contre{" "}
-                    <strong>{playerNames(offer, "to")}</strong>
+                    propose <strong>{assetLabels(offer, "from")}</strong> contre{" "}
+                    <strong>{assetLabels(offer, "to")}</strong>
                   </p>
                   <div className="mt-3 flex gap-2">
                     <form action={respondToTradeOffer}>
@@ -107,8 +124,8 @@ export default async function TradesPage() {
                 <div key={offer.id} className="rounded-lg border border-black/10 p-4 dark:border-white/10">
                   <p className="text-sm">
                     À <span className="font-medium">{toTeam ? teamFullName(toTeam) : "?"}</span> :{" "}
-                    <strong>{playerNames(offer, "from")}</strong> contre{" "}
-                    <strong>{playerNames(offer, "to")}</strong>
+                    <strong>{assetLabels(offer, "from")}</strong> contre{" "}
+                    <strong>{assetLabels(offer, "to")}</strong>
                   </p>
                   <form action={cancelTradeOffer} className="mt-3">
                     <input type="hidden" name="tradeOfferId" value={offer.id} />

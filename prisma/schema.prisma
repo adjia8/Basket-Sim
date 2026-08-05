@@ -78,23 +78,24 @@ model Conference {
 }
 
 model Team {
-  id             String       @id
-  leagueId       String
-  league         League       @relation(fields: [leagueId], references: [id])
-  conferenceId   String
-  conference     Conference   @relation(fields: [conferenceId], references: [id])
-  city           String
-  name           String
-  abbreviation   String
-  primaryColor   String
-  secondaryColor String
-  players        Player[]
-  memberships    Membership[]
-  homeGames      Game[]       @relation("HomeTeam")
-  awayGames      Game[]       @relation("AwayTeam")
-  contracts      Contract[]
-  draftPicks     DraftPick[]
-  deadCap        DeadCap[]
+  id                 String       @id
+  leagueId           String
+  league             League       @relation(fields: [leagueId], references: [id])
+  conferenceId       String
+  conference         Conference   @relation(fields: [conferenceId], references: [id])
+  city               String
+  name               String
+  abbreviation       String
+  primaryColor       String
+  secondaryColor     String
+  players            Player[]
+  memberships        Membership[]
+  homeGames          Game[]       @relation("HomeTeam")
+  awayGames          Game[]       @relation("AwayTeam")
+  contracts          Contract[]
+  draftPicks         DraftPick[]  @relation("DraftPickCurrentTeam")
+  originalDraftPicks DraftPick[]  @relation("DraftPickOriginalTeam")
+  deadCap            DeadCap[]
 
   @@index([leagueId])
   @@index([conferenceId])
@@ -221,33 +222,42 @@ model TradeOffer {
   @@index([toTeamId])
 }
 
+// playerId/draftPickId : exactement l'un des deux est renseigné selon la
+// nature de l'actif échangé. Pas de relation Prisma vers Player/DraftPick
+// (même convention que playerId ailleurs dans le schéma) — résolu
+// manuellement côté appelant via une requête séparée.
 model TradeOfferItem {
   id           String     @id @default(cuid())
   tradeOfferId String
   tradeOffer   TradeOffer @relation(fields: [tradeOfferId], references: [id], onDelete: Cascade)
-  playerId     String
+  playerId     String?
+  draftPickId  String?
   side         String // "from" | "to"
 
   @@index([tradeOfferId])
 }
 
-// Ordre du draft d'une saison donnée : une ligne par pick, dans l'ordre
-// inverse du classement de la saison qui vient de se terminer (la pire
-// équipe choisit en premier). "skipped" = l'équipe ne pouvait pas
-// légalement drafter à ce pick (effectif complet ou plafond dépassé).
+// Un pick de draft, résolu (saison en cours, pickNumber connu) ou futur
+// (pickNumber null tant que la saison correspondante n'a pas été jouée).
+// originalTeamId (fixe) détermine la position du pick une fois résolu, via
+// le classement de cette équipe ; teamId (mutable par échange) est qui a
+// actuellement le droit de le faire. "skipped" = l'équipe au pick ne
+// pouvait pas légalement drafter (effectif complet ou plafond dépassé).
 model DraftPick {
   id              String  @id @default(cuid())
   careerId        String
   career          Career  @relation(fields: [careerId], references: [id], onDelete: Cascade)
   season          String
   round           Int
-  pickNumber      Int
+  pickNumber      Int?
+  originalTeamId  String
+  originalTeam    Team    @relation("DraftPickOriginalTeam", fields: [originalTeamId], references: [id])
   teamId          String
-  team            Team    @relation(fields: [teamId], references: [id])
+  team            Team    @relation("DraftPickCurrentTeam", fields: [teamId], references: [id])
   status          String  @default("pending") // pending | completed | skipped
   draftedPlayerId String?
 
-  @@unique([careerId, season, pickNumber])
+  @@unique([careerId, season, round, originalTeamId])
   @@index([careerId, season, status])
 }
 

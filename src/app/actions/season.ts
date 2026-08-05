@@ -7,6 +7,11 @@ import { getScheduleForCareer } from "@/lib/data-access/schedule";
 import { getStandings } from "@/lib/data-access/standings";
 import { generateCareerSchedule } from "@/lib/careers/generate-schedule";
 import { generateProspectClass } from "@/lib/careers/generate-prospects";
+import {
+  createUnresolvedPicksForSeason,
+  FUTURE_PICK_WINDOW,
+  futureSeasonsAfter,
+} from "@/lib/careers/generate-draft-picks";
 import { nextSeasonLabel } from "@/lib/careers/season-format";
 import { ageOneSeason, RETIREMENT_AGE } from "@/lib/careers/aging-rules";
 import { toDomainLeague } from "@/lib/data-access/mappers";
@@ -84,24 +89,35 @@ export async function advanceSeason(): Promise<void> {
   await prisma.prospect.deleteMany({ where: { careerId: career.id } });
   await generateProspectClass(career.id, career.leagueId);
 
-  // 4bis. Ordre du draft pour la nouvelle saison : 2 tours, même ordre
-  // (pire bilan en premier) dans chaque tour.
-  await prisma.draftPick.deleteMany({ where: { careerId: career.id, season: newSeason } });
-  const pickRows = [];
-  let pickNumber = 1;
+  // 4bis. Résout les picks de la nouvelle saison (déjà créés à l'avance, non
+  // résolus, à la création de la carrière ou lors d'un rollover précédent —
+  // filet de sécurité au cas où). Le pickNumber suit l'ordre inverse du
+  // classement de l'équipe d'ORIGINE (originalTeamId), pas de son
+  // propriétaire actuel : un pick déjà échangé garde son nouveau
+  // propriétaire, seul le classement de qui l'a "généré" compte pour sa
+  // position.
+  const draftOrderTeamIds = draftOrder.map((row) => row.teamId);
+  await createUnresolvedPicksForSeason(career.id, newSeason, draftOrderTeamIds);
   for (let round = 1; round <= 2; round++) {
-    for (const row of draftOrder) {
-      pickRows.push({
-        careerId: career.id,
-        season: newSeason,
-        round,
-        pickNumber,
-        teamId: row.teamId,
+    for (let i = 0; i < draftOrderTeamIds.length; i++) {
+      const pickNumber = (round - 1) * draftOrderTeamIds.length + i + 1;
+      await prisma.draftPick.updateMany({
+        where: {
+          careerId: career.id,
+          season: newSeason,
+          round,
+          originalTeamId: draftOrderTeamIds[i],
+          pickNumber: null,
+        },
+        data: { pickNumber },
       });
-      pickNumber++;
     }
   }
-  await prisma.draftPick.createMany({ data: pickRows });
+
+  // Ouvre la fenêtre de picks futurs à l'autre bout : la saison qui vient de
+  // se résoudre libère un cran, donc une nouvelle saison future apparaît.
+  const newFarSeason = futureSeasonsAfter(newSeason, FUTURE_PICK_WINDOW).at(-1)!;
+  await createUnresolvedPicksForSeason(career.id, newFarSeason, draftOrderTeamIds);
 
   // 5. Nouveau calendrier, tout "scheduled" (rien à pré-simuler).
   await generateCareerSchedule(career.id, toDomainLeague(career.league), {

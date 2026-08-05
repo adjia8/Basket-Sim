@@ -5,6 +5,11 @@ import { rookieScaleContract } from "@/lib/careers/rookie-scale";
 import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import { getPayrollForTeam } from "./contracts";
 
+// Le pick "sur l'horloge" a toujours un pickNumber résolu (jamais un pick
+// futur pas encore joué) : ce type le reflète pour éviter d'avoir à
+// re-vérifier la nullabilité partout où getCurrentDraftPick est utilisé.
+export type ResolvedDraftPick = DraftPick & { pickNumber: number };
+
 // Le pick "sur l'horloge" : le plus petit pickNumber encore "pending". Le
 // salaire d'un pick est fixé par sa position (pas par le prospect choisi),
 // donc on peut savoir si l'équipe concernée peut légalement drafter à ce pick
@@ -20,13 +25,13 @@ export async function getCurrentDraftPick(
   salaryCap: number,
   picksPerRound: number,
   leagueId: string
-): Promise<DraftPick | null> {
+): Promise<ResolvedDraftPick | null> {
   for (;;) {
     const pick = await prisma.draftPick.findFirst({
-      where: { careerId, season, status: "pending" },
+      where: { careerId, season, status: "pending", pickNumber: { not: null } },
       orderBy: { pickNumber: "asc" },
     });
-    if (!pick) return null;
+    if (!pick || pick.pickNumber === null) return null;
 
     const [rosterSize, payroll] = await Promise.all([
       prisma.contract.count({ where: { careerId, teamId: pick.teamId } }),
@@ -34,7 +39,7 @@ export async function getCurrentDraftPick(
     ]);
     const { salary } = rookieScaleContract(pick.pickNumber, picksPerRound, leagueId);
     const canDraft = rosterSize < MAX_ROSTER_SIZE && payroll + salary <= salaryCap;
-    if (canDraft) return pick;
+    if (canDraft) return pick as ResolvedDraftPick;
 
     const { count } = await prisma.draftPick.updateMany({
       where: { id: pick.id, status: "pending" },

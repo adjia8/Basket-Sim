@@ -2,17 +2,17 @@
 
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import type { DraftPick, Prospect } from "@prisma/client";
+import type { Prospect } from "@prisma/client";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
-import { getCurrentDraftPick } from "@/lib/data-access/draft-picks";
+import { getCurrentDraftPick, type ResolvedDraftPick } from "@/lib/data-access/draft-picks";
 import { getLeagueById } from "@/lib/data-access/leagues";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { rookieScaleContract } from "@/lib/careers/rookie-scale";
 
 async function performDraftPick(
-  currentPick: DraftPick,
+  currentPick: ResolvedDraftPick,
   prospect: Prospect,
   picksPerRound: number,
   leagueId: string

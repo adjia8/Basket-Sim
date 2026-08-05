@@ -7,9 +7,26 @@ import { getRosterForTeam } from "@/lib/data-access/players";
 import { getTeamById } from "@/lib/data-access/teams";
 import { prisma } from "@/lib/prisma";
 import { RosterTable, type RosterPlayer } from "@/components/team/RosterTable";
-import { TradeProposalForm } from "@/components/team/TradeProposalForm";
+import { TradeProposalForm, type TradePick } from "@/components/team/TradeProposalForm";
 import { MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import { formatSalary, teamFullName } from "@/lib/utils";
+
+async function getPendingPicksForTeam(careerId: string, teamId: string): Promise<TradePick[]> {
+  const rows = await prisma.draftPick.findMany({
+    where: { careerId, teamId, status: "pending" },
+    include: { originalTeam: true },
+    orderBy: [{ season: "asc" }, { round: "asc" }],
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    season: row.season,
+    round: row.round,
+    pickNumber: row.pickNumber,
+    originalTeamId: row.originalTeamId,
+    teamId: row.teamId,
+    originalTeamAbbreviation: row.originalTeam.abbreviation,
+  }));
+}
 
 export default async function TeamRosterPage({
   params,
@@ -21,13 +38,14 @@ export default async function TeamRosterPage({
   const team = await getTeamById(teamId);
   if (!team) notFound();
 
-  const [roster, contracts, league, manager, totalPayroll, deadCap] = await Promise.all([
+  const [roster, contracts, league, manager, totalPayroll, deadCap, picks] = await Promise.all([
     getRosterForTeam(membership.careerId, teamId),
     getContractsForTeam(membership.careerId, teamId),
     getLeagueById(team.leagueId),
     getMembershipForTeam(membership.careerId, teamId),
     getPayrollForTeam(membership.careerId, teamId),
     prisma.deadCap.findMany({ where: { careerId: membership.careerId, teamId } }),
+    getPendingPicksForTeam(membership.careerId, teamId),
   ]);
 
   const contractByPlayerId = new Map(contracts.map((c) => [c.playerId, c]));
@@ -50,10 +68,12 @@ export default async function TeamRosterPage({
   const managerLabel = managedByMe ? "Géré par toi" : manager ? `Géré par ${manager.email}` : "Géré par l'IA";
 
   let myRosterWithContracts: RosterPlayer[] = [];
+  let myPicks: TradePick[] = [];
   if (isOpponentInMyLeague) {
-    const [myRoster, myContracts] = await Promise.all([
+    const [myRoster, myContracts, myPendingPicks] = await Promise.all([
       getRosterForTeam(membership.careerId, membership.teamId),
       getContractsForTeam(membership.careerId, membership.teamId),
+      getPendingPicksForTeam(membership.careerId, membership.teamId),
     ]);
     const myContractByPlayerId = new Map(myContracts.map((c) => [c.playerId, c]));
     myRosterWithContracts = myRoster.map((player) => {
@@ -65,6 +85,7 @@ export default async function TeamRosterPage({
         guaranteed: contract?.guaranteed ?? true,
       };
     });
+    myPicks = myPendingPicks;
   }
 
   return (
@@ -112,10 +133,35 @@ export default async function TeamRosterPage({
         />
       </div>
 
+      {picks.length > 0 && (
+        <div className="mt-6">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+            Picks de draft
+          </h2>
+          <ul className="flex flex-wrap gap-2 text-sm">
+            {picks.map((pick) => (
+              <li
+                key={pick.id}
+                className="rounded-full border border-black/10 px-3 py-1 dark:border-white/10"
+              >
+                {pick.pickNumber !== null
+                  ? `Pick ${pick.pickNumber} (Tour ${pick.round}, ${pick.season})`
+                  : `Tour ${pick.round} ${pick.season}`}
+                {pick.originalTeamId !== pick.teamId && (
+                  <span className="text-black/40 dark:text-white/40"> (via {pick.originalTeamAbbreviation})</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {isOpponentInMyLeague && (
         <TradeProposalForm
           myRoster={myRosterWithContracts}
           theirRoster={rosterWithContracts}
+          myPicks={myPicks}
+          theirPicks={picks}
           opponentTeamId={team.id}
         />
       )}
