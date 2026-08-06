@@ -1,6 +1,7 @@
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getFreeAgents, getPayrollForTeam } from "@/lib/data-access/contracts";
 import { getLeagueById } from "@/lib/data-access/leagues";
+import { isFreeAgencyOpen } from "@/lib/data-access/season-windows";
 import { prisma } from "@/lib/prisma";
 import { signFreeAgent } from "@/app/actions/roster";
 import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
@@ -9,13 +10,14 @@ import { formatSalary } from "@/lib/utils";
 export default async function FreeAgentsPage() {
   const membership = await getCurrentMembership();
 
-  const [freeAgents, rosterSize, payroll, league] = await Promise.all([
+  const [freeAgents, rosterSize, payroll, league, faOpen] = await Promise.all([
     getFreeAgents(membership.careerId, membership.leagueId),
     prisma.contract.count({
       where: { careerId: membership.careerId, teamId: membership.teamId },
     }),
     getPayrollForTeam(membership.careerId, membership.teamId),
     getLeagueById(membership.leagueId),
+    isFreeAgencyOpen(membership.careerId, membership.season),
   ]);
 
   const rosterFull = rosterSize >= MAX_ROSTER_SIZE;
@@ -24,7 +26,7 @@ export default async function FreeAgentsPage() {
   // salariale actuelle atteint déjà le plafond, aucune signature ne peut plus
   // passer, quel que soit le montant (aléatoire) qui serait proposé.
   const capReached = payroll >= salaryCap;
-  const canSign = !rosterFull && !capReached;
+  const canSign = !rosterFull && !capReached && faOpen;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
@@ -40,6 +42,12 @@ export default async function FreeAgentsPage() {
         </span>
       </p>
 
+      {!faOpen && (
+        <p className="mt-2 text-sm text-red-500">
+          Free agency pas encore ouverte — termine le draft de cette saison
+          avant de pouvoir signer des agents libres.
+        </p>
+      )}
       {rosterFull && (
         <p className="mt-2 text-sm text-red-500">
           Effectif complet ({rosterSize} / {MAX_ROSTER_SIZE}) — libère un joueur

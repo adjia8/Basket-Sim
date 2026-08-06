@@ -1,6 +1,7 @@
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getTeamById } from "@/lib/data-access/teams";
+import { isTradeDeadlinePassed } from "@/lib/data-access/season-windows";
 import { cancelTradeOffer, respondToTradeOffer } from "@/app/actions/trade";
 import { teamFullName } from "@/lib/utils";
 import type { Team } from "@/lib/types";
@@ -8,7 +9,7 @@ import type { Team } from "@/lib/types";
 export default async function TradesPage() {
   const membership = await getCurrentMembership();
 
-  const [received, sent] = await Promise.all([
+  const [received, sent, tradeDeadlinePassed] = await Promise.all([
     prisma.tradeOffer.findMany({
       where: { careerId: membership.careerId, toTeamId: membership.teamId, status: "pending" },
       include: { items: true },
@@ -19,6 +20,7 @@ export default async function TradesPage() {
       include: { items: true },
       orderBy: { createdAt: "desc" },
     }),
+    isTradeDeadlinePassed(membership.careerId, membership.season),
   ]);
 
   const allOffers = [...received, ...sent];
@@ -64,6 +66,14 @@ export default async function TradesPage() {
     <div className="mx-auto max-w-5xl px-4 py-8">
       <h1 className="text-2xl font-bold">Échanges</h1>
 
+      {tradeDeadlinePassed && (
+        <p className="mt-4 text-sm text-red-500">
+          Date limite des échanges dépassée pour cette saison — les offres en
+          attente ne peuvent plus être acceptées, seulement refusées ou
+          annulées.
+        </p>
+      )}
+
       <section className="mt-8">
         <h2 className="text-lg font-semibold">Propositions reçues</h2>
         {received.length === 0 ? (
@@ -82,16 +92,18 @@ export default async function TradesPage() {
                     <strong>{assetLabels(offer, "to")}</strong>
                   </p>
                   <div className="mt-3 flex gap-2">
-                    <form action={respondToTradeOffer}>
-                      <input type="hidden" name="tradeOfferId" value={offer.id} />
-                      <input type="hidden" name="decision" value="accept" />
-                      <button
-                        type="submit"
-                        className="rounded-full bg-black px-4 py-1.5 text-xs font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
-                      >
-                        Accepter
-                      </button>
-                    </form>
+                    {!tradeDeadlinePassed && (
+                      <form action={respondToTradeOffer}>
+                        <input type="hidden" name="tradeOfferId" value={offer.id} />
+                        <input type="hidden" name="decision" value="accept" />
+                        <button
+                          type="submit"
+                          className="rounded-full bg-black px-4 py-1.5 text-xs font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+                        >
+                          Accepter
+                        </button>
+                      </form>
+                    )}
                     <form action={respondToTradeOffer}>
                       <input type="hidden" name="tradeOfferId" value={offer.id} />
                       <input type="hidden" name="decision" value="reject" />

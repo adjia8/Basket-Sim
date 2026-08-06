@@ -35,3 +35,9 @@ export function draftPickTradeValue(
 // Assez permissif pour rester jouable, assez strict pour bloquer les échanges
 // absurdes (ex: un joueur de banc contre une superstar).
 export const TRADE_ACCEPT_TOLERANCE = 0.9;
+
+// Date limite des échanges : pas de vraie horloge murale dans ce jeu (le temps
+// n'avance qu'au fil des matchs simulés), donc calée sur la progression de la
+// saison en cours plutôt que sur une date — comme la vraie date limite NBA,
+// qui tombe aux alentours des deux tiers de la saison régulière.
+export const TRADE_DEADLINE_SEASON_FRACTION = 0.65;

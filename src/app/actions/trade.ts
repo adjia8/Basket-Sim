@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getLeagueById } from "@/lib/data-access/leagues";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getPayrollForTeam } from "@/lib/data-access/contracts";
+import { isTradeDeadlinePassed } from "@/lib/data-access/season-windows";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import {
   MAX_ROSTER_SIZE,
@@ -35,6 +36,10 @@ export async function proposeTrade(
     include: { career: true },
   });
   if (!membership) return { error: "Aucune carrière." };
+
+  if (await isTradeDeadlinePassed(membership.careerId, membership.career.season)) {
+    return { error: "La date limite des échanges est dépassée pour cette saison." };
+  }
 
   if (
     myPlayerIds.length + myPickIds.length === 0 ||
@@ -235,6 +240,7 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
     league,
     fromCurrentPayroll,
     toCurrentPayroll,
+    deadlinePassed,
   ] = await Promise.all([
     prisma.contract.findMany({
       where: { careerId: membership.careerId, playerId: { in: fromPlayerIds } },
@@ -253,6 +259,7 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
     getLeagueById(membership.career.leagueId),
     getPayrollForTeam(membership.careerId, offer.fromTeamId),
     getPayrollForTeam(membership.careerId, offer.toTeamId),
+    isTradeDeadlinePassed(membership.careerId, membership.career.season),
   ]);
 
   const fromPlayersValid =
@@ -278,6 +285,7 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
   const toNewPayroll = toCurrentPayroll - toSalaryOut + fromSalaryOut;
 
   const stillValid =
+    !deadlinePassed &&
     fromPlayersValid &&
     toPlayersValid &&
     fromPicksValid &&

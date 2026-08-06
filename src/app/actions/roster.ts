@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { generateContractTerms } from "@/lib/careers/generate-contracts";
 import { getLeagueById } from "@/lib/data-access/leagues";
 import { getPayrollForTeam } from "@/lib/data-access/contracts";
+import { isFreeAgencyOpen } from "@/lib/data-access/season-windows";
 import { MAX_ROSTER_SIZE, MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 
 function revalidateRosterPaths(teamId: string) {
@@ -82,6 +83,7 @@ export async function signFreeAgent(formData: FormData): Promise<void> {
   if (!player || player.leagueId !== membership.career.leagueId) return;
   if (existingContract) return; // déjà sous contrat dans cette Career
   if (rosterSize >= MAX_ROSTER_SIZE) return;
+  if (!(await isFreeAgencyOpen(membership.careerId, membership.career.season))) return;
 
   // Calculée une seule fois : generateContractTerms tire un salaire aléatoire,
   // la réutiliser pour la vérification du cap ET l'insertion évite un montant

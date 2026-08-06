@@ -4,6 +4,7 @@ import { getContractsForTeam, getPayrollForTeam } from "@/lib/data-access/contra
 import { getLeagueById } from "@/lib/data-access/leagues";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getRosterForTeam } from "@/lib/data-access/players";
+import { isTradeDeadlinePassed } from "@/lib/data-access/season-windows";
 import { getTeamById } from "@/lib/data-access/teams";
 import { prisma } from "@/lib/prisma";
 import { RosterTable, type RosterPlayer } from "@/components/team/RosterTable";
@@ -38,7 +39,7 @@ export default async function TeamRosterPage({
   const team = await getTeamById(teamId);
   if (!team) notFound();
 
-  const [roster, contracts, league, manager, totalPayroll, deadCap, picks] = await Promise.all([
+  const [roster, contracts, league, manager, totalPayroll, deadCap, picks, tradeDeadlinePassed] = await Promise.all([
     getRosterForTeam(membership.careerId, teamId),
     getContractsForTeam(membership.careerId, teamId),
     getLeagueById(team.leagueId),
@@ -46,6 +47,7 @@ export default async function TeamRosterPage({
     getPayrollForTeam(membership.careerId, teamId),
     prisma.deadCap.findMany({ where: { careerId: membership.careerId, teamId } }),
     getPendingPicksForTeam(membership.careerId, teamId),
+    isTradeDeadlinePassed(membership.careerId, membership.season),
   ]);
 
   const contractByPlayerId = new Map(contracts.map((c) => [c.playerId, c]));
@@ -156,7 +158,14 @@ export default async function TeamRosterPage({
         </div>
       )}
 
-      {isOpponentInMyLeague && (
+      {isOpponentInMyLeague && tradeDeadlinePassed && (
+        <p className="mt-8 rounded-lg border border-black/10 p-4 text-sm text-red-500 dark:border-white/10">
+          Date limite des échanges dépassée pour cette saison — les échanges
+          rouvriront à la saison prochaine.
+        </p>
+      )}
+
+      {isOpponentInMyLeague && !tradeDeadlinePassed && (
         <TradeProposalForm
           myRoster={myRosterWithContracts}
           theirRoster={rosterWithContracts}
