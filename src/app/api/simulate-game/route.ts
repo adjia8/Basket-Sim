@@ -6,6 +6,7 @@ import { getRosterForTeam } from "@/lib/data-access/players";
 import { getGameById, setGameReady, updateGameResult } from "@/lib/data-access/schedule";
 import { getTeamById } from "@/lib/data-access/teams";
 import { simulationEngine } from "@/lib/simulation/mockEngine";
+import { recordPlayoffGameResult } from "@/lib/data-access/playoffs";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -97,6 +98,10 @@ export async function POST(request: Request) {
     awayRoster
   );
   const updated = await updateGameResult(membership.careerId, gameId, result);
+
+  if (updated?.playoffSeriesId) {
+    await recordPlayoffGameResult(updated.playoffSeriesId, result.homeScore, result.awayScore);
+  }
 
   return NextResponse.json({ simulated: true, game: updated });
 }

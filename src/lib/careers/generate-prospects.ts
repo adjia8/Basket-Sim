@@ -13,7 +13,6 @@ const LAST_NAMES = [
   "Dubois", "Ferreira", "Kowalski", "Adeyemi", "Novak",
 ];
 const POSITIONS: Position[] = ["PG", "SG", "SF", "PF", "C"];
-const CLASS_SIZE = 12;
 
 function randomInt(min: number, max: number): number {
   return min + Math.floor(Math.random() * (max - min + 1));
@@ -29,9 +28,10 @@ function spreadAround(overall: number): number {
 
 export async function generateProspectClass(
   careerId: string,
-  leagueId: string
+  leagueId: string,
+  classSize: number
 ): Promise<void> {
-  const rows = Array.from({ length: CLASS_SIZE }, () => {
+  const rows = Array.from({ length: classSize }, () => {
     const overallRating = randomInt(55, 82); // rookies, pas encore des stars
     return {
       careerId,

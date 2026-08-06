@@ -61,4 +61,74 @@ export const playersWnba: Player[] = [
   mkPlayer({ id: "lexie-hull", teamId: "indiana-fever", leagueId: "wnba", firstName: "Lexie", lastName: "Hull", position: "SG", jerseyNumber: 10, heightCm: 183, age: 25, overallRating: 72 }),
   mkPlayer({ id: "grace-berger", teamId: "indiana-fever", leagueId: "wnba", firstName: "Grace", lastName: "Berger", position: "PG", jerseyNumber: 15, heightCm: 185, age: 25, overallRating: 66 }),
   mkPlayer({ id: "temi-fagbenle", teamId: "indiana-fever", leagueId: "wnba", firstName: "Temi", lastName: "Fagbenle", position: "C", jerseyNumber: 4, heightCm: 196, age: 32, overallRating: 65 }),
+
+  // --- Atlanta Dream ---
+  mkPlayer({ id: "rhyne-howard", teamId: "atlanta-dream", leagueId: "wnba", firstName: "Rhyne", lastName: "Howard", position: "SG", jerseyNumber: 10, heightCm: 185, age: 25, overallRating: 84 }),
+  mkPlayer({ id: "allisha-gray", teamId: "atlanta-dream", leagueId: "wnba", firstName: "Allisha", lastName: "Gray", position: "SF", jerseyNumber: 15, heightCm: 178, age: 30, overallRating: 85 }),
+  mkPlayer({ id: "brittney-griner", teamId: "atlanta-dream", leagueId: "wnba", firstName: "Brittney", lastName: "Griner", position: "C", jerseyNumber: 42, heightCm: 206, age: 34, overallRating: 86 }),
+  mkPlayer({ id: "jordin-canada", teamId: "atlanta-dream", leagueId: "wnba", firstName: "Jordin", lastName: "Canada", position: "PG", jerseyNumber: 21, heightCm: 170, age: 29, overallRating: 78 }),
+  mkPlayer({ id: "naz-hillmon", teamId: "atlanta-dream", leagueId: "wnba", firstName: "Naz", lastName: "Hillmon", position: "PF", jerseyNumber: 5, heightCm: 185, age: 25, overallRating: 74 }),
+  mkPlayer({ id: "te-hina-paopao", teamId: "atlanta-dream", leagueId: "wnba", firstName: "Te-Hina", lastName: "Paopao", position: "PG", jerseyNumber: 12, heightCm: 173, age: 22, overallRating: 71 }),
+  mkPlayer({ id: "maya-caldwell", teamId: "atlanta-dream", leagueId: "wnba", firstName: "Maya", lastName: "Caldwell", position: "SG", jerseyNumber: 2, heightCm: 178, age: 24, overallRating: 70 }),
+  mkPlayer({ id: "taylor-thierry", teamId: "atlanta-dream", leagueId: "wnba", firstName: "Taylor", lastName: "Thierry", position: "SF", jerseyNumber: 34, heightCm: 185, age: 22, overallRating: 69 }),
+
+  // --- Chicago Sky ---
+  mkPlayer({ id: "angel-reese", teamId: "chicago-sky", leagueId: "wnba", firstName: "Angel", lastName: "Reese", position: "PF", jerseyNumber: 5, heightCm: 190, age: 23, overallRating: 84 }),
+  mkPlayer({ id: "kamilla-cardoso", teamId: "chicago-sky", leagueId: "wnba", firstName: "Kamilla", lastName: "Cardoso", position: "C", jerseyNumber: 10, heightCm: 201, age: 24, overallRating: 77 }),
+  mkPlayer({ id: "ariel-atkins", teamId: "chicago-sky", leagueId: "wnba", firstName: "Ariel", lastName: "Atkins", position: "SG", jerseyNumber: 7, heightCm: 178, age: 28, overallRating: 78 }),
+  mkPlayer({ id: "hailey-van-lith", teamId: "chicago-sky", leagueId: "wnba", firstName: "Hailey", lastName: "Van Lith", position: "PG", jerseyNumber: 11, heightCm: 178, age: 23, overallRating: 72 }),
+  mkPlayer({ id: "michaela-onyenwere", teamId: "chicago-sky", leagueId: "wnba", firstName: "Michaela", lastName: "Onyenwere", position: "SF", jerseyNumber: 24, heightCm: 183, age: 25, overallRating: 70 }),
+  mkPlayer({ id: "elizabeth-williams", teamId: "chicago-sky", leagueId: "wnba", firstName: "Elizabeth", lastName: "Williams", position: "C", jerseyNumber: 1, heightCm: 191, age: 32, overallRating: 71 }),
+  mkPlayer({ id: "maddy-westbeld", teamId: "chicago-sky", leagueId: "wnba", firstName: "Maddy", lastName: "Westbeld", position: "PF", jerseyNumber: 24, heightCm: 188, age: 23, overallRating: 69 }),
+  mkPlayer({ id: "rebecca-allen", teamId: "chicago-sky", leagueId: "wnba", firstName: "Rebecca", lastName: "Allen", position: "SF", jerseyNumber: 9, heightCm: 185, age: 32, overallRating: 68 }),
+
+  // --- Washington Mystics ---
+  mkPlayer({ id: "brittney-sykes", teamId: "washington-mystics", leagueId: "wnba", firstName: "Brittney", lastName: "Sykes", position: "SG", jerseyNumber: 42, heightCm: 175, age: 31, overallRating: 80 }),
+  mkPlayer({ id: "shakira-austin", teamId: "washington-mystics", leagueId: "wnba", firstName: "Shakira", lastName: "Austin", position: "C", jerseyNumber: 0, heightCm: 193, age: 25, overallRating: 76 }),
+  mkPlayer({ id: "kiki-iriafen", teamId: "washington-mystics", leagueId: "wnba", firstName: "Kiki", lastName: "Iriafen", position: "PF", jerseyNumber: 44, heightCm: 190, age: 22, overallRating: 76 }),
+  mkPlayer({ id: "sonia-citron", teamId: "washington-mystics", leagueId: "wnba", firstName: "Sonia", lastName: "Citron", position: "SG", jerseyNumber: 3, heightCm: 183, age: 22, overallRating: 75 }),
+  mkPlayer({ id: "aaliyah-edwards", teamId: "washington-mystics", leagueId: "wnba", firstName: "Aaliyah", lastName: "Edwards", position: "PF", jerseyNumber: 25, heightCm: 190, age: 22, overallRating: 74 }),
+  mkPlayer({ id: "georgia-amoore", teamId: "washington-mystics", leagueId: "wnba", firstName: "Georgia", lastName: "Amoore", position: "PG", jerseyNumber: 14, heightCm: 170, age: 23, overallRating: 72 }),
+  mkPlayer({ id: "jade-melbourne", teamId: "washington-mystics", leagueId: "wnba", firstName: "Jade", lastName: "Melbourne", position: "PG", jerseyNumber: 2, heightCm: 173, age: 21, overallRating: 68 }),
+  mkPlayer({ id: "sug-sutton", teamId: "washington-mystics", leagueId: "wnba", firstName: "Sug", lastName: "Sutton", position: "PG", jerseyNumber: 4, heightCm: 175, age: 27, overallRating: 67 }),
+
+  // --- Dallas Wings ---
+  mkPlayer({ id: "paige-bueckers", teamId: "dallas-wings", leagueId: "wnba", firstName: "Paige", lastName: "Bueckers", position: "PG", jerseyNumber: 5, heightCm: 180, age: 23, overallRating: 86 }),
+  mkPlayer({ id: "arike-ogunbowale", teamId: "dallas-wings", leagueId: "wnba", firstName: "Arike", lastName: "Ogunbowale", position: "SG", jerseyNumber: 24, heightCm: 175, age: 28, overallRating: 87 }),
+  mkPlayer({ id: "myisha-hines-allen", teamId: "dallas-wings", leagueId: "wnba", firstName: "Myisha", lastName: "Hines-Allen", position: "PF", jerseyNumber: 2, heightCm: 188, age: 28, overallRating: 76 }),
+  mkPlayer({ id: "maddy-siegrist", teamId: "dallas-wings", leagueId: "wnba", firstName: "Maddy", lastName: "Siegrist", position: "PF", jerseyNumber: 32, heightCm: 188, age: 24, overallRating: 72 }),
+  mkPlayer({ id: "luisa-geiselsoder", teamId: "dallas-wings", leagueId: "wnba", firstName: "Luisa", lastName: "Geiselsoder", position: "PF", jerseyNumber: 21, heightCm: 191, age: 22, overallRating: 68 }),
+  mkPlayer({ id: "jj-quinerly", teamId: "dallas-wings", leagueId: "wnba", firstName: "JJ", lastName: "Quinerly", position: "PG", jerseyNumber: 15, heightCm: 175, age: 23, overallRating: 70 }),
+  mkPlayer({ id: "aziaha-james", teamId: "dallas-wings", leagueId: "wnba", firstName: "Aziaha", lastName: "James", position: "SG", jerseyNumber: 32, heightCm: 178, age: 22, overallRating: 69 }),
+  mkPlayer({ id: "deyona-gaston", teamId: "dallas-wings", leagueId: "wnba", firstName: "DeYona", lastName: "Gaston", position: "SF", jerseyNumber: 11, heightCm: 185, age: 24, overallRating: 66 }),
+
+  // --- Los Angeles Sparks ---
+  mkPlayer({ id: "dearica-hamby", teamId: "los-angeles-sparks", leagueId: "wnba", firstName: "Dearica", lastName: "Hamby", position: "PF", jerseyNumber: 5, heightCm: 185, age: 31, overallRating: 80 }),
+  mkPlayer({ id: "cameron-brink", teamId: "los-angeles-sparks", leagueId: "wnba", firstName: "Cameron", lastName: "Brink", position: "PF", jerseyNumber: 22, heightCm: 196, age: 23, overallRating: 78 }),
+  mkPlayer({ id: "rickea-jackson", teamId: "los-angeles-sparks", leagueId: "wnba", firstName: "Rickea", lastName: "Jackson", position: "SF", jerseyNumber: 2, heightCm: 185, age: 23, overallRating: 77 }),
+  mkPlayer({ id: "azura-stevens", teamId: "los-angeles-sparks", leagueId: "wnba", firstName: "Azura", lastName: "Stevens", position: "PF", jerseyNumber: 23, heightCm: 196, age: 27, overallRating: 76 }),
+  mkPlayer({ id: "julie-vanloo", teamId: "los-angeles-sparks", leagueId: "wnba", firstName: "Julie", lastName: "Vanloo", position: "PG", jerseyNumber: 3, heightCm: 175, age: 30, overallRating: 72 }),
+  mkPlayer({ id: "odyssey-sims", teamId: "los-angeles-sparks", leagueId: "wnba", firstName: "Odyssey", lastName: "Sims", position: "PG", jerseyNumber: 1, heightCm: 173, age: 33, overallRating: 71 }),
+  mkPlayer({ id: "sarah-ashlee-barker", teamId: "los-angeles-sparks", leagueId: "wnba", firstName: "Sarah Ashlee", lastName: "Barker", position: "SG", jerseyNumber: 15, heightCm: 180, age: 23, overallRating: 68 }),
+  mkPlayer({ id: "emily-engstler", teamId: "los-angeles-sparks", leagueId: "wnba", firstName: "Emily", lastName: "Engstler", position: "PF", jerseyNumber: 21, heightCm: 188, age: 24, overallRating: 68 }),
+
+  // --- Phoenix Mercury ---
+  mkPlayer({ id: "satou-sabally", teamId: "phoenix-mercury", leagueId: "wnba", firstName: "Satou", lastName: "Sabally", position: "PF", jerseyNumber: 0, heightCm: 196, age: 27, overallRating: 85 }),
+  mkPlayer({ id: "kahleah-copper", teamId: "phoenix-mercury", leagueId: "wnba", firstName: "Kahleah", lastName: "Copper", position: "SG", jerseyNumber: 2, heightCm: 178, age: 31, overallRating: 83 }),
+  mkPlayer({ id: "natasha-cloud", teamId: "phoenix-mercury", leagueId: "wnba", firstName: "Natasha", lastName: "Cloud", position: "PG", jerseyNumber: 9, heightCm: 180, age: 33, overallRating: 76 }),
+  mkPlayer({ id: "sami-whitcomb", teamId: "phoenix-mercury", leagueId: "wnba", firstName: "Sami", lastName: "Whitcomb", position: "SG", jerseyNumber: 4, heightCm: 178, age: 36, overallRating: 71 }),
+  mkPlayer({ id: "julie-allemand", teamId: "phoenix-mercury", leagueId: "wnba", firstName: "Julie", lastName: "Allemand", position: "PG", jerseyNumber: 20, heightCm: 173, age: 28, overallRating: 70 }),
+  mkPlayer({ id: "monique-akoa-makani", teamId: "phoenix-mercury", leagueId: "wnba", firstName: "Monique", lastName: "Akoa Makani", position: "PG", jerseyNumber: 13, heightCm: 175, age: 26, overallRating: 68 }),
+  mkPlayer({ id: "kalani-brown", teamId: "phoenix-mercury", leagueId: "wnba", firstName: "Kalani", lastName: "Brown", position: "C", jerseyNumber: 42, heightCm: 196, age: 28, overallRating: 69 }),
+  mkPlayer({ id: "lorela-cubaj", teamId: "phoenix-mercury", leagueId: "wnba", firstName: "Lorela", lastName: "Cubaj", position: "PF", jerseyNumber: 34, heightCm: 191, age: 25, overallRating: 67 }),
+
+  // --- Golden State Valkyries ---
+  mkPlayer({ id: "kayla-thornton", teamId: "golden-state-valkyries", leagueId: "wnba", firstName: "Kayla", lastName: "Thornton", position: "SF", jerseyNumber: 6, heightCm: 188, age: 32, overallRating: 78 }),
+  mkPlayer({ id: "veronica-burton", teamId: "golden-state-valkyries", leagueId: "wnba", firstName: "Veronica", lastName: "Burton", position: "PG", jerseyNumber: 22, heightCm: 178, age: 25, overallRating: 74 }),
+  mkPlayer({ id: "cecilia-zandalasini", teamId: "golden-state-valkyries", leagueId: "wnba", firstName: "Cecilia", lastName: "Zandalasini", position: "SF", jerseyNumber: 5, heightCm: 185, age: 29, overallRating: 73 }),
+  mkPlayer({ id: "monique-billings", teamId: "golden-state-valkyries", leagueId: "wnba", firstName: "Monique", lastName: "Billings", position: "PF", jerseyNumber: 25, heightCm: 193, age: 28, overallRating: 72 }),
+  mkPlayer({ id: "kate-martin", teamId: "golden-state-valkyries", leagueId: "wnba", firstName: "Kate", lastName: "Martin", position: "SG", jerseyNumber: 20, heightCm: 183, age: 24, overallRating: 70 }),
+  mkPlayer({ id: "janelle-salaun", teamId: "golden-state-valkyries", leagueId: "wnba", firstName: "Janelle", lastName: "Salaun", position: "SF", jerseyNumber: 13, heightCm: 188, age: 22, overallRating: 69 }),
+  mkPlayer({ id: "carla-leite", teamId: "golden-state-valkyries", leagueId: "wnba", firstName: "Carla", lastName: "Leite", position: "SG", jerseyNumber: 8, heightCm: 178, age: 20, overallRating: 68 }),
+  mkPlayer({ id: "iliana-rupert", teamId: "golden-state-valkyries", leagueId: "wnba", firstName: "Iliana", lastName: "Rupert", position: "C", jerseyNumber: 15, heightCm: 196, age: 24, overallRating: 67 }),
 ];

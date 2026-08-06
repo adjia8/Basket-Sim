@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: "/free-agents", label: "Agents libres" },
   { href: "/draft", label: "Draft" },
   { href: "/trades", label: "Échanges" },
+  { href: "/playoffs", label: "Playoffs" },
 ];
 
 export async function NavBar() {

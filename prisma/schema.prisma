@@ -20,20 +20,21 @@ model User {
 }
 
 model Career {
-  id           String        @id @default(cuid())
-  inviteCode   String        @unique
-  leagueId     String
-  league       League        @relation(fields: [leagueId], references: [id])
-  season       String
-  createdAt    DateTime      @default(now())
-  memberships  Membership[]
-  games        Game[]
-  contracts    Contract[]
-  playerStates PlayerState[]
-  prospects    Prospect[]
-  tradeOffers  TradeOffer[]
-  draftPicks   DraftPick[]
-  deadCap      DeadCap[]
+  id            String          @id @default(cuid())
+  inviteCode    String          @unique
+  leagueId      String
+  league        League          @relation(fields: [leagueId], references: [id])
+  season        String
+  createdAt     DateTime        @default(now())
+  memberships   Membership[]
+  games         Game[]
+  contracts     Contract[]
+  playerStates  PlayerState[]
+  prospects     Prospect[]
+  tradeOffers   TradeOffer[]
+  draftPicks    DraftPick[]
+  deadCap       DeadCap[]
+  playoffSeries PlayoffSeries[]
 }
 
 // Qui gère quelle équipe dans une Career (ligue) partagée. Un compte n'est
@@ -78,11 +79,11 @@ model Conference {
 }
 
 model Team {
-  id                 String       @id
+  id                 String          @id
   leagueId           String
-  league             League       @relation(fields: [leagueId], references: [id])
+  league             League          @relation(fields: [leagueId], references: [id])
   conferenceId       String
-  conference         Conference   @relation(fields: [conferenceId], references: [id])
+  conference         Conference      @relation(fields: [conferenceId], references: [id])
   city               String
   name               String
   abbreviation       String
@@ -90,12 +91,14 @@ model Team {
   secondaryColor     String
   players            Player[]
   memberships        Membership[]
-  homeGames          Game[]       @relation("HomeTeam")
-  awayGames          Game[]       @relation("AwayTeam")
+  homeGames          Game[]          @relation("HomeTeam")
+  awayGames          Game[]          @relation("AwayTeam")
   contracts          Contract[]
-  draftPicks         DraftPick[]  @relation("DraftPickCurrentTeam")
-  originalDraftPicks DraftPick[]  @relation("DraftPickOriginalTeam")
+  draftPicks         DraftPick[]     @relation("DraftPickCurrentTeam")
+  originalDraftPicks DraftPick[]     @relation("DraftPickOriginalTeam")
   deadCap            DeadCap[]
+  homePlayoffSeries  PlayoffSeries[] @relation("PlayoffSeriesHomeTeam")
+  awayPlayoffSeries  PlayoffSeries[] @relation("PlayoffSeriesAwayTeam")
 
   @@index([leagueId])
   @@index([conferenceId])
@@ -143,7 +146,47 @@ model Game {
   homeReady  Boolean  @default(false)
   awayReady  Boolean  @default(false)
 
+  playoffSeriesId String?
+  playoffSeries   PlayoffSeries? @relation(fields: [playoffSeriesId], references: [id], onDelete: SetNull)
+  gameNumber      Int? // position dans la série (1er match, 2e, ...) — détermine qui reçoit
+
   @@index([careerId])
+  @@index([playoffSeriesId])
+}
+
+// Une série de playoffs (ou un match unique de play-in, bestOf = 1). Rejoue
+// exactement comme un match de saison régulière (même Game, mêmes homeReady/
+// awayReady) : seul l'agrégat homeWins/awayWins et la clôture de la série
+// diffèrent. season porte le suffixe "-playoffs" pour rester hors du champ
+// des requêtes de saison régulière (classement, calendrier, date limite des
+// échanges) sans aucune modification de ces requêtes.
+model PlayoffSeries {
+  id           String  @id @default(cuid())
+  careerId     String
+  career       Career  @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  season       String
+  conference   String? // null pour la WNBA (pas de logique de conférence) et la finale NBA
+  round        String // "play-in-7-8" | "play-in-9-10" | "play-in-final" | "round-1" | "conf-semis" | "conf-finals" | "finals" (NBA)
+  // "round-1" | "semifinals" | "finals" (WNBA)
+  // Position dans le bracket de ce tour (0-indexé) : le tour suivant apparie
+  // slotIndex i avec le dernier slotIndex (n-1-i), pas de reseeding dynamique
+  // sur le seed — nécessaire pour retrouver l'ordre du bracket sur plusieurs
+  // tours (le seed du vainqueur d'une série ne dit pas à lui seul sa position
+  // dans l'arbre).
+  slotIndex    Int     @default(0)
+  bestOf       Int
+  homeSeed     Int
+  homeTeamId   String
+  homeTeam     Team    @relation("PlayoffSeriesHomeTeam", fields: [homeTeamId], references: [id])
+  awaySeed     Int
+  awayTeamId   String
+  awayTeam     Team    @relation("PlayoffSeriesAwayTeam", fields: [awayTeamId], references: [id])
+  homeWins     Int     @default(0)
+  awayWins     Int     @default(0)
+  winnerTeamId String?
+  games        Game[]
+
+  @@index([careerId, season])
 }
 
 model Contract {

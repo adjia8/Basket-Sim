@@ -5,6 +5,7 @@ import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getScheduleForCareer } from "@/lib/data-access/schedule";
 import { getStandings } from "@/lib/data-access/standings";
+import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
 import { generateCareerSchedule } from "@/lib/careers/generate-schedule";
 import { generateProspectClass } from "@/lib/careers/generate-prospects";
 import {
@@ -32,6 +33,11 @@ export async function advanceSeason(): Promise<void> {
     currentSeasonGames.every((g) => g.status === "final");
   if (!seasonComplete) return;
 
+  // La saison régulière terminée ne suffit pas : il faut aussi qu'un champion
+  // de playoffs soit désigné (avance/crée le bracket au passage si besoin).
+  const playoffs = await getOrAdvancePlayoffs(career.id, career.season, career.leagueId);
+  if (!playoffs?.champion) return;
+
   // Ordre du draft basé sur le classement de la saison qui vient de se
   // terminer (la pire équipe choisit en premier) — calculé maintenant, avant
   // que `career.season` soit écrasé par la nouvelle saison plus bas.
@@ -41,6 +47,7 @@ export async function advanceSeason(): Promise<void> {
       ? a.wins - b.wins
       : a.pointsFor - a.pointsAgainst - (b.pointsFor - b.pointsAgainst)
   );
+  const draftOrderTeamIds = draftOrder.map((row) => row.teamId);
 
   // 1. Contrats : décrément, résiliation à 0 (le joueur devient agent libre).
   await prisma.contract.updateMany({
@@ -86,8 +93,10 @@ export async function advanceSeason(): Promise<void> {
   });
 
   // 4. Nouvelle classe de prospects (l'ancienne, non draftée, disparaît).
+  // 2 tours × nb d'équipes de la ligue : toujours assez de prospects pour
+  // que chaque pick ait un candidat disponible.
   await prisma.prospect.deleteMany({ where: { careerId: career.id } });
-  await generateProspectClass(career.id, career.leagueId);
+  await generateProspectClass(career.id, career.leagueId, draftOrderTeamIds.length * 2);
 
   // 4bis. Résout les picks de la nouvelle saison (déjà créés à l'avance, non
   // résolus, à la création de la carrière ou lors d'un rollover précédent —
@@ -96,7 +105,6 @@ export async function advanceSeason(): Promise<void> {
   // propriétaire actuel : un pick déjà échangé garde son nouveau
   // propriétaire, seul le classement de qui l'a "généré" compte pour sa
   // position.
-  const draftOrderTeamIds = draftOrder.map((row) => row.teamId);
   await createUnresolvedPicksForSeason(career.id, newSeason, draftOrderTeamIds);
   for (let round = 1; round <= 2; round++) {
     for (let i = 0; i < draftOrderTeamIds.length; i++) {

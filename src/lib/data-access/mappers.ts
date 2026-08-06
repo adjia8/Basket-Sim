@@ -141,5 +141,6 @@ export function toDomainGame(row: PrismaGame): Game {
       : undefined,
     homeReady: row.homeReady,
     awayReady: row.awayReady,
+    playoffSeriesId: row.playoffSeriesId ?? undefined,
   };
 }

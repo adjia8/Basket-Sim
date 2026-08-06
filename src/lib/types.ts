@@ -78,6 +78,7 @@ export interface Game {
   boxScore?: BoxScoreEntry[];
   homeReady: boolean;
   awayReady: boolean;
+  playoffSeriesId?: string;
 }
 
 // --- Contrat ---

@@ -12,6 +12,8 @@ export function DashboardClient({
   payroll,
   salaryCap,
   seasonComplete,
+  playoffsInProgress,
+  championTeamName,
   inviteCode,
 }: {
   teamId: string;
@@ -22,6 +24,8 @@ export function DashboardClient({
   payroll: number;
   salaryCap: number;
   seasonComplete: boolean;
+  playoffsInProgress: boolean;
+  championTeamName?: string;
   inviteCode: string;
 }) {
   const myTeam = teams.find((t) => t.id === teamId);
@@ -54,9 +58,23 @@ export function DashboardClient({
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 px-4 py-8">
-      {seasonComplete && (
+      {seasonComplete && playoffsInProgress && (
         <div className="flex items-center justify-between rounded-lg border border-black/10 bg-black/5 px-4 py-3 dark:border-white/10 dark:bg-white/10">
-          <p className="text-sm font-medium">Saison terminée !</p>
+          <p className="text-sm font-medium">Saison régulière terminée — playoffs en cours.</p>
+          <Link
+            href="/playoffs"
+            className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+          >
+            Voir les playoffs
+          </Link>
+        </div>
+      )}
+
+      {seasonComplete && !playoffsInProgress && (
+        <div className="flex items-center justify-between rounded-lg border border-black/10 bg-black/5 px-4 py-3 dark:border-white/10 dark:bg-white/10">
+          <p className="text-sm font-medium">
+            Saison terminée ! Champion : {championTeamName ?? "-"}
+          </p>
           <form action={advanceSeason}>
             <button
               type="submit"
