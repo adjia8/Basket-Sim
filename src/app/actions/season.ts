@@ -20,6 +20,24 @@ import { toDomainLeague } from "@/lib/data-access/mappers";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { applySeasonFinancials, getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { winPctForStandings } from "@/lib/careers/player-demands";
+import { getPlayoffResultTier } from "@/lib/data-access/playoffs";
+import { evaluateGmSeason, expectationForRoster, type ExpectationTier } from "@/lib/careers/gm-rules";
+
+const POACH_OFFER_CHANCE = 0.25;
+
+async function averageOverallForTeam(careerId: string, teamId: string): Promise<number> {
+  const contracts = await prisma.contract.findMany({
+    where: { careerId, teamId },
+    select: { playerId: true },
+  });
+  if (contracts.length === 0) return 50;
+  const states = await prisma.playerState.findMany({
+    where: { careerId, playerId: { in: contracts.map((c) => c.playerId) } },
+    select: { overallRating: true },
+  });
+  if (states.length === 0) return 50;
+  return states.reduce((sum, s) => sum + s.overallRating, 0) / states.length;
+}
 
 export async function advanceSeason(): Promise<void> {
   const { userId } = await verifySession();
@@ -133,6 +151,80 @@ export async function advanceSeason(): Promise<void> {
     const row = finishedStandings.find((s) => s.teamId === team.id);
     const winPct = winPctForStandings(row?.wins ?? 0, row?.losses ?? 0);
     await applySeasonFinancials(career.id, team.id, career.leagueId, winPct, team.marketAppeal);
+  }
+
+  // 2ter. Évaluation des GM humains : compare l'objectif de pré-saison au
+  // résultat réel des playoffs (+ pénalité si finances négatives en fin de
+  // saison), journalise le bilan, et déclenche avertissement/licenciement/
+  // offre de dépeçage. Doit tourner APRÈS les finances de l'étape 2bis (pour
+  // évaluer les finances à jour) et AVANT l'écrasement de career.season plus
+  // bas (finishedStandings/playoffs portent encore sur la saison qui se termine).
+  const gmMemberships = await prisma.membership.findMany({
+    where: { careerId: career.id },
+    include: { gmProfile: true },
+  });
+  for (const member of gmMemberships) {
+    const gmProfile = member.gmProfile;
+    if (!gmProfile) continue;
+
+    const standingsRow = finishedStandings.find((s) => s.teamId === member.teamId);
+    const [resultTier, teamState] = await Promise.all([
+      getPlayoffResultTier(career.id, career.season, member.teamId),
+      getOrCreateTeamState(career.id, member.teamId, career.leagueId),
+    ]);
+    const { outcome } = evaluateGmSeason(
+      gmProfile.currentExpectationTier as ExpectationTier,
+      resultTier,
+      teamState.finances < 0,
+      gmProfile.warningsAtCurrentTeam
+    );
+
+    await prisma.gmSeasonRecord.create({
+      data: {
+        gmProfileId: gmProfile.id,
+        teamId: member.teamId,
+        season: career.season,
+        wins: standingsRow?.wins ?? 0,
+        losses: standingsRow?.losses ?? 0,
+        expectationTier: gmProfile.currentExpectationTier,
+        resultTier,
+        outcome,
+      },
+    });
+
+    if (outcome === "fired") {
+      await prisma.gmProfile.update({
+        where: { id: gmProfile.id },
+        data: { pendingReassignment: true },
+      });
+      continue; // le GM viré choisira sa nouvelle franchise via /onboarding/reassign
+    }
+
+    const nextWarnings = outcome === "warning" ? gmProfile.warningsAtCurrentTeam + 1 : 0;
+    let pendingOfferTeamId: string | null = null;
+    if (outcome === "exceeded" && teamState.finances >= 0 && Math.random() < POACH_OFFER_CHANCE) {
+      const currentTeam = teams.find((t) => t.id === member.teamId);
+      const takenTeamIds = new Set(gmMemberships.map((m) => m.teamId));
+      const candidates = teams.filter(
+        (t) => !takenTeamIds.has(t.id) && t.marketAppeal > (currentTeam?.marketAppeal ?? 0)
+      );
+      if (candidates.length > 0) {
+        pendingOfferTeamId = candidates[Math.floor(Math.random() * candidates.length)].id;
+      }
+    }
+
+    // Objectif de la saison à venir : basé sur le roster tel qu'il sera
+    // (contrats/vieillissement déjà appliqués aux étapes 1-2 ci-dessus).
+    const nextAverageOverall = await averageOverallForTeam(career.id, member.teamId);
+    const nextTeam = teams.find((t) => t.id === member.teamId);
+    await prisma.gmProfile.update({
+      where: { id: gmProfile.id },
+      data: {
+        warningsAtCurrentTeam: nextWarnings,
+        pendingOfferTeamId,
+        currentExpectationTier: expectationForRoster(nextAverageOverall, nextTeam?.marketAppeal ?? 50),
+      },
+    });
   }
 
   // 3. Nouvelle saison (label déjà calculé plus haut, dans newSeason).

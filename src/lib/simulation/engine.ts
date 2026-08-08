@@ -12,6 +12,10 @@ export interface SimulationResult {
 export interface SimulationOptions {
   homeChemistry?: number;
   awayChemistry?: number;
+  // Bonus de force permanent du GM humain de l'équipe (0 pour une équipe IA
+  // ou sans GmProfile) — voir gm-rules.ts/getGmBonusForTeam.
+  homeGmBonus?: number;
+  awayGmBonus?: number;
 }
 
 export interface SimulationEngine {

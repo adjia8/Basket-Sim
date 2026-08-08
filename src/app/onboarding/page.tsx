@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getLeagues } from "@/lib/data-access/leagues";
-import { getAllTeams, getTeamsByLeague } from "@/lib/data-access/teams";
-import { getMembershipsForCareer } from "@/lib/data-access/memberships";
+import {
+  getFranchiseSummariesForCareer,
+  getFranchiseSummariesForNewCareer,
+} from "@/lib/data-access/franchise-summary";
 import { CareerForm } from "@/components/onboarding/CareerForm";
 import { JoinByCodeForm } from "@/components/onboarding/JoinByCodeForm";
 import { JoinCareerForm } from "@/components/onboarding/JoinCareerForm";
@@ -38,35 +40,37 @@ export default async function OnboardingPage({
       );
     }
 
-    const [teams, managers] = await Promise.all([
-      getTeamsByLeague(career.leagueId),
-      getMembershipsForCareer(career.id),
-    ]);
+    const slides = await getFranchiseSummariesForCareer(career.id, career.leagueId, false);
 
     return (
-      <div className="mx-auto max-w-5xl px-4 py-10">
+      <div className="mx-auto max-w-3xl px-4 py-10">
         <h1 className="text-2xl font-bold">Rejoindre la ligue</h1>
         <p className="mt-1 text-black/60 dark:text-white/60">
-          Choisis une franchise encore disponible.
+          Choisis une franchise encore disponible, puis crée ton GM.
         </p>
         <div className="mt-8">
-          <JoinCareerForm inviteCode={inviteCode} teams={teams} managers={managers} />
+          <JoinCareerForm inviteCode={inviteCode} slides={slides} />
         </div>
       </div>
     );
   }
 
-  const [leagues, teams] = await Promise.all([getLeagues(), getAllTeams()]);
+  const leagues = await getLeagues();
+  const summariesByLeague = Object.fromEntries(
+    await Promise.all(
+      leagues.map(async (league) => [league.id, await getFranchiseSummariesForNewCareer(league.id)] as const)
+    )
+  );
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
+    <div className="mx-auto max-w-3xl px-4 py-10">
       <h1 className="text-2xl font-bold">Quelle équipe veux-tu gérer ?</h1>
       <p className="mt-1 text-black/60 dark:text-white/60">
-        Choisis une ligue puis une franchise. Ta carrière commence
-        immédiatement.
+        Choisis une ligue puis une franchise, découvre ses finances/effectif/
+        objectifs, puis crée ton GM. Ta carrière commence immédiatement.
       </p>
       <div className="mt-8">
-        <CareerForm leagues={leagues} teams={teams} />
+        <CareerForm leagues={leagues} summariesByLeague={summariesByLeague} />
       </div>
 
       <div className="mt-12 border-t border-black/10 pt-8 dark:border-white/10">

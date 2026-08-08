@@ -13,6 +13,7 @@ import { advancePlayerRenown } from "@/lib/data-access/renown";
 import { advanceRosterFatigue, getRestDays } from "@/lib/data-access/fatigue";
 import { advanceTeamChemistry, getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { advanceRosterTraining } from "@/lib/data-access/training";
+import { getGmBonusForTeam } from "@/lib/data-access/gm";
 import { winPctForStandings } from "@/lib/careers/player-demands";
 import {
   chemistryTrainingBonus,
@@ -105,11 +106,13 @@ export async function POST(request: Request) {
   }
 
   const gameDate = new Date(updatedGame.gameDate);
-  const [homeRestDays, awayRestDays, homeTeamState, awayTeamState] = await Promise.all([
+  const [homeRestDays, awayRestDays, homeTeamState, awayTeamState, homeGm, awayGm] = await Promise.all([
     getRestDays(membership.careerId, updatedGame.homeTeamId, updatedGame.season, gameDate),
     getRestDays(membership.careerId, updatedGame.awayTeamId, updatedGame.season, gameDate),
     getOrCreateTeamState(membership.careerId, updatedGame.homeTeamId, updatedGame.leagueId),
     getOrCreateTeamState(membership.careerId, updatedGame.awayTeamId, updatedGame.leagueId),
+    getGmBonusForTeam(membership.careerId, updatedGame.homeTeamId),
+    getGmBonusForTeam(membership.careerId, updatedGame.awayTeamId),
   ]);
 
   // Les joueurs actuellement blessés ne jouent pas : exclus du roster transmis
@@ -123,7 +126,12 @@ export async function POST(request: Request) {
     homeRoster.filter(canPlay),
     awayTeam,
     awayRoster.filter(canPlay),
-    { homeChemistry: homeTeamState.chemistry, awayChemistry: awayTeamState.chemistry }
+    {
+      homeChemistry: homeTeamState.chemistry + homeGm.chemistry,
+      awayChemistry: awayTeamState.chemistry + awayGm.chemistry,
+      homeGmBonus: homeGm.strength,
+      awayGmBonus: awayGm.strength,
+    }
   );
   const updated = await updateGameResult(membership.careerId, gameId, result);
 

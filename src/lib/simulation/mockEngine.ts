@@ -82,7 +82,13 @@ function rotationOf(activeRoster: Player[]): Player[] {
   return [...activeRoster].sort((a, b) => playerImpact(b) - playerImpact(a)).slice(0, ROTATION_SIZE);
 }
 
-function teamStrength(activeRoster: Player[], chemistry: number): number {
+// gmBonus : bonus de force permanent apporté par le GM humain de l'équipe
+// (voir gm-rules.ts/getGmBonusForTeam) — 0 pour une équipe gérée par l'IA.
+// Ajouté après le multiplicateur de chimie, comme HOME_ADVANTAGE : un effet
+// "front-office" constant, pas une mécanique de rotation par joueur (donc
+// aucune dénormalisation sur Player nécessaire ici, contrairement au bonus
+// d'entraînement).
+function teamStrength(activeRoster: Player[], chemistry: number, gmBonus = 0): number {
   const rotation = rotationOf(activeRoster);
   if (rotation.length === 0) return 0;
   const starters = rotation.slice(0, 5);
@@ -92,7 +98,7 @@ function teamStrength(activeRoster: Player[], chemistry: number): number {
   const rawStrength = startersAvg * 0.75 + benchAvg * 0.25;
   // Chimie d'équipe : modificateur ±10% autour de la force brute.
   const chemistryMultiplier = 0.9 + (Math.max(0, Math.min(99, chemistry)) / 99) * 0.2;
-  return rawStrength * chemistryMultiplier;
+  return rawStrength * chemistryMultiplier + gmBonus;
 }
 
 function averageClutch(activeRoster: Player[]): number {
@@ -202,6 +208,8 @@ export class MockSimulationEngine implements SimulationEngine {
   ): SimulationResult {
     const homeChemistry = options?.homeChemistry ?? 50;
     const awayChemistry = options?.awayChemistry ?? 50;
+    const homeGmBonus = options?.homeGmBonus ?? 0;
+    const awayGmBonus = options?.awayGmBonus ?? 0;
     const quarterBase = basePointsForLeague(home.leagueId) / QUARTERS;
     const quarterHomeAdvantage = HOME_ADVANTAGE / QUARTERS;
 
@@ -216,8 +224,8 @@ export class MockSimulationEngine implements SimulationEngine {
       const homeRotation = rotationOf(homeActive);
       const awayRotation = rotationOf(awayActive);
 
-      const homeStrength = teamStrength(homeActive, homeChemistry) + quarterHomeAdvantage;
-      const awayStrength = teamStrength(awayActive, awayChemistry);
+      const homeStrength = teamStrength(homeActive, homeChemistry, homeGmBonus) + quarterHomeAdvantage;
+      const awayStrength = teamStrength(awayActive, awayChemistry, awayGmBonus);
 
       const homeQuarterScore = Math.max(
         15,

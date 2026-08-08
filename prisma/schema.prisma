@@ -44,17 +44,59 @@ model Career {
 // peut être prise que par un seul membre (@@unique([careerId, teamId])).
 // Une équipe sans Membership est gérée par l'IA.
 model Membership {
-  id       String   @id @default(cuid())
-  careerId String
-  career   Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
-  userId   String   @unique
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  teamId   String
-  team     Team     @relation(fields: [teamId], references: [id])
-  joinedAt DateTime @default(now())
+  id        String     @id @default(cuid())
+  careerId  String
+  career    Career     @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  teamId    String
+  team      Team       @relation(fields: [teamId], references: [id])
+  joinedAt  DateTime   @default(now())
+  gmProfile GmProfile?
 
   @@unique([careerId, teamId])
   @@index([careerId])
+}
+
+// Identité du GM incarné par ce Membership — 1:1, persiste tel quel à
+// travers un licenciement/dépeçage puisque Membership n'est jamais supprimée
+// ni recréée : seul teamId change (voir reassignFranchise/acceptPoachOffer).
+model GmProfile {
+  id                     String           @id @default(cuid())
+  membershipId           String           @unique
+  membership             Membership       @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  firstName              String
+  lastName               String
+  age                    Int
+  sex                    String // "M" | "F" | "autre"
+  offensePoints          Int
+  defensePoints          Int
+  physicalPoints         Int
+  tacticalPoints         Int
+  chemistryPoints        Int
+  hiredSeason            String // saison de prise de poste À L'ÉQUIPE ACTUELLE (reset au changement d'équipe)
+  currentExpectationTier String // objectif de la saison en cours
+  warningsAtCurrentTeam  Int              @default(0)
+  pendingReassignment    Boolean          @default(false) // vient d'être viré, doit choisir une nouvelle franchise
+  pendingOfferTeamId     String? // offre de dépeçage en attente de réponse
+  seasonRecords          GmSeasonRecord[]
+}
+
+// Journal historique (bilan de saison + de carrière), jamais modifié après création.
+model GmSeasonRecord {
+  id              String    @id @default(cuid())
+  gmProfileId     String
+  gmProfile       GmProfile @relation(fields: [gmProfileId], references: [id], onDelete: Cascade)
+  teamId          String
+  season          String
+  wins            Int
+  losses          Int
+  expectationTier String
+  resultTier      String
+  outcome         String // "met" | "exceeded" | "warning" | "fired" | "poached"
+  createdAt       DateTime  @default(now())
+
+  @@index([gmProfileId])
 }
 
 model League {

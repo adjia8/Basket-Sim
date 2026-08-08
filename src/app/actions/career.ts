@@ -15,9 +15,47 @@ import {
 } from "@/lib/careers/generate-draft-picks";
 import { toDomainLeague, toDomainPlayer } from "@/lib/data-access/mappers";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
+import { GM_POINT_POOL, expectationForRoster } from "@/lib/careers/gm-rules";
 
 export interface CreateCareerState {
   error?: string;
+}
+
+const VALID_SEXES = new Set(["M", "F", "autre"]);
+
+interface GmFormFields {
+  firstName: string;
+  lastName: string;
+  age: number;
+  sex: string;
+  offensePoints: number;
+  defensePoints: number;
+  physicalPoints: number;
+  tacticalPoints: number;
+  chemistryPoints: number;
+}
+
+// Ne fait jamais confiance au client pour la répartition des points — revalide
+// systématiquement que la somme égale exactement GM_POINT_POOL.
+function parseGmFields(formData: FormData): GmFormFields | null {
+  const firstName = String(formData.get("gmFirstName") ?? "").trim();
+  const lastName = String(formData.get("gmLastName") ?? "").trim();
+  const age = Number(formData.get("gmAge"));
+  const sex = String(formData.get("gmSex") ?? "");
+  const offensePoints = Number(formData.get("gmOffensePoints"));
+  const defensePoints = Number(formData.get("gmDefensePoints"));
+  const physicalPoints = Number(formData.get("gmPhysicalPoints"));
+  const tacticalPoints = Number(formData.get("gmTacticalPoints"));
+  const chemistryPoints = Number(formData.get("gmChemistryPoints"));
+
+  if (!firstName || !lastName) return null;
+  if (!Number.isInteger(age) || age < 25 || age > 80) return null;
+  if (!VALID_SEXES.has(sex)) return null;
+  const points = [offensePoints, defensePoints, physicalPoints, tacticalPoints, chemistryPoints];
+  if (points.some((p) => !Number.isInteger(p) || p < 0)) return null;
+  if (points.reduce((sum, p) => sum + p, 0) !== GM_POINT_POOL) return null;
+
+  return { firstName, lastName, age, sex, offensePoints, defensePoints, physicalPoints, tacticalPoints, chemistryPoints };
 }
 
 export async function createCareer(
@@ -27,6 +65,10 @@ export async function createCareer(
   const { userId } = await verifySession();
   const leagueId = String(formData.get("leagueId") ?? "");
   const teamId = String(formData.get("teamId") ?? "");
+  const gm = parseGmFields(formData);
+  if (!gm) {
+    return { error: "Identité du GM ou répartition des points invalide." };
+  }
 
   const [league, team, existing] = await Promise.all([
     prisma.league.findUnique({
@@ -44,7 +86,7 @@ export async function createCareer(
     redirect("/");
   }
 
-  let career: { id: string };
+  let career: { id: string; memberships: { id: string }[] };
   // Collision extrêmement improbable (32^6 combinaisons) — quelques tentatives suffisent.
   for (let attempt = 0; ; attempt++) {
     try {
@@ -55,6 +97,7 @@ export async function createCareer(
           inviteCode: generateInviteCode(),
           memberships: { create: { userId, teamId } },
         },
+        include: { memberships: true },
       });
       break;
     } catch (err) {
@@ -70,6 +113,28 @@ export async function createCareer(
   // des rosters pour pré-simuler les matchs déjà joués.
   const leaguePlayers = await prisma.player.findMany({ where: { leagueId } });
   const domainPlayers = leaguePlayers.map(toDomainPlayer);
+
+  const teamCatalogRoster = domainPlayers.filter((p) => p.teamId === teamId);
+  const teamAverageOverall = teamCatalogRoster.length
+    ? teamCatalogRoster.reduce((sum, p) => sum + p.overallRating, 0) / teamCatalogRoster.length
+    : 50;
+  await prisma.gmProfile.create({
+    data: {
+      membershipId: career.memberships[0].id,
+      firstName: gm.firstName,
+      lastName: gm.lastName,
+      age: gm.age,
+      sex: gm.sex,
+      offensePoints: gm.offensePoints,
+      defensePoints: gm.defensePoints,
+      physicalPoints: gm.physicalPoints,
+      tacticalPoints: gm.tacticalPoints,
+      chemistryPoints: gm.chemistryPoints,
+      hiredSeason: league.season,
+      currentExpectationTier: expectationForRoster(teamAverageOverall, team.marketAppeal),
+    },
+  });
+
   await generateCareerContracts(career.id, leagueId, domainPlayers);
   await generateCareerPlayerStates(career.id, domainPlayers);
   await generateCareerSchedule(career.id, toDomainLeague(league), {
@@ -102,6 +167,10 @@ export async function joinCareer(
     .trim()
     .toUpperCase();
   const teamId = String(formData.get("teamId") ?? "");
+  const gm = parseGmFields(formData);
+  if (!gm) {
+    return { error: "Identité du GM ou répartition des points invalide." };
+  }
 
   const [career, existing] = await Promise.all([
     prisma.career.findUnique({ where: { inviteCode } }),
@@ -122,8 +191,9 @@ export async function joinCareer(
     return { error: "Équipe invalide pour cette ligue." };
   }
 
+  let membership: { id: string };
   try {
-    await prisma.membership.create({
+    membership = await prisma.membership.create({
       data: { userId, careerId: career.id, teamId },
     });
   } catch (err) {
@@ -132,6 +202,30 @@ export async function joinCareer(
     }
     throw err;
   }
+
+  const roster = await prisma.contract.findMany({
+    where: { careerId: career.id, teamId },
+    include: { player: { select: { overallRating: true } } },
+  });
+  const teamAverageOverall = roster.length
+    ? roster.reduce((sum, c) => sum + c.player.overallRating, 0) / roster.length
+    : 50;
+  await prisma.gmProfile.create({
+    data: {
+      membershipId: membership.id,
+      firstName: gm.firstName,
+      lastName: gm.lastName,
+      age: gm.age,
+      sex: gm.sex,
+      offensePoints: gm.offensePoints,
+      defensePoints: gm.defensePoints,
+      physicalPoints: gm.physicalPoints,
+      tacticalPoints: gm.tacticalPoints,
+      chemistryPoints: gm.chemistryPoints,
+      hiredSeason: career.season,
+      currentExpectationTier: expectationForRoster(teamAverageOverall, team.marketAppeal),
+    },
+  });
 
   revalidatePath("/", "layout");
   redirect("/");

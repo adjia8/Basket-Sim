@@ -48,10 +48,17 @@ export const getCurrentMembership = cache(async (): Promise<CurrentMembership> =
   const { userId } = await verifySession();
   const membership = await prisma.membership.findUnique({
     where: { userId },
-    include: { career: true },
+    include: { career: true, gmProfile: { select: { pendingReassignment: true } } },
   });
   if (!membership) {
     redirect("/onboarding");
+  }
+  // GM viré en fin de saison : doit choisir une nouvelle franchise avant de
+  // pouvoir accéder au reste de l'app (voir src/app/onboarding/reassign/page.tsx,
+  // qui ne passe volontairement pas par getCurrentMembership pour éviter une
+  // boucle de redirection).
+  if (membership.gmProfile?.pendingReassignment) {
+    redirect("/onboarding/reassign");
   }
   return flattenMembership(membership);
 });

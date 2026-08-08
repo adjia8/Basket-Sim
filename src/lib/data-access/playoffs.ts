@@ -14,6 +14,7 @@ import {
   winsNeeded,
   type RoundSpec,
 } from "@/lib/careers/playoff-rules";
+import type { ExpectationTier } from "@/lib/careers/gm-rules";
 
 export interface PlayoffsState {
   series: PlayoffSeriesRow[];
@@ -368,4 +369,32 @@ export async function getOrAdvancePlayoffs(
 
   const champion = allSeries.find((s) => s.round === "finals")?.winnerTeamId ?? null;
   return { series: allSeries, champion };
+}
+
+// Résultat réel d'une équipe dans les playoffs d'une saison, sur la même
+// échelle que les objectifs GM (gm-rules.ts) — utilisé par l'évaluation de
+// fin de saison. Aucune série (pas atteint le play-in/les playoffs) →
+// "rebuild". La WNBA n'a que 3 tours (round-1/semifinals/finals, pas de
+// play-in ni de conf-semis) : "semifinals" est tassé sur "conf_finals" (même
+// profondeur relative dans un bracket à 3 tours qu'un conf-finals NBA dans
+// un bracket à 4 tours) — limite assumée, WNBA ne peut jamais atterrir
+// exactement sur "play_in"/"conf_semis" comme résultat réel.
+export async function getPlayoffResultTier(
+  careerId: string,
+  regularSeason: string,
+  teamId: string
+): Promise<ExpectationTier> {
+  const season = playoffSeason(regularSeason);
+  const series = await prisma.playoffSeries.findMany({
+    where: { careerId, season, OR: [{ homeTeamId: teamId }, { awayTeamId: teamId }] },
+  });
+  if (series.length === 0) return "rebuild";
+
+  const finals = series.find((s) => s.round === "finals");
+  if (finals) return finals.winnerTeamId === teamId ? "champion" : "nba_finals";
+  if (series.some((s) => s.round === "conf-finals" || s.round === "semifinals")) return "conf_finals";
+  if (series.some((s) => s.round === "conf-semis")) return "conf_semis";
+  if (series.some((s) => s.round === "round-1")) return "playoffs";
+  if (series.some((s) => s.round.startsWith("play-in"))) return "play_in";
+  return "rebuild";
 }
