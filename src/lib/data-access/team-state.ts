@@ -6,14 +6,15 @@ import { chemistryTarget, nextChemistry } from "@/lib/careers/chemistry-rules";
 import {
   ANNUAL_DEGRADATION,
   clampFacilityLevel,
-  INITIAL_FINANCES,
   UPGRADE_INCREMENT,
+  initialFinances,
   seasonRevenue,
   upgradeCost,
 } from "@/lib/careers/finance-rules";
 
 // Lecture paresseuse : crée la ligne à la valeur par défaut (chimie 50,
-// infrastructures/personnel 50, trésorerie amorcée selon la ligue) si elle
+// infrastructures/personnel 50, trésorerie de départ amorcée selon la ligue
+// ET l'attractivité de marché de l'équipe — voir initialFinances) si elle
 // n'existe pas encore pour cette Career/équipe — même principe que
 // getCurrentDraftPick. Gère la course concurrente (deux managers déclenchant
 // la création au même instant) via le même repli P2002 que signFreeAgent.
@@ -27,10 +28,11 @@ export async function getOrCreateTeamState(
   });
   if (existing) return existing;
 
-  const initialFinances = INITIAL_FINANCES[leagueId] ?? INITIAL_FINANCES.nba;
+  const team = await prisma.team.findUnique({ where: { id: teamId } });
+  const finances = initialFinances(leagueId, team?.marketAppeal ?? 50);
   try {
     return await prisma.teamState.create({
-      data: { careerId, teamId, finances: initialFinances },
+      data: { careerId, teamId, finances },
     });
   } catch (err) {
     if (err instanceof Error && "code" in err && err.code === "P2002") {

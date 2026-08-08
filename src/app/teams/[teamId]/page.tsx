@@ -78,6 +78,7 @@ export default async function TeamRosterPage({
         renown: player.renown,
         teamWinPct,
         teamMarketAppeal: team.marketAppeal,
+        teamFacilitiesLevel: teamState.facilitiesLevel,
       }) ||
         salary < minAcceptableSalary(player.renown, player.overallRating, team.leagueId));
     return {

@@ -3,6 +3,7 @@ import { getFreeAgents, getPayrollForTeam } from "@/lib/data-access/contracts";
 import { getLeagueById } from "@/lib/data-access/leagues";
 import { getStandings } from "@/lib/data-access/standings";
 import { getTeamById } from "@/lib/data-access/teams";
+import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { isFreeAgencyOpen } from "@/lib/data-access/season-windows";
 import { prisma } from "@/lib/prisma";
 import { signFreeAgent } from "@/app/actions/roster";
@@ -17,7 +18,7 @@ import { formatSalary } from "@/lib/utils";
 export default async function FreeAgentsPage() {
   const membership = await getCurrentMembership();
 
-  const [freeAgents, rosterSize, payroll, league, faOpen, standings, myTeam] = await Promise.all([
+  const [freeAgents, rosterSize, payroll, league, faOpen, standings, myTeam, myTeamState] = await Promise.all([
     getFreeAgents(membership.careerId, membership.leagueId),
     prisma.contract.count({
       where: { careerId: membership.careerId, teamId: membership.teamId },
@@ -27,6 +28,7 @@ export default async function FreeAgentsPage() {
     isFreeAgencyOpen(membership.careerId, membership.season),
     getStandings(membership.careerId, membership.leagueId, membership.season),
     getTeamById(membership.teamId),
+    getOrCreateTeamState(membership.careerId, membership.teamId, membership.leagueId),
   ]);
 
   const rosterFull = rosterSize >= MAX_ROSTER_SIZE;
@@ -94,6 +96,7 @@ export default async function FreeAgentsPage() {
                 renown: player.renown,
                 teamWinPct,
                 teamMarketAppeal,
+                teamFacilitiesLevel: myTeamState.facilitiesLevel,
               });
               const expectedSalary = minAcceptableSalary(
                 player.renown,
@@ -133,7 +136,7 @@ export default async function FreeAgentsPage() {
                         </form>
                       ) : (
                         <span className="text-xs text-red-500">
-                          Refuse : équipe pas assez compétitive ou marché pas assez attractif
+                          Refuse : équipe pas assez compétitive, marché ou infrastructures pas assez attractifs
                         </span>
                       )}
                     </td>

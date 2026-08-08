@@ -9,6 +9,7 @@ import { SALARY_RANGES, salaryForRating } from "./salary-rules";
 export const STAR_RENOWN_THRESHOLD = 70;
 export const COMPETITIVE_WIN_PCT_THRESHOLD = 0.45;
 export const ATTRACTIVE_MARKET_THRESHOLD = 60;
+export const ATTRACTIVE_FACILITIES_THRESHOLD = 60;
 
 // Salaire plancher accepté par un joueur, dérivé de son renommé — nul jusqu'au
 // renommé "moyen" (50, comportement inchangé pour un joueur non renommé),
@@ -32,6 +33,13 @@ export function wantsAttractiveMarket(renown: number): boolean {
   return renown >= STAR_RENOWN_THRESHOLD;
 }
 
+// Un joueur renommé veut aussi de bonnes infrastructures d'entraînement —
+// distinct de l'attractivité du marché (une ville peu attractive peut avoir
+// d'excellentes infrastructures, et inversement).
+export function wantsGoodFacilities(renown: number): boolean {
+  return renown >= STAR_RENOWN_THRESHOLD;
+}
+
 // Bilan de victoires exploitable pour juger la compétitivité d'une équipe —
 // neutre (0.5) tant qu'aucun match n'a encore été joué cette saison, pour ne
 // pas bloquer les signatures en tout début de saison.
@@ -44,10 +52,12 @@ export function teamMeetsPlayerDemands(params: {
   renown: number;
   teamWinPct: number;
   teamMarketAppeal: number;
+  teamFacilitiesLevel: number;
 }): boolean {
   if (params.renown < STAR_RENOWN_THRESHOLD) return true;
   return (
     params.teamWinPct >= COMPETITIVE_WIN_PCT_THRESHOLD &&
-    params.teamMarketAppeal >= ATTRACTIVE_MARKET_THRESHOLD
+    params.teamMarketAppeal >= ATTRACTIVE_MARKET_THRESHOLD &&
+    params.teamFacilitiesLevel >= ATTRACTIVE_FACILITIES_THRESHOLD
   );
 }

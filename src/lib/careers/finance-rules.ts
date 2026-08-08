@@ -2,7 +2,18 @@
 // tout est piloté par src/lib/data-access/team-state.ts.
 
 const BASE_SEASON_REVENUE: Record<string, number> = { nba: 4_000_000, wnba: 600_000 };
-export const INITIAL_FINANCES = BASE_SEASON_REVENUE; // trésorerie de départ = un revenu de saison "moyen"
+
+// Trésorerie de départ : la situation financière réelle varie énormément
+// d'un club à l'autre (marché, ownership, historique) — faute de pouvoir
+// modéliser cette réalité en détail, on l'approxime via l'attractivité du
+// marché déjà curée (Team.marketAppeal) : une grande métropole touristique
+// remplit plus facilement ses stades qu'une petite ville, donc démarre avec
+// plus de trésorerie.
+export function initialFinances(leagueId: string, marketAppeal: number): number {
+  const base = BASE_SEASON_REVENUE[leagueId] ?? BASE_SEASON_REVENUE.nba;
+  const marketMultiplier = 0.5 + (Math.max(0, Math.min(99, marketAppeal)) / 99) * 1.5; // 0.5x à 2x
+  return Math.round(base * marketMultiplier);
+}
 
 // Billetterie/maillots/snackerie : dépend du bilan de la saison qui vient de
 // se terminer ET de l'attractivité du marché (Team.marketAppeal) — un grand

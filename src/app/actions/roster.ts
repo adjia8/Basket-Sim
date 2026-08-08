@@ -8,6 +8,7 @@ import { getLeagueById } from "@/lib/data-access/leagues";
 import { getPayrollForTeam } from "@/lib/data-access/contracts";
 import { getStandings } from "@/lib/data-access/standings";
 import { getTeamById } from "@/lib/data-access/teams";
+import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { isFreeAgencyOpen } from "@/lib/data-access/season-windows";
 import { MAX_ROSTER_SIZE, MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import { initialRenown } from "@/lib/careers/renown-rules";
@@ -76,7 +77,7 @@ export async function signFreeAgent(formData: FormData): Promise<void> {
   });
   if (!membership) return;
 
-  const [player, playerState, existingContract, rosterSize, currentPayroll, league, standings, myTeam] =
+  const [player, playerState, existingContract, rosterSize, currentPayroll, league, standings, myTeam, myTeamState] =
     await Promise.all([
       prisma.player.findUnique({ where: { id: playerId } }),
       prisma.playerState.findUnique({
@@ -92,6 +93,7 @@ export async function signFreeAgent(formData: FormData): Promise<void> {
       getLeagueById(membership.career.leagueId),
       getStandings(membership.careerId, membership.career.leagueId, membership.career.season),
       getTeamById(membership.teamId),
+      getOrCreateTeamState(membership.careerId, membership.teamId, membership.career.leagueId),
     ]);
 
   if (!player || player.leagueId !== membership.career.leagueId) return;
@@ -108,9 +110,10 @@ export async function signFreeAgent(formData: FormData): Promise<void> {
       renown,
       teamWinPct,
       teamMarketAppeal: myTeam.marketAppeal,
+      teamFacilitiesLevel: myTeamState.facilitiesLevel,
     })
   ) {
-    return; // refuse : équipe pas assez compétitive et/ou marché pas assez attractif
+    return; // refuse : équipe pas assez compétitive, marché pas assez attractif, et/ou infrastructures insuffisantes
   }
 
   // Calculée une seule fois : generateContractTerms tire un salaire aléatoire,
