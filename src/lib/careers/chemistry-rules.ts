@@ -13,7 +13,13 @@ export function chemistryTarget(winPct: number, averageBasketballIQ: number): nu
 
 // Dérive lente vers la cible (5% de l'écart par match) plutôt qu'un saut
 // brutal — la chimie d'une équipe ne se construit/détruit pas en un match.
+// Le pas est arrondi au plus proche mais jamais à zéro tant que la cible
+// n'est pas atteinte : un simple Math.round(diff * taux) peut stagner
+// indéfiniment sous la cible (ex. diff=9 → pas 0.45 → arrondi à 0 en
+// boucle), donc on force au moins un point de progression par match.
 export function nextChemistry(current: number, target: number): number {
-  const next = current + (target - current) * 0.05;
-  return Math.max(0, Math.min(99, Math.round(next)));
+  const diff = target - current;
+  if (diff === 0) return current;
+  const step = Math.sign(diff) * Math.max(1, Math.round(Math.abs(diff) * 0.05));
+  return Math.max(0, Math.min(99, current + step));
 }

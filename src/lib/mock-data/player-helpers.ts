@@ -125,5 +125,6 @@ export function mkPlayer(input: PlayerInput): Player {
     renown: initialRenown(input.overallRating),
     fatigue: 0,
     conditioning: 100,
+    trainingBoost: 0,
   };
 }

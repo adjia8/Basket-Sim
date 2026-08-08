@@ -1,4 +1,4 @@
-import type { BoxScoreEntry, Player, Team } from "@/lib/types";
+import type { BoxScoreEntry, Player, PlayerRatings, Team } from "@/lib/types";
 import type { SimulationEngine, SimulationOptions, SimulationResult } from "./engine";
 import {
   FLAGRANT_ONE_EJECTION_LIMIT,
@@ -9,6 +9,7 @@ import {
   rollsPersonalFoul,
   rollsTechnicalFoul,
 } from "./foul-rules";
+import { TRAINING_FOCUS_ATTRIBUTES } from "@/lib/careers/training-rules";
 
 const HOME_ADVANTAGE = 2.5;
 const ROTATION_SIZE = 8; // joueurs qui touchent des minutes significatives
@@ -28,26 +29,41 @@ function noise(spread: number): number {
   return (Math.random() + Math.random() - 1) * spread;
 }
 
-// Force brute d'un joueur sur le terrain — moyenne pondérée de 9 des 10
-// attributs techniques (stamina exclue : elle ne pèse pas sur la force, elle
-// détermine seulement la vitesse d'accumulation/récupération de fatigue, voir
-// fatigue-rules.ts). Les poids somment à 1 pour rester sur l'échelle 0-99,
-// comparable à l'ancien overallRating qu'elle remplace comme mesure de force
-// de simulation (overallRating reste la valeur "front-office" : salaire,
-// trade, draft — inchangée par ce moteur).
+// Poids de chaque attribut dans la force brute (stamina exclue : elle ne
+// pèse pas sur la force, elle détermine seulement la vitesse d'accumulation/
+// récupération de fatigue, voir fatigue-rules.ts). Somment à 1 pour rester
+// sur l'échelle 0-99, comparable à l'ancien overallRating qu'ils remplacent
+// comme mesure de force de simulation (overallRating reste la valeur
+// "front-office" : salaire, trade, draft — inchangée par ce moteur).
+const IMPACT_WEIGHTS: Record<keyof PlayerRatings, number> = {
+  scoringInside: 0.12,
+  scoringOutside: 0.12,
+  playmaking: 0.12,
+  defenseInside: 0.12,
+  defenseOutside: 0.12,
+  rebounding: 0.1,
+  athleticism: 0.1,
+  basketballIQ: 0.1,
+  clutch: 0.1,
+  stamina: 0,
+};
+
+// Force brute d'un joueur sur le terrain — moyenne pondérée des attributs
+// techniques, plus la contribution du bonus d'entraînement temporaire (voir
+// training-rules.ts) sur les attributs actuellement ciblés par son focus.
 function baseImpact(player: Player): number {
   const r = player.ratings;
-  return (
-    r.scoringInside * 0.12 +
-    r.scoringOutside * 0.12 +
-    r.playmaking * 0.12 +
-    r.defenseInside * 0.12 +
-    r.defenseOutside * 0.12 +
-    r.rebounding * 0.1 +
-    r.athleticism * 0.1 +
-    r.basketballIQ * 0.1 +
-    r.clutch * 0.1
-  );
+  let sum = 0;
+  for (const key of Object.keys(IMPACT_WEIGHTS) as (keyof PlayerRatings)[]) {
+    sum += r[key] * IMPACT_WEIGHTS[key];
+  }
+  if (player.trainingBoostFocus) {
+    const boostedAttrs = TRAINING_FOCUS_ATTRIBUTES[player.trainingBoostFocus] as (keyof PlayerRatings)[];
+    for (const attr of boostedAttrs) {
+      sum += player.trainingBoost * IMPACT_WEIGHTS[attr];
+    }
+  }
+  return sum;
 }
 
 // Un joueur fatigué ou pas encore remis d'une blessure (conditionnement bas,

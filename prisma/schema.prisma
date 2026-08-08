@@ -248,6 +248,8 @@ model PlayerState {
   peakRenown           Int     @default(50) // plus haut renommé jamais atteint en carrière
   hallOfFame           Boolean @default(false) // fixé à la retraite si les seuils HOF sont atteints
   retiredSeason        String? // saison (label) de la retraite, null si actif
+  trainingBoost        Int     @default(0) // 0-8, bonus temporaire courant sur les attributs de trainingBoostFocus
+  trainingBoostFocus   String? // catégorie ciblée par le bonus courant, null si aucun
 
   @@unique([careerId, playerId])
   @@index([careerId])
@@ -360,15 +362,17 @@ model DeadCap {
 // Créée paresseusement à la première lecture (défaut 50), même principe que
 // getCurrentDraftPick.
 model TeamState {
-  id                 String @id @default(cuid())
+  id                 String  @id @default(cuid())
   careerId           String
-  career             Career @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  career             Career  @relation(fields: [careerId], references: [id], onDelete: Cascade)
   teamId             String
-  team               Team   @relation(fields: [teamId], references: [id])
-  chemistry          Int    @default(50) // 0-99
-  finances           Int    @default(0) // dollars, trésorerie de franchise — distincte du plafond salarial
-  facilitiesLevel    Int    @default(50) // 0-100
-  trainingStaffLevel Int    @default(50) // 0-100
+  team               Team    @relation(fields: [teamId], references: [id])
+  chemistry          Int     @default(50) // 0-99
+  finances           Int     @default(0) // dollars, trésorerie de franchise — distincte du plafond salarial
+  facilitiesLevel    Int     @default(50) // 0-100
+  trainingStaffLevel Int     @default(50) // 0-100
+  trainingFocus      String? // "offensive" | "defensive" | "tactical" | "physical" | "chemistry" | "rest", null = aucun
+  trainingIntensity  String  @default("medium") // "low" | "medium" | "high"
 
   @@unique([careerId, teamId])
 }

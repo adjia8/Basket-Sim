@@ -52,14 +52,15 @@ export async function advanceTeamChemistry(
   teamId: string,
   leagueId: string,
   winPct: number,
-  roster: Player[]
+  roster: Player[],
+  trainingBonus = 0
 ): Promise<void> {
   const state = await getOrCreateTeamState(careerId, teamId, leagueId);
   const averageBasketballIQ = roster.length
     ? roster.reduce((sum, p) => sum + p.ratings.basketballIQ, 0) / roster.length
     : 50;
   const target = chemistryTarget(winPct, averageBasketballIQ);
-  const chemistry = nextChemistry(state.chemistry, target);
+  const chemistry = Math.max(0, Math.min(99, nextChemistry(state.chemistry, target) + trainingBonus));
 
   await prisma.teamState.update({
     where: { id: state.id },

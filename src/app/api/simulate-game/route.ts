@@ -12,7 +12,14 @@ import { advanceRosterInjuries } from "@/lib/data-access/injuries";
 import { advancePlayerRenown } from "@/lib/data-access/renown";
 import { advanceRosterFatigue, getRestDays } from "@/lib/data-access/fatigue";
 import { advanceTeamChemistry, getOrCreateTeamState } from "@/lib/data-access/team-state";
+import { advanceRosterTraining } from "@/lib/data-access/training";
 import { winPctForStandings } from "@/lib/careers/player-demands";
+import {
+  chemistryTrainingBonus,
+  trainingFatigueDelta,
+  type TrainingFocus,
+  type TrainingIntensity,
+} from "@/lib/careers/training-rules";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -136,26 +143,42 @@ export async function POST(request: Request) {
   // Ajuste le renommé de chaque joueur qui a joué selon sa performance.
   await advancePlayerRenown(membership.careerId, result.boxScore, [...homeRoster, ...awayRoster]);
 
+  // Programme d'entraînement : fait dériver le bonus temporaire de chaque
+  // joueur vers le plafond de l'intensité choisie (ou vers 0 si aucun focus
+  // ciblant des attributs n'est actif).
+  const homeFocus = homeTeamState.trainingFocus as TrainingFocus | null;
+  const awayFocus = awayTeamState.trainingFocus as TrainingFocus | null;
+  const homeIntensity = homeTeamState.trainingIntensity as TrainingIntensity;
+  const awayIntensity = awayTeamState.trainingIntensity as TrainingIntensity;
+  await Promise.all([
+    advanceRosterTraining(membership.careerId, homeRoster, homeFocus, homeIntensity),
+    advanceRosterTraining(membership.careerId, awayRoster, awayFocus, awayIntensity),
+  ]);
+
   // Fatigue : récupération selon les jours de repos réels (accélérée par de
-  // bonnes infrastructures) puis gain pour ceux qui ont joué.
+  // bonnes infrastructures) puis gain pour ceux qui ont joué, plus le coût
+  // (ou le gain, pour un focus "repos") de l'entraînement en cours.
   await Promise.all([
     advanceRosterFatigue(
       membership.careerId,
       homeRoster,
       result.boxScore,
       homeRestDays,
-      homeTeamState.facilitiesLevel
+      homeTeamState.facilitiesLevel,
+      trainingFatigueDelta(homeFocus, homeIntensity)
     ),
     advanceRosterFatigue(
       membership.careerId,
       awayRoster,
       result.boxScore,
       awayRestDays,
-      awayTeamState.facilitiesLevel
+      awayTeamState.facilitiesLevel,
+      trainingFatigueDelta(awayFocus, awayIntensity)
     ),
   ]);
 
-  // Chimie d'équipe : dérive vers sa cible (bilan à jour + QI basket moyen du roster).
+  // Chimie d'équipe : dérive vers sa cible (bilan à jour + QI basket moyen du
+  // roster), plus le bonus si un focus "cohésion d'équipe" est actif.
   const standings = await getStandings(membership.careerId, updatedGame.leagueId, updatedGame.season);
   const homeStandingsRow = standings.find((s) => s.teamId === updatedGame.homeTeamId);
   const awayStandingsRow = standings.find((s) => s.teamId === updatedGame.awayTeamId);
@@ -165,14 +188,16 @@ export async function POST(request: Request) {
       updatedGame.homeTeamId,
       updatedGame.leagueId,
       winPctForStandings(homeStandingsRow?.wins ?? 0, homeStandingsRow?.losses ?? 0),
-      homeRoster
+      homeRoster,
+      chemistryTrainingBonus(homeFocus, homeIntensity)
     ),
     advanceTeamChemistry(
       membership.careerId,
       updatedGame.awayTeamId,
       updatedGame.leagueId,
       winPctForStandings(awayStandingsRow?.wins ?? 0, awayStandingsRow?.losses ?? 0),
-      awayRoster
+      awayRoster,
+      chemistryTrainingBonus(awayFocus, awayIntensity)
     ),
   ]);
 

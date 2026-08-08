@@ -69,6 +69,8 @@ export interface Player {
   renown: number; // 0-99, évolue à chaque match joué
   fatigue: number; // 0-99, monte après un match, redescend avec le repos
   conditioning: number; // 0-100, 100 = conditionnement optimal
+  trainingBoost: number; // 0-8, bonus temporaire courant sur les attributs de trainingBoostFocus
+  trainingBoostFocus?: "offensive" | "defensive" | "tactical" | "physical" | "chemistry" | "rest";
 }
 
 // --- Calendrier / Match ---

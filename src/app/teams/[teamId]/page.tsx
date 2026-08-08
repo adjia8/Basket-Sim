@@ -11,6 +11,7 @@ import { getTeamById } from "@/lib/data-access/teams";
 import { prisma } from "@/lib/prisma";
 import { RosterTable, type RosterPlayer } from "@/components/team/RosterTable";
 import { TradeProposalForm, type TradePick } from "@/components/team/TradeProposalForm";
+import { TrainingPlanForm } from "@/components/team/TrainingPlanForm";
 import { MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import {
   minAcceptableSalary,
@@ -162,6 +163,15 @@ export default async function TeamRosterPage({
           <p className="mt-1 text-xl font-semibold">{teamState.chemistry} / 99</p>
         </div>
       </div>
+
+      {isMyTeam && (
+        <div className="mt-6">
+          <TrainingPlanForm
+            focus={teamState.trainingFocus}
+            intensity={teamState.trainingIntensity}
+          />
+        </div>
+      )}
 
       <div className="mt-6">
         <RosterTable

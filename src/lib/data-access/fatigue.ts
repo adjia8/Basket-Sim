@@ -37,7 +37,8 @@ export async function advanceRosterFatigue(
   roster: Player[],
   boxScore: BoxScoreEntry[],
   restDays: number,
-  facilitiesLevel = 50
+  facilitiesLevel = 50,
+  trainingFatigueDelta = 0
 ): Promise<void> {
   const playedIds = new Set(boxScore.map((e) => e.playerId));
 
@@ -47,6 +48,9 @@ export async function advanceRosterFatigue(
     if (playedIds.has(player.id)) {
       newFatigue += fatigueGainForGame(player.ratings.stamina);
     }
+    // L'entraînement a lieu entre les matchs, pour tout l'effectif (pas
+    // seulement ceux qui ont joué ce match précis).
+    newFatigue += trainingFatigueDelta;
     newFatigue = Math.max(0, Math.min(99, newFatigue));
 
     await prisma.playerState.updateMany({

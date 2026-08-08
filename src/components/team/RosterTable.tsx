@@ -11,6 +11,15 @@ const SEVERITY_LABELS: Record<NonNullable<Player["injurySeverity"]>, string> = {
   severe: "sévère",
 };
 
+const TRAINING_FOCUS_LABELS: Record<NonNullable<Player["trainingBoostFocus"]>, string> = {
+  offensive: "Offensif",
+  defensive: "Défensif",
+  tactical: "Tactique",
+  physical: "Physique",
+  chemistry: "Cohésion",
+  rest: "Repos",
+};
+
 export type RosterPlayer = Player & {
   salary: number;
   yearsRemaining: number;
@@ -36,7 +45,8 @@ type SortKey =
   | "injuryRisk"
   | "renown"
   | "fatigue"
-  | "conditioning";
+  | "conditioning"
+  | "trainingBoost";
 
 const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "overallRating", label: "Overall" },
@@ -57,6 +67,7 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "renown", label: "Renommé" },
   { key: "fatigue", label: "Fatigue" },
   { key: "conditioning", label: "Conditionnement" },
+  { key: "trainingBoost", label: "Bonus entraînement" },
 ];
 
 const RATING_KEYS = new Set<SortKey>([
@@ -80,6 +91,7 @@ function valueFor(player: RosterPlayer, key: SortKey): number {
   if (key === "renown") return player.renown;
   if (key === "fatigue") return player.fatigue;
   if (key === "conditioning") return player.conditioning;
+  if (key === "trainingBoost") return player.trainingBoost;
   return player[key as "overallRating" | "age" | "salary" | "yearsRemaining"];
 }
 
@@ -192,7 +204,16 @@ export function RosterTable({
               <td className="py-2 pr-4">{player.injuryRisk}</td>
               <td className="py-2 pr-4">{player.renown}</td>
               <td className="py-2 pr-4">{player.fatigue}</td>
-              <td className="py-2">{player.conditioning}</td>
+              <td className="py-2 pr-4">{player.conditioning}</td>
+              <td className="py-2">
+                {player.trainingBoost > 0 && player.trainingBoostFocus ? (
+                  <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-normal text-blue-500">
+                    +{player.trainingBoost} {TRAINING_FOCUS_LABELS[player.trainingBoostFocus]}
+                  </span>
+                ) : (
+                  <span className="text-black/30 dark:text-white/30">—</span>
+                )}
+              </td>
               {canRelease && (
                 <td className="py-2 pr-4">
                   <form action={releasePlayer}>

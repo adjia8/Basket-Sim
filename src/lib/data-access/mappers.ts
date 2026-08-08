@@ -77,6 +77,7 @@ export function toDomainPlayer(row: PrismaPlayer): Player {
     renown: initialRenown(row.overallRating),
     fatigue: 0,
     conditioning: 100,
+    trainingBoost: 0,
   };
 }
 
@@ -119,6 +120,8 @@ export function toDomainPlayerWithState(
     renown: state?.renown ?? initialRenown(row.overallRating),
     fatigue: state?.fatigue ?? 0,
     conditioning: state?.conditioning ?? 100,
+    trainingBoost: state?.trainingBoost ?? 0,
+    trainingBoostFocus: (state?.trainingBoostFocus as Player["trainingBoostFocus"]) ?? undefined,
   };
 }
 
