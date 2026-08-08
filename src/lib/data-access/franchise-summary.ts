@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { Team } from "@/lib/types";
 import { toDomainTeam } from "./mappers";
-import { initialFinances } from "@/lib/careers/finance-rules";
+import { initialFacilityLevel, initialFinances, initialTrainingStaffLevel } from "@/lib/careers/finance-rules";
 import { expectationForRoster, type ExpectationTier } from "@/lib/careers/gm-rules";
 
 export interface FranchiseTopPlayer {
@@ -67,8 +67,8 @@ export async function getFranchiseSummariesForNewCareer(leagueId: string): Promi
     return {
       team,
       finances: initialFinances(leagueId, row.marketAppeal),
-      facilitiesLevel: 50,
-      trainingStaffLevel: 50,
+      facilitiesLevel: initialFacilityLevel(row.marketAppeal, row.id),
+      trainingStaffLevel: initialTrainingStaffLevel(row.marketAppeal, row.id),
       rosterSize: players.length,
       averageOverall,
       topPlayers: topPlayersOf(players),
@@ -131,8 +131,8 @@ export async function getFranchiseSummariesForCareer(
     return {
       team,
       finances: teamState?.finances ?? initialFinances(leagueId, row.marketAppeal),
-      facilitiesLevel: teamState?.facilitiesLevel ?? 50,
-      trainingStaffLevel: teamState?.trainingStaffLevel ?? 50,
+      facilitiesLevel: teamState?.facilitiesLevel ?? initialFacilityLevel(row.marketAppeal, row.id),
+      trainingStaffLevel: teamState?.trainingStaffLevel ?? initialTrainingStaffLevel(row.marketAppeal, row.id),
       rosterSize: roster.length,
       averageOverall,
       topPlayers: topPlayersOf(roster),

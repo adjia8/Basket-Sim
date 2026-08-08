@@ -7,17 +7,22 @@ import {
   ANNUAL_DEGRADATION,
   clampFacilityLevel,
   UPGRADE_INCREMENT,
+  initialFacilityLevel,
   initialFinances,
+  initialTrainingStaffLevel,
   seasonRevenue,
   upgradeCost,
 } from "@/lib/careers/finance-rules";
 
 // Lecture paresseuse : crée la ligne à la valeur par défaut (chimie 50,
-// infrastructures/personnel 50, trésorerie de départ amorcée selon la ligue
-// ET l'attractivité de marché de l'équipe — voir initialFinances) si elle
-// n'existe pas encore pour cette Career/équipe — même principe que
-// getCurrentDraftPick. Gère la course concurrente (deux managers déclenchant
-// la création au même instant) via le même repli P2002 que signFreeAgent.
+// trésorerie/infrastructures/personnel amorcés selon la ligue ET
+// l'attractivité de marché de l'équipe — voir initialFinances/
+// initialFacilityLevel/initialTrainingStaffLevel, chacune avec une variation
+// déterministe par équipe pour éviter que toutes les franchises démarrent
+// identiques) si elle n'existe pas encore pour cette Career/équipe — même
+// principe que getCurrentDraftPick. Gère la course concurrente (deux
+// managers déclenchant la création au même instant) via le même repli P2002
+// que signFreeAgent.
 export async function getOrCreateTeamState(
   careerId: string,
   teamId: string,
@@ -29,10 +34,13 @@ export async function getOrCreateTeamState(
   if (existing) return existing;
 
   const team = await prisma.team.findUnique({ where: { id: teamId } });
-  const finances = initialFinances(leagueId, team?.marketAppeal ?? 50);
+  const marketAppeal = team?.marketAppeal ?? 50;
+  const finances = initialFinances(leagueId, marketAppeal);
+  const facilitiesLevel = initialFacilityLevel(marketAppeal, teamId);
+  const trainingStaffLevel = initialTrainingStaffLevel(marketAppeal, teamId);
   try {
     return await prisma.teamState.create({
-      data: { careerId, teamId, finances },
+      data: { careerId, teamId, finances, facilitiesLevel, trainingStaffLevel },
     });
   } catch (err) {
     if (err instanceof Error && "code" in err && err.code === "P2002") {

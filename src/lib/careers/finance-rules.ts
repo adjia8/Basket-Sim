@@ -46,3 +46,30 @@ export function healthyFinancesThreshold(leagueId: string): number {
 export function clampFacilityLevel(value: number): number {
   return Math.max(10, Math.min(99, value));
 }
+
+// Petit hash déterministe (même principe que seededVariance dans
+// player-helpers.ts) : fait varier la situation de départ d'une équipe à
+// l'autre sans dépendre de Math.random() — deux appels avec le même seed
+// (ex. teamId) donnent toujours la même valeur.
+function seededVariance(seed: string, spread: number): number {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+  }
+  const normalized = ((hash % 1000) + 1000) % 1000; // 0..999
+  return Math.round((normalized / 999) * spread * 2 - spread);
+}
+
+// Niveau de départ des infrastructures/personnel : comme les finances, lié à
+// l'attractivité du marché (une grande franchise investit historiquement
+// plus), avec une variation par équipe pour éviter que toutes les franchises
+// démarrent avec une barre identique.
+export function initialFacilityLevel(marketAppeal: number, seed: string): number {
+  const base = 30 + (Math.max(0, Math.min(99, marketAppeal)) / 99) * 40; // 30-70
+  return clampFacilityLevel(Math.round(base + seededVariance(`${seed}-facilities`, 15)));
+}
+
+export function initialTrainingStaffLevel(marketAppeal: number, seed: string): number {
+  const base = 30 + (Math.max(0, Math.min(99, marketAppeal)) / 99) * 40; // 30-70
+  return clampFacilityLevel(Math.round(base + seededVariance(`${seed}-training-staff`, 15)));
+}
