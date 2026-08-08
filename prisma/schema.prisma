@@ -355,12 +355,15 @@ model DeadCap {
 // Créée paresseusement à la première lecture (défaut 50), même principe que
 // getCurrentDraftPick.
 model TeamState {
-  id        String @id @default(cuid())
-  careerId  String
-  career    Career @relation(fields: [careerId], references: [id], onDelete: Cascade)
-  teamId    String
-  team      Team   @relation(fields: [teamId], references: [id])
-  chemistry Int    @default(50) // 0-99
+  id                 String @id @default(cuid())
+  careerId           String
+  career             Career @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  teamId             String
+  team               Team   @relation(fields: [teamId], references: [id])
+  chemistry          Int    @default(50) // 0-99
+  finances           Int    @default(0) // dollars, trésorerie de franchise — distincte du plafond salarial
+  facilitiesLevel    Int    @default(50) // 0-100
+  trainingStaffLevel Int    @default(50) // 0-100
 
   @@unique([careerId, teamId])
 }

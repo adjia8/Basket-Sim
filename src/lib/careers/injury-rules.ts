@@ -8,14 +8,18 @@ const MAX_INJURY_CHANCE_PER_GAME = 0.02; // risque ≈ 99
 // sur l'échelle 0-99 du risque. Calibré pour qu'un risque ~99 corresponde à
 // environ 1,5 blessure/saison en espérance (82 matchs), et un risque par
 // défaut (~30) à environ une blessure tous les deux ans — ordre de grandeur
-// plausible, pas une vérité statistique.
-export function injuryChanceForGame(injuryRisk: number): number {
+// plausible, pas une vérité statistique. `facilitiesLevel` (0-100, 50 =
+// neutre) module ce risque de ±20% — de meilleures infrastructures
+// d'entraînement réduisent les blessures.
+export function injuryChanceForGame(injuryRisk: number, facilitiesLevel = 50): number {
   const t = Math.max(0, Math.min(99, injuryRisk)) / 99;
-  return BASE_INJURY_CHANCE_PER_GAME + t * (MAX_INJURY_CHANCE_PER_GAME - BASE_INJURY_CHANCE_PER_GAME);
+  const base = BASE_INJURY_CHANCE_PER_GAME + t * (MAX_INJURY_CHANCE_PER_GAME - BASE_INJURY_CHANCE_PER_GAME);
+  const facilitiesFactor = 1 - ((Math.max(0, Math.min(100, facilitiesLevel)) - 50) / 50) * 0.2;
+  return base * facilitiesFactor;
 }
 
-export function rollsInjury(injuryRisk: number): boolean {
-  return Math.random() < injuryChanceForGame(injuryRisk);
+export function rollsInjury(injuryRisk: number, facilitiesLevel = 50): boolean {
+  return Math.random() < injuryChanceForGame(injuryRisk, facilitiesLevel);
 }
 
 // Durée d'indisponibilité (en matchs de l'équipe) tirée aléatoirement,

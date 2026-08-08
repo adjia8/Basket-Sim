@@ -16,6 +16,9 @@ import {
 import { nextSeasonLabel } from "@/lib/careers/season-format";
 import { ageOneSeason, RETIREMENT_AGE } from "@/lib/careers/aging-rules";
 import { toDomainLeague } from "@/lib/data-access/mappers";
+import { getTeamsByLeague } from "@/lib/data-access/teams";
+import { applySeasonFinancials, getOrCreateTeamState } from "@/lib/data-access/team-state";
+import { winPctForStandings } from "@/lib/careers/player-demands";
 
 export async function advanceSeason(): Promise<void> {
   const { userId } = await verifySession();
@@ -49,6 +52,19 @@ export async function advanceSeason(): Promise<void> {
   );
   const draftOrderTeamIds = draftOrder.map((row) => row.teamId);
 
+  // Niveaux de personnel de training par équipe, capturés maintenant (avant
+  // la dégradation annuelle plus bas) — le bonus de progression des jeunes
+  // joueurs doit refléter l'encadrement pendant la saison qui vient de se
+  // jouer. Correspondance joueur -> équipe via les contrats encore actifs à
+  // cet instant (avant le décrément de l'étape 1).
+  const teams = await getTeamsByLeague(career.leagueId);
+  const teamStates = await Promise.all(
+    teams.map((t) => getOrCreateTeamState(career.id, t.id, career.leagueId))
+  );
+  const trainingStaffByTeamId = new Map(teamStates.map((s) => [s.teamId, s.trainingStaffLevel]));
+  const activeContracts = await prisma.contract.findMany({ where: { careerId: career.id } });
+  const teamIdByPlayerId = new Map(activeContracts.map((c) => [c.playerId, c.teamId]));
+
   // 1. Contrats : décrément, résiliation à 0 (le joueur devient agent libre).
   await prisma.contract.updateMany({
     where: { careerId: career.id },
@@ -72,7 +88,9 @@ export async function advanceSeason(): Promise<void> {
     where: { careerId: career.id, retired: false },
   });
   for (const state of states) {
-    const aged = ageOneSeason(state);
+    const teamId = teamIdByPlayerId.get(state.playerId);
+    const trainingStaffLevel = teamId ? (trainingStaffByTeamId.get(teamId) ?? 50) : 50;
+    const aged = ageOneSeason(state, trainingStaffLevel);
     const retiring = aged.age >= RETIREMENT_AGE;
     await prisma.playerState.update({
       where: { id: state.id },
@@ -83,6 +101,16 @@ export async function advanceSeason(): Promise<void> {
         where: { careerId: career.id, playerId: state.playerId },
       });
     }
+  }
+
+  // 2bis. Finances de franchise : revenu de la saison qui vient de se
+  // terminer (bilan + attractivité du marché) pour chaque équipe de la
+  // ligue, puis dégradation annuelle des infrastructures/personnel non
+  // réinvestis.
+  for (const team of teams) {
+    const row = finishedStandings.find((s) => s.teamId === team.id);
+    const winPct = winPctForStandings(row?.wins ?? 0, row?.losses ?? 0);
+    await applySeasonFinancials(career.id, team.id, career.leagueId, winPct, team.marketAppeal);
   }
 
   // 3. Nouvelle saison.

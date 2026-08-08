@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "TeamState" ADD COLUMN     "facilitiesLevel" INTEGER NOT NULL DEFAULT 50,
+ADD COLUMN     "finances" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "trainingStaffLevel" INTEGER NOT NULL DEFAULT 50;
+

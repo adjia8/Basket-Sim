@@ -57,7 +57,7 @@ export default async function TeamRosterPage({
       getPendingPicksForTeam(membership.careerId, teamId),
       isTradeDeadlinePassed(membership.careerId, membership.season),
       getStandings(membership.careerId, team.leagueId, membership.season),
-      getOrCreateTeamState(membership.careerId, teamId),
+      getOrCreateTeamState(membership.careerId, teamId, team.leagueId),
     ]);
 
   const isMyTeam = team.id === membership.teamId;

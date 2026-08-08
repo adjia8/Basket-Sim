@@ -36,12 +36,13 @@ export async function advanceRosterFatigue(
   careerId: string,
   roster: Player[],
   boxScore: BoxScoreEntry[],
-  restDays: number
+  restDays: number,
+  facilitiesLevel = 50
 ): Promise<void> {
   const playedIds = new Set(boxScore.map((e) => e.playerId));
 
   for (const player of roster) {
-    const recovered = fatigueRecoveryForRestDays(restDays, player.ratings.stamina);
+    const recovered = fatigueRecoveryForRestDays(restDays, player.ratings.stamina, facilitiesLevel);
     let newFatigue = Math.max(0, player.fatigue - recovered);
     if (playedIds.has(player.id)) {
       newFatigue += fatigueGainForGame(player.ratings.stamina);

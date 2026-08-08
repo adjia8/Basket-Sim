@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { href: "/draft", label: "Draft" },
   { href: "/trades", label: "Échanges" },
   { href: "/playoffs", label: "Playoffs" },
+  { href: "/franchise", label: "Franchise" },
 ];
 
 export async function NavBar() {

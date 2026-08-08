@@ -101,8 +101,8 @@ export async function POST(request: Request) {
   const [homeRestDays, awayRestDays, homeTeamState, awayTeamState] = await Promise.all([
     getRestDays(membership.careerId, updatedGame.homeTeamId, updatedGame.season, gameDate),
     getRestDays(membership.careerId, updatedGame.awayTeamId, updatedGame.season, gameDate),
-    getOrCreateTeamState(membership.careerId, updatedGame.homeTeamId),
-    getOrCreateTeamState(membership.careerId, updatedGame.awayTeamId),
+    getOrCreateTeamState(membership.careerId, updatedGame.homeTeamId, updatedGame.leagueId),
+    getOrCreateTeamState(membership.careerId, updatedGame.awayTeamId, updatedGame.leagueId),
   ]);
 
   // Les joueurs actuellement blessés ne jouent pas : exclus du roster transmis
@@ -124,18 +124,35 @@ export async function POST(request: Request) {
     await recordPlayoffGameResult(updated.playoffSeriesId, result.homeScore, result.awayScore);
   }
 
-  // Roster complet (pas filtré) : décompte les indisponibilités en cours,
-  // ajuste le conditionnement physique, et tire de nouvelles blessures parmi
-  // les joueurs valides.
-  await advanceRosterInjuries(membership.careerId, [...homeRoster, ...awayRoster], result.boxScore);
+  // Roster complet (pas filtré), une fois par équipe (les infrastructures
+  // diffèrent d'une équipe à l'autre) : décompte les indisponibilités en
+  // cours, ajuste le conditionnement physique, et tire de nouvelles
+  // blessures parmi les joueurs valides.
+  await Promise.all([
+    advanceRosterInjuries(membership.careerId, homeRoster, result.boxScore, homeTeamState.facilitiesLevel),
+    advanceRosterInjuries(membership.careerId, awayRoster, result.boxScore, awayTeamState.facilitiesLevel),
+  ]);
 
   // Ajuste le renommé de chaque joueur qui a joué selon sa performance.
   await advancePlayerRenown(membership.careerId, result.boxScore, [...homeRoster, ...awayRoster]);
 
-  // Fatigue : récupération selon les jours de repos réels puis gain pour ceux qui ont joué.
+  // Fatigue : récupération selon les jours de repos réels (accélérée par de
+  // bonnes infrastructures) puis gain pour ceux qui ont joué.
   await Promise.all([
-    advanceRosterFatigue(membership.careerId, homeRoster, result.boxScore, homeRestDays),
-    advanceRosterFatigue(membership.careerId, awayRoster, result.boxScore, awayRestDays),
+    advanceRosterFatigue(
+      membership.careerId,
+      homeRoster,
+      result.boxScore,
+      homeRestDays,
+      homeTeamState.facilitiesLevel
+    ),
+    advanceRosterFatigue(
+      membership.careerId,
+      awayRoster,
+      result.boxScore,
+      awayRestDays,
+      awayTeamState.facilitiesLevel
+    ),
   ]);
 
   // Chimie d'équipe : dérive vers sa cible (bilan à jour + QI basket moyen du roster).
@@ -146,12 +163,14 @@ export async function POST(request: Request) {
     advanceTeamChemistry(
       membership.careerId,
       updatedGame.homeTeamId,
+      updatedGame.leagueId,
       winPctForStandings(homeStandingsRow?.wins ?? 0, homeStandingsRow?.losses ?? 0),
       homeRoster
     ),
     advanceTeamChemistry(
       membership.careerId,
       updatedGame.awayTeamId,
+      updatedGame.leagueId,
       winPctForStandings(awayStandingsRow?.wins ?? 0, awayStandingsRow?.losses ?? 0),
       awayRoster
     ),
