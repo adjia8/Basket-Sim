@@ -50,11 +50,13 @@ function baseImpact(player: Player): number {
   );
 }
 
-// Un joueur fatigué rend moins sur le terrain — jusqu'à -30% à fatigue
-// maximale (99).
+// Un joueur fatigué ou pas encore remis d'une blessure (conditionnement bas,
+// voir conditioning-rules.ts) rend moins sur le terrain — jusqu'à -30% à
+// fatigue maximale (99), jusqu'à -20% au plancher de conditionnement (20).
 function playerImpact(player: Player): number {
   const fatigueFactor = 1 - (Math.max(0, Math.min(99, player.fatigue)) / 99) * 0.3;
-  return baseImpact(player) * fatigueFactor;
+  const conditioningFactor = 0.8 + (Math.max(0, Math.min(100, player.conditioning)) / 100) * 0.2;
+  return baseImpact(player) * fatigueFactor * conditioningFactor;
 }
 
 // Rotation calculée à chaque quart-temps à partir du roster encore éligible

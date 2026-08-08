@@ -27,3 +27,34 @@ export function rollInjuryDurationGames(): number {
   if (r < 0.9) return 5 + Math.floor(Math.random() * 10); // 5-14 matchs (modérée)
   return 15 + Math.floor(Math.random() * 20); // 15-34 matchs (sévère)
 }
+
+export type InjurySeverity = "minor" | "moderate" | "severe";
+
+// Mêmes seuils que les tranches de rollInjuryDurationGames ci-dessus.
+export function severityForDuration(duration: number): InjurySeverity {
+  if (duration <= 4) return "minor";
+  if (duration <= 14) return "moderate";
+  return "severe";
+}
+
+export function escalateSeverity(severity: InjurySeverity): InjurySeverity {
+  if (severity === "minor") return "moderate";
+  if (severity === "moderate") return "severe";
+  return "severe";
+}
+
+export type PlayThroughOutcome = "none" | "aggravation" | "reinjury";
+
+// Risque encouru en jouant sur une blessure non guérie — plus élevé si le
+// conditionnement est déjà bas. "aggravation" (plus probable) alourdit la
+// MÊME blessure ; "reinjury" (plus rare) simule une nouvelle blessure
+// distincte contractée en compensant.
+export function rollsPlayThroughSetback(conditioning: number): PlayThroughOutcome {
+  const lowConditioningFactor = 1 - Math.max(0, Math.min(100, conditioning)) / 100;
+  const reinjuryChance = 0.03 + lowConditioningFactor * 0.05; // 3% à 8%
+  const aggravationChance = 0.08 + lowConditioningFactor * 0.12; // 8% à 20%
+  const r = Math.random();
+  if (r < reinjuryChance) return "reinjury";
+  if (r < reinjuryChance + aggravationChance) return "aggravation";
+  return "none";
+}

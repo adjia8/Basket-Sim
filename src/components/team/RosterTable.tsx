@@ -3,7 +3,13 @@
 import { useMemo, useState } from "react";
 import type { Player, PlayerRatings } from "@/lib/types";
 import { formatSalary } from "@/lib/utils";
-import { releasePlayer } from "@/app/actions/roster";
+import { releasePlayer, setPlayingThroughInjury } from "@/app/actions/roster";
+
+const SEVERITY_LABELS: Record<NonNullable<Player["injurySeverity"]>, string> = {
+  minor: "légère",
+  moderate: "modérée",
+  severe: "sévère",
+};
 
 export type RosterPlayer = Player & {
   salary: number;
@@ -29,7 +35,8 @@ type SortKey =
   | "stamina"
   | "injuryRisk"
   | "renown"
-  | "fatigue";
+  | "fatigue"
+  | "conditioning";
 
 const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "overallRating", label: "Overall" },
@@ -49,6 +56,7 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "injuryRisk", label: "Risque blessure" },
   { key: "renown", label: "Renommé" },
   { key: "fatigue", label: "Fatigue" },
+  { key: "conditioning", label: "Conditionnement" },
 ];
 
 const RATING_KEYS = new Set<SortKey>([
@@ -71,6 +79,7 @@ function valueFor(player: RosterPlayer, key: SortKey): number {
   if (key === "injuryRisk") return player.injuryRisk;
   if (key === "renown") return player.renown;
   if (key === "fatigue") return player.fatigue;
+  if (key === "conditioning") return player.conditioning;
   return player[key as "overallRating" | "age" | "salary" | "yearsRemaining"];
 }
 
@@ -131,8 +140,26 @@ export function RosterTable({
                 #{player.jerseyNumber} {player.firstName} {player.lastName}
                 {player.injured && (
                   <span className="ml-2 rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-normal text-red-500">
-                    🩹 Indispo. ({player.injuryGamesRemaining} matchs)
+                    🩹 Indispo.{" "}
+                    {player.injurySeverity ? `(${SEVERITY_LABELS[player.injurySeverity]}, ` : "("}
+                    {player.injuryGamesRemaining} matchs)
                   </span>
+                )}
+                {player.injured && player.injurySeverity === "minor" && canRelease && (
+                  <form action={setPlayingThroughInjury} className="ml-2 inline">
+                    <input type="hidden" name="playerId" value={player.id} />
+                    <input
+                      type="hidden"
+                      name="value"
+                      value={player.playingThroughInjury ? "false" : "true"}
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-full border border-black/10 px-2 py-0.5 text-xs font-normal hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+                    >
+                      {player.playingThroughInjury ? "Mettre au repos" : "Jouer malgré la blessure"}
+                    </button>
+                  </form>
                 )}
                 {player.wantsTrade && (
                   <span className="ml-2 rounded-full bg-orange-500/10 px-2 py-0.5 text-xs font-normal text-orange-500">
@@ -164,7 +191,8 @@ export function RosterTable({
               <td className="py-2 pr-4">{player.ratings.stamina}</td>
               <td className="py-2 pr-4">{player.injuryRisk}</td>
               <td className="py-2 pr-4">{player.renown}</td>
-              <td className="py-2">{player.fatigue}</td>
+              <td className="py-2 pr-4">{player.fatigue}</td>
+              <td className="py-2">{player.conditioning}</td>
               {canRelease && (
                 <td className="py-2 pr-4">
                   <form action={releasePlayer}>

@@ -64,8 +64,11 @@ export interface Player {
   injuryRisk: number; // 0-99, risque de blessure basé sur l'historique réel connu
   injured: boolean;
   injuryGamesRemaining: number;
+  injurySeverity?: "minor" | "moderate" | "severe"; // undefined = sain
+  playingThroughInjury: boolean;
   renown: number; // 0-99, évolue à chaque match joué
   fatigue: number; // 0-99, monte après un match, redescend avec le repos
+  conditioning: number; // 0-100, 100 = conditionnement optimal
 }
 
 // --- Calendrier / Match ---

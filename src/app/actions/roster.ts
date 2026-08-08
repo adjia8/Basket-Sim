@@ -143,3 +143,33 @@ export async function signFreeAgent(formData: FormData): Promise<void> {
 
   revalidateRosterPaths(membership.teamId);
 }
+
+// Choix explicite du manager de faire jouer un joueur malgré une blessure
+// mineure (au risque d'une récupération de conditionnement plus lente,
+// d'une aggravation ou d'une nouvelle blessure — voir advanceRosterInjuries).
+// Seulement valable pour SON PROPRE effectif et une blessure "minor" active.
+export async function setPlayingThroughInjury(formData: FormData): Promise<void> {
+  const { userId } = await verifySession();
+  const playerId = String(formData.get("playerId") ?? "");
+  const value = formData.get("value") === "true";
+
+  const membership = await prisma.membership.findUnique({ where: { userId } });
+  if (!membership) return;
+
+  const contract = await prisma.contract.findUnique({
+    where: { careerId_playerId: { careerId: membership.careerId, playerId } },
+  });
+  if (!contract || contract.teamId !== membership.teamId) return;
+
+  const state = await prisma.playerState.findUnique({
+    where: { careerId_playerId: { careerId: membership.careerId, playerId } },
+  });
+  if (!state || !state.injured || state.injurySeverity !== "minor") return;
+
+  await prisma.playerState.update({
+    where: { id: state.id },
+    data: { playingThroughInjury: value },
+  });
+
+  revalidateRosterPaths(membership.teamId);
+}

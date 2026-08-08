@@ -121,7 +121,9 @@ export function mkPlayer(input: PlayerInput): Player {
     injuryRisk: input.injuryRisk ?? defaultInjuryRisk(input.age, input.id),
     injured: false,
     injuryGamesRemaining: 0,
+    playingThroughInjury: false,
     renown: initialRenown(input.overallRating),
     fatigue: 0,
+    conditioning: 100,
   };
 }

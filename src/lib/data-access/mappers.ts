@@ -73,8 +73,10 @@ export function toDomainPlayer(row: PrismaPlayer): Player {
     injuryRisk: row.injuryRisk,
     injured: false,
     injuryGamesRemaining: 0,
+    playingThroughInjury: false,
     renown: initialRenown(row.overallRating),
     fatigue: 0,
+    conditioning: 100,
   };
 }
 
@@ -112,8 +114,11 @@ export function toDomainPlayerWithState(
     injuryRisk: row.injuryRisk,
     injured: state?.injured ?? false,
     injuryGamesRemaining: state?.injuryGamesRemaining ?? 0,
+    injurySeverity: (state?.injurySeverity as Player["injurySeverity"]) ?? undefined,
+    playingThroughInjury: state?.playingThroughInjury ?? false,
     renown: state?.renown ?? initialRenown(row.overallRating),
     fatigue: state?.fatigue ?? 0,
+    conditioning: state?.conditioning ?? 100,
   };
 }
 

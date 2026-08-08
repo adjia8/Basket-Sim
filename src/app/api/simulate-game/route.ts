@@ -106,12 +106,16 @@ export async function POST(request: Request) {
   ]);
 
   // Les joueurs actuellement blessés ne jouent pas : exclus du roster transmis
-  // au moteur (ni minutes, ni stats de box score).
+  // au moteur (ni minutes, ni stats de box score). Exception : une blessure
+  // mineure sur laquelle le manager a choisi de faire jouer le joueur quand
+  // même (voir src/app/actions/roster.ts, setPlayingThroughInjury).
+  const canPlay = (p: (typeof homeRoster)[number]) =>
+    !p.injured || (p.playingThroughInjury && p.injurySeverity === "minor");
   const result = simulationEngine.simulateGame(
     homeTeam,
-    homeRoster.filter((p) => !p.injured),
+    homeRoster.filter(canPlay),
     awayTeam,
-    awayRoster.filter((p) => !p.injured),
+    awayRoster.filter(canPlay),
     { homeChemistry: homeTeamState.chemistry, awayChemistry: awayTeamState.chemistry }
   );
   const updated = await updateGameResult(membership.careerId, gameId, result);
@@ -120,9 +124,10 @@ export async function POST(request: Request) {
     await recordPlayoffGameResult(updated.playoffSeriesId, result.homeScore, result.awayScore);
   }
 
-  // Roster complet (pas filtré) : décompte les indisponibilités en cours et
-  // tire de nouvelles blessures parmi les joueurs valides.
-  await advanceRosterInjuries(membership.careerId, [...homeRoster, ...awayRoster]);
+  // Roster complet (pas filtré) : décompte les indisponibilités en cours,
+  // ajuste le conditionnement physique, et tire de nouvelles blessures parmi
+  // les joueurs valides.
+  await advanceRosterInjuries(membership.careerId, [...homeRoster, ...awayRoster], result.boxScore);
 
   // Ajuste le renommé de chaque joueur qui a joué selon sa performance.
   await advancePlayerRenown(membership.careerId, result.boxScore, [...homeRoster, ...awayRoster]);

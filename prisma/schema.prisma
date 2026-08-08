@@ -241,6 +241,9 @@ model PlayerState {
   injuryGamesRemaining Int     @default(0)
   renown               Int     @default(50) // 0-99, évolue à chaque match joué
   fatigue              Int     @default(0) // 0-99, monte après un match, redescend avec le repos
+  conditioning         Int     @default(100) // 0-100, 100 = conditionnement optimal
+  injurySeverity       String? // "minor" | "moderate" | "severe", null si sain
+  playingThroughInjury Boolean @default(false) // choix du manager, valable seulement pour une blessure "minor"
 
   @@unique([careerId, playerId])
   @@index([careerId])
