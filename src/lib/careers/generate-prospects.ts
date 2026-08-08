@@ -42,11 +42,16 @@ export async function generateProspectClass(
       heightCm: randomInt(180, 216),
       age: randomInt(19, 22),
       overallRating,
-      scoring: spreadAround(overallRating),
+      scoringInside: spreadAround(overallRating),
+      scoringOutside: spreadAround(overallRating),
       playmaking: spreadAround(overallRating),
+      defenseInside: spreadAround(overallRating),
+      defenseOutside: spreadAround(overallRating),
       rebounding: spreadAround(overallRating),
-      defense: spreadAround(overallRating),
       athleticism: spreadAround(overallRating),
+      basketballIQ: spreadAround(overallRating),
+      clutch: spreadAround(overallRating),
+      stamina: spreadAround(overallRating),
     };
   });
 

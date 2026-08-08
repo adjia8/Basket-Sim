@@ -35,6 +35,7 @@ model Career {
   draftPicks    DraftPick[]
   deadCap       DeadCap[]
   playoffSeries PlayoffSeries[]
+  teamStates    TeamState[]
 }
 
 // Qui gère quelle équipe dans une Career (ligue) partagée. Un compte n'est
@@ -89,6 +90,7 @@ model Team {
   abbreviation       String
   primaryColor       String
   secondaryColor     String
+  marketAppeal       Int             @default(50) // 0-99, attractivité de la ville (marché, climat, style de vie)
   players            Player[]
   memberships        Membership[]
   homeGames          Game[]          @relation("HomeTeam")
@@ -99,30 +101,39 @@ model Team {
   deadCap            DeadCap[]
   homePlayoffSeries  PlayoffSeries[] @relation("PlayoffSeriesHomeTeam")
   awayPlayoffSeries  PlayoffSeries[] @relation("PlayoffSeriesAwayTeam")
+  teamStates         TeamState[]
 
   @@index([leagueId])
   @@index([conferenceId])
 }
 
 model Player {
-  id            String        @id
-  teamId        String
-  team          Team          @relation(fields: [teamId], references: [id])
-  leagueId      String
-  firstName     String
-  lastName      String
-  position      String
-  jerseyNumber  Int
-  heightCm      Int
-  age           Int
-  overallRating Int
-  scoring       Int
-  playmaking    Int
-  rebounding    Int
-  defense       Int
-  athleticism   Int
-  contracts     Contract[]
-  playerStates  PlayerState[]
+  id             String        @id
+  teamId         String
+  team           Team          @relation(fields: [teamId], references: [id])
+  leagueId       String
+  firstName      String
+  lastName       String
+  position       String
+  jerseyNumber   Int
+  heightCm       Int
+  age            Int
+  overallRating  Int
+  // 10 attributs techniques (0-99) — pilotent la simulation (voir mockEngine.ts) ;
+  // distincts d'overallRating, qui reste la valeur "front-office" (salaire, trade, draft).
+  scoringInside  Int
+  scoringOutside Int
+  playmaking     Int
+  defenseInside  Int
+  defenseOutside Int
+  rebounding     Int
+  athleticism    Int
+  basketballIQ   Int
+  clutch         Int
+  stamina        Int
+  injuryRisk     Int           @default(30) // 0-99, risque de blessure basé sur l'historique réel connu
+  contracts      Contract[]
+  playerStates   PlayerState[]
 
   @@index([teamId])
 }
@@ -208,41 +219,55 @@ model Contract {
 }
 
 model PlayerState {
-  id            String  @id @default(cuid())
-  careerId      String
-  career        Career  @relation(fields: [careerId], references: [id], onDelete: Cascade)
-  playerId      String
-  player        Player  @relation(fields: [playerId], references: [id])
-  age           Int
-  overallRating Int
-  scoring       Int
-  playmaking    Int
-  rebounding    Int
-  defense       Int
-  athleticism   Int
-  retired       Boolean @default(false)
+  id                   String  @id @default(cuid())
+  careerId             String
+  career               Career  @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  playerId             String
+  player               Player  @relation(fields: [playerId], references: [id])
+  age                  Int
+  overallRating        Int
+  scoringInside        Int
+  scoringOutside       Int
+  playmaking           Int
+  defenseInside        Int
+  defenseOutside       Int
+  rebounding           Int
+  athleticism          Int
+  basketballIQ         Int
+  clutch               Int
+  stamina              Int
+  retired              Boolean @default(false)
+  injured              Boolean @default(false)
+  injuryGamesRemaining Int     @default(0)
+  renown               Int     @default(50) // 0-99, évolue à chaque match joué
+  fatigue              Int     @default(0) // 0-99, monte après un match, redescend avec le repos
 
   @@unique([careerId, playerId])
   @@index([careerId])
 }
 
 model Prospect {
-  id            String @id @default(cuid())
-  careerId      String
-  career        Career @relation(fields: [careerId], references: [id], onDelete: Cascade)
-  leagueId      String
-  league        League @relation(fields: [leagueId], references: [id])
-  firstName     String
-  lastName      String
-  position      String
-  heightCm      Int
-  age           Int
-  overallRating Int
-  scoring       Int
-  playmaking    Int
-  rebounding    Int
-  defense       Int
-  athleticism   Int
+  id             String @id @default(cuid())
+  careerId       String
+  career         Career @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  leagueId       String
+  league         League @relation(fields: [leagueId], references: [id])
+  firstName      String
+  lastName       String
+  position       String
+  heightCm       Int
+  age            Int
+  overallRating  Int
+  scoringInside  Int
+  scoringOutside Int
+  playmaking     Int
+  defenseInside  Int
+  defenseOutside Int
+  rebounding     Int
+  athleticism    Int
+  basketballIQ   Int
+  clutch         Int
+  stamina        Int
 
   @@index([careerId])
 }
@@ -320,4 +345,19 @@ model DeadCap {
   yearsRemaining Int
 
   @@index([careerId, teamId])
+}
+
+// Chimie d'équipe par Career — dérive lentement vers une cible calculée à
+// chaque match (bilan + QI basket moyen du roster, voir chemistry-rules.ts).
+// Créée paresseusement à la première lecture (défaut 50), même principe que
+// getCurrentDraftPick.
+model TeamState {
+  id        String @id @default(cuid())
+  careerId  String
+  career    Career @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  teamId    String
+  team      Team   @relation(fields: [teamId], references: [id])
+  chemistry Int    @default(50) // 0-99
+
+  @@unique([careerId, teamId])
 }

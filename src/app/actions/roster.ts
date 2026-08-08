@@ -6,8 +6,16 @@ import { prisma } from "@/lib/prisma";
 import { generateContractTerms } from "@/lib/careers/generate-contracts";
 import { getLeagueById } from "@/lib/data-access/leagues";
 import { getPayrollForTeam } from "@/lib/data-access/contracts";
+import { getStandings } from "@/lib/data-access/standings";
+import { getTeamById } from "@/lib/data-access/teams";
 import { isFreeAgencyOpen } from "@/lib/data-access/season-windows";
 import { MAX_ROSTER_SIZE, MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import { initialRenown } from "@/lib/careers/renown-rules";
+import {
+  minAcceptableSalary,
+  teamMeetsPlayerDemands,
+  winPctForStandings,
+} from "@/lib/careers/player-demands";
 
 function revalidateRosterPaths(teamId: string) {
   revalidatePath("/");
@@ -68,29 +76,54 @@ export async function signFreeAgent(formData: FormData): Promise<void> {
   });
   if (!membership) return;
 
-  const [player, existingContract, rosterSize, currentPayroll, league] = await Promise.all([
-    prisma.player.findUnique({ where: { id: playerId } }),
-    prisma.contract.findUnique({
-      where: { careerId_playerId: { careerId: membership.careerId, playerId } },
-    }),
-    prisma.contract.count({
-      where: { careerId: membership.careerId, teamId: membership.teamId },
-    }),
-    getPayrollForTeam(membership.careerId, membership.teamId),
-    getLeagueById(membership.career.leagueId),
-  ]);
+  const [player, playerState, existingContract, rosterSize, currentPayroll, league, standings, myTeam] =
+    await Promise.all([
+      prisma.player.findUnique({ where: { id: playerId } }),
+      prisma.playerState.findUnique({
+        where: { careerId_playerId: { careerId: membership.careerId, playerId } },
+      }),
+      prisma.contract.findUnique({
+        where: { careerId_playerId: { careerId: membership.careerId, playerId } },
+      }),
+      prisma.contract.count({
+        where: { careerId: membership.careerId, teamId: membership.teamId },
+      }),
+      getPayrollForTeam(membership.careerId, membership.teamId),
+      getLeagueById(membership.career.leagueId),
+      getStandings(membership.careerId, membership.career.leagueId, membership.career.season),
+      getTeamById(membership.teamId),
+    ]);
 
   if (!player || player.leagueId !== membership.career.leagueId) return;
   if (existingContract) return; // déjà sous contrat dans cette Career
   if (rosterSize >= MAX_ROSTER_SIZE) return;
   if (!(await isFreeAgencyOpen(membership.careerId, membership.career.season))) return;
+  if (!myTeam) return;
+
+  const renown = playerState?.renown ?? initialRenown(player.overallRating);
+  const myStandingsRow = standings.find((row) => row.teamId === membership.teamId);
+  const teamWinPct = winPctForStandings(myStandingsRow?.wins ?? 0, myStandingsRow?.losses ?? 0);
+  if (
+    !teamMeetsPlayerDemands({
+      renown,
+      teamWinPct,
+      teamMarketAppeal: myTeam.marketAppeal,
+    })
+  ) {
+    return; // refuse : équipe pas assez compétitive et/ou marché pas assez attractif
+  }
 
   // Calculée une seule fois : generateContractTerms tire un salaire aléatoire,
   // la réutiliser pour la vérification du cap ET l'insertion évite un montant
-  // vérifié différent du montant réellement facturé.
+  // vérifié différent du montant réellement facturé. Le renommé impose un
+  // plancher salarial en plus de ce que suggérerait le seul overall.
   const terms = generateContractTerms(player.overallRating, membership.career.leagueId);
+  const salary = Math.max(
+    terms.salary,
+    minAcceptableSalary(renown, player.overallRating, membership.career.leagueId)
+  );
   const salaryCap = league?.salaryCap ?? Infinity;
-  if (currentPayroll + terms.salary > salaryCap) return;
+  if (currentPayroll + salary > salaryCap) return;
 
   try {
     await prisma.contract.create({
@@ -99,6 +132,7 @@ export async function signFreeAgent(formData: FormData): Promise<void> {
         playerId,
         teamId: membership.teamId,
         ...terms,
+        salary,
       },
     });
   } catch (err) {

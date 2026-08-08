@@ -4,12 +4,19 @@ import { getContractsForTeam, getPayrollForTeam } from "@/lib/data-access/contra
 import { getLeagueById } from "@/lib/data-access/leagues";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getRosterForTeam } from "@/lib/data-access/players";
+import { getStandings } from "@/lib/data-access/standings";
 import { isTradeDeadlinePassed } from "@/lib/data-access/season-windows";
+import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getTeamById } from "@/lib/data-access/teams";
 import { prisma } from "@/lib/prisma";
 import { RosterTable, type RosterPlayer } from "@/components/team/RosterTable";
 import { TradeProposalForm, type TradePick } from "@/components/team/TradeProposalForm";
 import { MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import {
+  minAcceptableSalary,
+  teamMeetsPlayerDemands,
+  winPctForStandings,
+} from "@/lib/careers/player-demands";
 import { formatSalary, teamFullName } from "@/lib/utils";
 
 async function getPendingPicksForTeam(careerId: string, teamId: string): Promise<TradePick[]> {
@@ -39,32 +46,52 @@ export default async function TeamRosterPage({
   const team = await getTeamById(teamId);
   if (!team) notFound();
 
-  const [roster, contracts, league, manager, totalPayroll, deadCap, picks, tradeDeadlinePassed] = await Promise.all([
-    getRosterForTeam(membership.careerId, teamId),
-    getContractsForTeam(membership.careerId, teamId),
-    getLeagueById(team.leagueId),
-    getMembershipForTeam(membership.careerId, teamId),
-    getPayrollForTeam(membership.careerId, teamId),
-    prisma.deadCap.findMany({ where: { careerId: membership.careerId, teamId } }),
-    getPendingPicksForTeam(membership.careerId, teamId),
-    isTradeDeadlinePassed(membership.careerId, membership.season),
-  ]);
+  const [roster, contracts, league, manager, totalPayroll, deadCap, picks, tradeDeadlinePassed, standings, teamState] =
+    await Promise.all([
+      getRosterForTeam(membership.careerId, teamId),
+      getContractsForTeam(membership.careerId, teamId),
+      getLeagueById(team.leagueId),
+      getMembershipForTeam(membership.careerId, teamId),
+      getPayrollForTeam(membership.careerId, teamId),
+      prisma.deadCap.findMany({ where: { careerId: membership.careerId, teamId } }),
+      getPendingPicksForTeam(membership.careerId, teamId),
+      isTradeDeadlinePassed(membership.careerId, membership.season),
+      getStandings(membership.careerId, team.leagueId, membership.season),
+      getOrCreateTeamState(membership.careerId, teamId),
+    ]);
+
+  const isMyTeam = team.id === membership.teamId;
+  const teamStandingsRow = standings.find((row) => row.teamId === teamId);
+  const teamWinPct = winPctForStandings(teamStandingsRow?.wins ?? 0, teamStandingsRow?.losses ?? 0);
 
   const contractByPlayerId = new Map(contracts.map((c) => [c.playerId, c]));
   const rosterWithContracts: RosterPlayer[] = roster.map((player) => {
     const contract = contractByPlayerId.get(player.id);
+    const salary = contract?.salary ?? 0;
+    // Demande de trade visible uniquement pour mon propre effectif : un
+    // joueur mécontent (équipe pas assez compétitive/attractive pour son
+    // standing, ou sous-payé par rapport à son exigence) — purement
+    // informatif, n'affecte aucune mécanique.
+    const wantsTrade =
+      isMyTeam &&
+      (!teamMeetsPlayerDemands({
+        renown: player.renown,
+        teamWinPct,
+        teamMarketAppeal: team.marketAppeal,
+      }) ||
+        salary < minAcceptableSalary(player.renown, player.overallRating, team.leagueId));
     return {
       ...player,
-      salary: contract?.salary ?? 0,
+      salary,
       yearsRemaining: contract?.yearsRemaining ?? 0,
       guaranteed: contract?.guaranteed ?? true,
+      wantsTrade,
     };
   });
 
   const deadCapTotal = deadCap.reduce((sum, d) => sum + d.salary, 0);
   const salaryCap = league?.salaryCap ?? 0;
   const overCap = totalPayroll > salaryCap;
-  const isMyTeam = team.id === membership.teamId;
   const isOpponentInMyLeague = !isMyTeam && team.leagueId === membership.leagueId;
   const managedByMe = manager?.userId === membership.userId;
   const managerLabel = managedByMe ? "Géré par toi" : manager ? `Géré par ${manager.email}` : "Géré par l'IA";
@@ -85,6 +112,7 @@ export default async function TeamRosterPage({
         salary: contract?.salary ?? 0,
         yearsRemaining: contract?.yearsRemaining ?? 0,
         guaranteed: contract?.guaranteed ?? true,
+        wantsTrade: false, // non pertinent dans le contexte du formulaire d'échange
       };
     });
     myPicks = myPendingPicks;
@@ -125,6 +153,12 @@ export default async function TeamRosterPage({
             Effectif
           </p>
           <p className="mt-1 text-xl font-semibold">{roster.length} / 10 joueurs</p>
+        </div>
+        <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
+          <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
+            Chimie d&apos;équipe
+          </p>
+          <p className="mt-1 text-xl font-semibold">{teamState.chemistry} / 99</p>
         </div>
       </div>
 

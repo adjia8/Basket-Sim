@@ -32,43 +32,58 @@ async function main() {
   }
 
   for (const team of teams) {
+    // Même raisonnement que pour Player plus bas : le catalogue Team est
+    // statique côté gameplay, un re-seed doit répercuter les changements de
+    // mock-data (ex. marketAppeal) sur les lignes déjà en base.
+    const fields = {
+      leagueId: team.leagueId,
+      conferenceId: team.conferenceId,
+      city: team.city,
+      name: team.name,
+      abbreviation: team.abbreviation,
+      primaryColor: team.primaryColor,
+      secondaryColor: team.secondaryColor,
+      marketAppeal: team.marketAppeal,
+    };
     await prisma.team.upsert({
       where: { id: team.id },
-      update: {},
-      create: {
-        id: team.id,
-        leagueId: team.leagueId,
-        conferenceId: team.conferenceId,
-        city: team.city,
-        name: team.name,
-        abbreviation: team.abbreviation,
-        primaryColor: team.primaryColor,
-        secondaryColor: team.secondaryColor,
-      },
+      update: fields,
+      create: { id: team.id, ...fields },
     });
   }
 
   for (const player of [...playersNba, ...playersWnba]) {
+    // `update` reprend les mêmes champs que `create` (plutôt que `{}`) : le
+    // catalogue Player est statique côté gameplay (l'évolution en cours de
+    // carrière passe par PlayerState, jamais par ces colonnes), donc un
+    // re-seed doit pouvoir répercuter un changement dans les fichiers
+    // mock-data (ex. injuryRisk) sur les lignes déjà en base.
+    const fields = {
+      teamId: player.teamId,
+      leagueId: player.leagueId,
+      firstName: player.firstName,
+      lastName: player.lastName,
+      position: player.position,
+      jerseyNumber: player.jerseyNumber,
+      heightCm: player.heightCm,
+      age: player.age,
+      overallRating: player.overallRating,
+      scoringInside: player.ratings.scoringInside,
+      scoringOutside: player.ratings.scoringOutside,
+      playmaking: player.ratings.playmaking,
+      defenseInside: player.ratings.defenseInside,
+      defenseOutside: player.ratings.defenseOutside,
+      rebounding: player.ratings.rebounding,
+      athleticism: player.ratings.athleticism,
+      basketballIQ: player.ratings.basketballIQ,
+      clutch: player.ratings.clutch,
+      stamina: player.ratings.stamina,
+      injuryRisk: player.injuryRisk,
+    };
     await prisma.player.upsert({
       where: { id: player.id },
-      update: {},
-      create: {
-        id: player.id,
-        teamId: player.teamId,
-        leagueId: player.leagueId,
-        firstName: player.firstName,
-        lastName: player.lastName,
-        position: player.position,
-        jerseyNumber: player.jerseyNumber,
-        heightCm: player.heightCm,
-        age: player.age,
-        overallRating: player.overallRating,
-        scoring: player.ratings.scoring,
-        playmaking: player.ratings.playmaking,
-        rebounding: player.ratings.rebounding,
-        defense: player.ratings.defense,
-        athleticism: player.ratings.athleticism,
-      },
+      update: fields,
+      create: { id: player.id, ...fields },
     });
   }
 

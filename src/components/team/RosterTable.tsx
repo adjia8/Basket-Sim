@@ -9,6 +9,7 @@ export type RosterPlayer = Player & {
   salary: number;
   yearsRemaining: number;
   guaranteed: boolean;
+  wantsTrade: boolean;
 };
 
 type SortKey =
@@ -16,36 +17,60 @@ type SortKey =
   | "age"
   | "salary"
   | "yearsRemaining"
-  | "scoring"
+  | "scoringInside"
+  | "scoringOutside"
   | "playmaking"
+  | "defenseInside"
+  | "defenseOutside"
   | "rebounding"
-  | "defense"
-  | "athleticism";
+  | "athleticism"
+  | "basketballIQ"
+  | "clutch"
+  | "stamina"
+  | "injuryRisk"
+  | "renown"
+  | "fatigue";
 
 const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "overallRating", label: "Overall" },
   { key: "age", label: "Âge" },
   { key: "salary", label: "Salaire" },
   { key: "yearsRemaining", label: "Ann. restantes" },
-  { key: "scoring", label: "Scoring" },
+  { key: "scoringInside", label: "Scoring intérieur" },
+  { key: "scoringOutside", label: "Scoring extérieur" },
   { key: "playmaking", label: "Playmaking" },
+  { key: "defenseInside", label: "Défense intérieure" },
+  { key: "defenseOutside", label: "Défense extérieure" },
   { key: "rebounding", label: "Rebonds" },
-  { key: "defense", label: "Défense" },
   { key: "athleticism", label: "Athlétisme" },
+  { key: "basketballIQ", label: "QI basket" },
+  { key: "clutch", label: "Clutch" },
+  { key: "stamina", label: "Stamina" },
+  { key: "injuryRisk", label: "Risque blessure" },
+  { key: "renown", label: "Renommé" },
+  { key: "fatigue", label: "Fatigue" },
 ];
 
 const RATING_KEYS = new Set<SortKey>([
-  "scoring",
+  "scoringInside",
+  "scoringOutside",
   "playmaking",
+  "defenseInside",
+  "defenseOutside",
   "rebounding",
-  "defense",
   "athleticism",
+  "basketballIQ",
+  "clutch",
+  "stamina",
 ]);
 
 function valueFor(player: RosterPlayer, key: SortKey): number {
   if (RATING_KEYS.has(key)) {
     return player.ratings[key as keyof PlayerRatings];
   }
+  if (key === "injuryRisk") return player.injuryRisk;
+  if (key === "renown") return player.renown;
+  if (key === "fatigue") return player.fatigue;
   return player[key as "overallRating" | "age" | "salary" | "yearsRemaining"];
 }
 
@@ -104,6 +129,16 @@ export function RosterTable({
             <tr key={player.id} className="border-b border-black/5 dark:border-white/5">
               <td className="py-2 pr-4 font-medium">
                 #{player.jerseyNumber} {player.firstName} {player.lastName}
+                {player.injured && (
+                  <span className="ml-2 rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-normal text-red-500">
+                    🩹 Indispo. ({player.injuryGamesRemaining} matchs)
+                  </span>
+                )}
+                {player.wantsTrade && (
+                  <span className="ml-2 rounded-full bg-orange-500/10 px-2 py-0.5 text-xs font-normal text-orange-500">
+                    🚩 Veut être échangé
+                  </span>
+                )}
               </td>
               <td className="py-2 pr-4">{player.position}</td>
               <td className="py-2 pr-4 font-semibold">{player.overallRating}</td>
@@ -117,11 +152,19 @@ export function RosterTable({
                 )}
               </td>
               <td className="py-2 pr-4">{player.yearsRemaining}</td>
-              <td className="py-2 pr-4">{player.ratings.scoring}</td>
+              <td className="py-2 pr-4">{player.ratings.scoringInside}</td>
+              <td className="py-2 pr-4">{player.ratings.scoringOutside}</td>
               <td className="py-2 pr-4">{player.ratings.playmaking}</td>
+              <td className="py-2 pr-4">{player.ratings.defenseInside}</td>
+              <td className="py-2 pr-4">{player.ratings.defenseOutside}</td>
               <td className="py-2 pr-4">{player.ratings.rebounding}</td>
-              <td className="py-2 pr-4">{player.ratings.defense}</td>
-              <td className="py-2">{player.ratings.athleticism}</td>
+              <td className="py-2 pr-4">{player.ratings.athleticism}</td>
+              <td className="py-2 pr-4">{player.ratings.basketballIQ}</td>
+              <td className="py-2 pr-4">{player.ratings.clutch}</td>
+              <td className="py-2 pr-4">{player.ratings.stamina}</td>
+              <td className="py-2 pr-4">{player.injuryRisk}</td>
+              <td className="py-2 pr-4">{player.renown}</td>
+              <td className="py-2">{player.fatigue}</td>
               {canRelease && (
                 <td className="py-2 pr-4">
                   <form action={releasePlayer}>

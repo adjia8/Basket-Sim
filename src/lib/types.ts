@@ -26,18 +26,27 @@ export interface Team {
   abbreviation: string; // "LAL"
   primaryColor: string; // hex
   secondaryColor: string; // hex
+  marketAppeal: number; // 0-99, attractivité de la ville (marché, climat, style de vie)
   userId?: string | null; // null/undefined = géré par l'IA (préparé pour le multijoueur futur)
 }
 
 // --- Joueur ---
 export type Position = "PG" | "SG" | "SF" | "PF" | "C";
 
+// 10 attributs techniques (0-99), pilotent la simulation (voir mockEngine.ts) —
+// distincts d'overallRating, qui reste la valeur "front-office" (salaire,
+// trade, ordre de draft).
 export interface PlayerRatings {
-  scoring: number; // 0-99
+  scoringInside: number;
+  scoringOutside: number;
   playmaking: number;
+  defenseInside: number;
+  defenseOutside: number;
   rebounding: number;
-  defense: number;
   athleticism: number;
+  basketballIQ: number;
+  clutch: number;
+  stamina: number;
 }
 
 export interface Player {
@@ -52,6 +61,11 @@ export interface Player {
   age: number;
   overallRating: number; // 0-99
   ratings: PlayerRatings;
+  injuryRisk: number; // 0-99, risque de blessure basé sur l'historique réel connu
+  injured: boolean;
+  injuryGamesRemaining: number;
+  renown: number; // 0-99, évolue à chaque match joué
+  fatigue: number; // 0-99, monte après un match, redescend avec le repos
 }
 
 // --- Calendrier / Match ---

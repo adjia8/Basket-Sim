@@ -65,6 +65,27 @@ function seededShuffle<T>(items: T[], seed: string): T[] {
   return arr;
 }
 
+// Regroupe les paires (déjà mélangées) en "tours" façon round-robin : dans un
+// même tour, aucune équipe n'apparaît deux fois — glouton, chaque paire va
+// dans le premier tour où ni l'une ni l'autre équipe n'est déjà engagée.
+// Combiné à un mappage tour -> jour strictement croissant (voir dayForRound),
+// garantit qu'aucune équipe ne se retrouve avec deux matchs le même jour
+// calendaire (l'ancienne assignation par index global le permettait).
+function assignRounds(pairs: [string, string][]): number[] {
+  const teamsUsedInRound: Set<string>[] = [];
+  const roundOfPair: number[] = [];
+  for (const [teamA, teamB] of pairs) {
+    let round = 0;
+    while (teamsUsedInRound[round]?.has(teamA) || teamsUsedInRound[round]?.has(teamB)) {
+      round++;
+    }
+    (teamsUsedInRound[round] ??= new Set()).add(teamA);
+    teamsUsedInRound[round].add(teamB);
+    roundOfPair.push(round);
+  }
+  return roundOfPair;
+}
+
 export interface GenerateScheduleOptions {
   // Étiquette de saison à appliquer aux Game générés (Career.season courant,
   // pas forcément league.season une fois qu'on a dépassé la 1ère saison).
@@ -121,13 +142,21 @@ export async function generateCareerSchedule(
 
   const today = new Date();
   const pairs = seededShuffle(allPairs, `${careerId}-${options.seasonLabel}`);
+  const roundOfPair = assignRounds(pairs);
+  const totalRounds = Math.max(...roundOfPair) + 1;
   const startDate = addDays(today, -8); // une poignée de matchs déjà joués
   const seasonDays = SEASON_LENGTH_DAYS[league.id] ?? SEASON_LENGTH_DAYS.nba;
 
+  // Étale les tours sur toute la durée de la saison (plusieurs équipes jouent
+  // le même jour, mais jamais une même équipe deux fois). Strictement
+  // croissant en tour tant que totalRounds <= seasonDays (le cas normal —
+  // ~82-90 tours pour 170 jours NBA, ~44-55 pour 130 jours WNBA) ; repli à un
+  // tour = un jour sinon (saison compressée mais toujours sans collision).
+  const dayForRound = (round: number): number =>
+    totalRounds <= seasonDays ? Math.floor((round * seasonDays) / totalRounds) : round;
+
   const rows = pairs.map(([teamA, teamB], index) => {
-    // Étale les matchs sur toute la durée de la saison (plusieurs par jour)
-    // plutôt qu'un match tous les 2 jours strictement séquentiel.
-    const dayOffset = Math.floor((index * seasonDays) / pairs.length);
+    const dayOffset = dayForRound(roundOfPair[index]);
     const gameDate = addDays(startDate, dayOffset);
     const isPast = options.presimulatePast && gameDate < today;
     const homeTeamId = index % 2 === 0 ? teamA : teamB;

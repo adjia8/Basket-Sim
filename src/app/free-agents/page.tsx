@@ -1,16 +1,23 @@
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getFreeAgents, getPayrollForTeam } from "@/lib/data-access/contracts";
 import { getLeagueById } from "@/lib/data-access/leagues";
+import { getStandings } from "@/lib/data-access/standings";
+import { getTeamById } from "@/lib/data-access/teams";
 import { isFreeAgencyOpen } from "@/lib/data-access/season-windows";
 import { prisma } from "@/lib/prisma";
 import { signFreeAgent } from "@/app/actions/roster";
 import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import {
+  minAcceptableSalary,
+  teamMeetsPlayerDemands,
+  winPctForStandings,
+} from "@/lib/careers/player-demands";
 import { formatSalary } from "@/lib/utils";
 
 export default async function FreeAgentsPage() {
   const membership = await getCurrentMembership();
 
-  const [freeAgents, rosterSize, payroll, league, faOpen] = await Promise.all([
+  const [freeAgents, rosterSize, payroll, league, faOpen, standings, myTeam] = await Promise.all([
     getFreeAgents(membership.careerId, membership.leagueId),
     prisma.contract.count({
       where: { careerId: membership.careerId, teamId: membership.teamId },
@@ -18,6 +25,8 @@ export default async function FreeAgentsPage() {
     getPayrollForTeam(membership.careerId, membership.teamId),
     getLeagueById(membership.leagueId),
     isFreeAgencyOpen(membership.careerId, membership.season),
+    getStandings(membership.careerId, membership.leagueId, membership.season),
+    getTeamById(membership.teamId),
   ]);
 
   const rosterFull = rosterSize >= MAX_ROSTER_SIZE;
@@ -27,6 +36,10 @@ export default async function FreeAgentsPage() {
   // passer, quel que soit le montant (aléatoire) qui serait proposé.
   const capReached = payroll >= salaryCap;
   const canSign = !rosterFull && !capReached && faOpen;
+
+  const myStandingsRow = standings.find((row) => row.teamId === membership.teamId);
+  const teamWinPct = winPctForStandings(myStandingsRow?.wins ?? 0, myStandingsRow?.losses ?? 0);
+  const teamMarketAppeal = myTeam?.marketAppeal ?? 50;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
@@ -69,33 +82,65 @@ export default async function FreeAgentsPage() {
               <th className="py-2 pr-4">Poste</th>
               <th className="py-2 pr-4">Overall</th>
               <th className="py-2 pr-4">Âge</th>
+              <th className="py-2 pr-4">Risque blessure</th>
+              <th className="py-2 pr-4">Renommé</th>
+              <th className="py-2 pr-4">Exigence salariale</th>
               {canSign && <th className="py-2">Action</th>}
             </tr>
           </thead>
           <tbody>
-            {freeAgents.map((player) => (
-              <tr key={player.id} className="border-b border-black/5 dark:border-white/5">
-                <td className="py-2 pr-4 font-medium">
-                  {player.firstName} {player.lastName}
-                </td>
-                <td className="py-2 pr-4">{player.position}</td>
-                <td className="py-2 pr-4 font-semibold">{player.overallRating}</td>
-                <td className="py-2 pr-4">{player.age}</td>
-                {canSign && (
-                  <td className="py-2">
-                    <form action={signFreeAgent}>
-                      <input type="hidden" name="playerId" value={player.id} />
-                      <button
-                        type="submit"
-                        className="rounded-full bg-black px-3 py-1 text-xs font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
-                      >
-                        Signer
-                      </button>
-                    </form>
+            {freeAgents.map((player) => {
+              const meetsDemands = teamMeetsPlayerDemands({
+                renown: player.renown,
+                teamWinPct,
+                teamMarketAppeal,
+              });
+              const expectedSalary = minAcceptableSalary(
+                player.renown,
+                player.overallRating,
+                membership.leagueId
+              );
+
+              return (
+                <tr key={player.id} className="border-b border-black/5 dark:border-white/5">
+                  <td className="py-2 pr-4 font-medium">
+                    {player.firstName} {player.lastName}
                   </td>
-                )}
-              </tr>
-            ))}
+                  <td className="py-2 pr-4">{player.position}</td>
+                  <td className="py-2 pr-4 font-semibold">{player.overallRating}</td>
+                  <td className="py-2 pr-4">{player.age}</td>
+                  <td className="py-2 pr-4">
+                    {player.injuryRisk}
+                    {player.injured && (
+                      <span className="ml-1 text-xs text-red-500">
+                        🩹 indispo. ({player.injuryGamesRemaining})
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-2 pr-4">{player.renown}</td>
+                  <td className="py-2 pr-4">{formatSalary(expectedSalary)}</td>
+                  {canSign && (
+                    <td className="py-2">
+                      {meetsDemands ? (
+                        <form action={signFreeAgent}>
+                          <input type="hidden" name="playerId" value={player.id} />
+                          <button
+                            type="submit"
+                            className="rounded-full bg-black px-3 py-1 text-xs font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+                          >
+                            Signer
+                          </button>
+                        </form>
+                      ) : (
+                        <span className="text-xs text-red-500">
+                          Refuse : équipe pas assez compétitive ou marché pas assez attractif
+                        </span>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {freeAgents.length === 0 && (

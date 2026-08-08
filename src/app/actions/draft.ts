@@ -10,6 +10,7 @@ import { getLeagueById } from "@/lib/data-access/leagues";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { rookieScaleContract } from "@/lib/careers/rookie-scale";
+import { initialRenown } from "@/lib/careers/renown-rules";
 
 async function performDraftPick(
   currentPick: ResolvedDraftPick,
@@ -40,11 +41,16 @@ async function performDraftPick(
           heightCm: prospect.heightCm,
           age: prospect.age,
           overallRating: prospect.overallRating,
-          scoring: prospect.scoring,
+          scoringInside: prospect.scoringInside,
+          scoringOutside: prospect.scoringOutside,
           playmaking: prospect.playmaking,
+          defenseInside: prospect.defenseInside,
+          defenseOutside: prospect.defenseOutside,
           rebounding: prospect.rebounding,
-          defense: prospect.defense,
           athleticism: prospect.athleticism,
+          basketballIQ: prospect.basketballIQ,
+          clutch: prospect.clutch,
+          stamina: prospect.stamina,
         },
       });
       await tx.contract.create({
@@ -61,12 +67,21 @@ async function performDraftPick(
           playerId: newPlayerId,
           age: prospect.age,
           overallRating: prospect.overallRating,
-          scoring: prospect.scoring,
+          scoringInside: prospect.scoringInside,
+          scoringOutside: prospect.scoringOutside,
           playmaking: prospect.playmaking,
+          defenseInside: prospect.defenseInside,
+          defenseOutside: prospect.defenseOutside,
           rebounding: prospect.rebounding,
-          defense: prospect.defense,
           athleticism: prospect.athleticism,
+          basketballIQ: prospect.basketballIQ,
+          clutch: prospect.clutch,
+          stamina: prospect.stamina,
           retired: false,
+          // Bug latent corrigé au passage : sans ceci, un rookie draftée en
+          // cours de carrière retombait sur le défaut plat de PlayerState.renown
+          // (50) plutôt que la valeur dérivée de son overall.
+          renown: initialRenown(prospect.overallRating),
         },
       });
 

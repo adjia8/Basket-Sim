@@ -4,9 +4,15 @@ import { prisma } from "@/lib/prisma";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getRosterForTeam } from "@/lib/data-access/players";
 import { getGameById, setGameReady, updateGameResult } from "@/lib/data-access/schedule";
+import { getStandings } from "@/lib/data-access/standings";
 import { getTeamById } from "@/lib/data-access/teams";
 import { simulationEngine } from "@/lib/simulation/mockEngine";
 import { recordPlayoffGameResult } from "@/lib/data-access/playoffs";
+import { advanceRosterInjuries } from "@/lib/data-access/injuries";
+import { advancePlayerRenown } from "@/lib/data-access/renown";
+import { advanceRosterFatigue, getRestDays } from "@/lib/data-access/fatigue";
+import { advanceTeamChemistry, getOrCreateTeamState } from "@/lib/data-access/team-state";
+import { winPctForStandings } from "@/lib/careers/player-demands";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -91,17 +97,60 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Équipe introuvable" }, { status: 404 });
   }
 
+  const gameDate = new Date(updatedGame.gameDate);
+  const [homeRestDays, awayRestDays, homeTeamState, awayTeamState] = await Promise.all([
+    getRestDays(membership.careerId, updatedGame.homeTeamId, updatedGame.season, gameDate),
+    getRestDays(membership.careerId, updatedGame.awayTeamId, updatedGame.season, gameDate),
+    getOrCreateTeamState(membership.careerId, updatedGame.homeTeamId),
+    getOrCreateTeamState(membership.careerId, updatedGame.awayTeamId),
+  ]);
+
+  // Les joueurs actuellement blessés ne jouent pas : exclus du roster transmis
+  // au moteur (ni minutes, ni stats de box score).
   const result = simulationEngine.simulateGame(
     homeTeam,
-    homeRoster,
+    homeRoster.filter((p) => !p.injured),
     awayTeam,
-    awayRoster
+    awayRoster.filter((p) => !p.injured),
+    { homeChemistry: homeTeamState.chemistry, awayChemistry: awayTeamState.chemistry }
   );
   const updated = await updateGameResult(membership.careerId, gameId, result);
 
   if (updated?.playoffSeriesId) {
     await recordPlayoffGameResult(updated.playoffSeriesId, result.homeScore, result.awayScore);
   }
+
+  // Roster complet (pas filtré) : décompte les indisponibilités en cours et
+  // tire de nouvelles blessures parmi les joueurs valides.
+  await advanceRosterInjuries(membership.careerId, [...homeRoster, ...awayRoster]);
+
+  // Ajuste le renommé de chaque joueur qui a joué selon sa performance.
+  await advancePlayerRenown(membership.careerId, result.boxScore, [...homeRoster, ...awayRoster]);
+
+  // Fatigue : récupération selon les jours de repos réels puis gain pour ceux qui ont joué.
+  await Promise.all([
+    advanceRosterFatigue(membership.careerId, homeRoster, result.boxScore, homeRestDays),
+    advanceRosterFatigue(membership.careerId, awayRoster, result.boxScore, awayRestDays),
+  ]);
+
+  // Chimie d'équipe : dérive vers sa cible (bilan à jour + QI basket moyen du roster).
+  const standings = await getStandings(membership.careerId, updatedGame.leagueId, updatedGame.season);
+  const homeStandingsRow = standings.find((s) => s.teamId === updatedGame.homeTeamId);
+  const awayStandingsRow = standings.find((s) => s.teamId === updatedGame.awayTeamId);
+  await Promise.all([
+    advanceTeamChemistry(
+      membership.careerId,
+      updatedGame.homeTeamId,
+      winPctForStandings(homeStandingsRow?.wins ?? 0, homeStandingsRow?.losses ?? 0),
+      homeRoster
+    ),
+    advanceTeamChemistry(
+      membership.careerId,
+      updatedGame.awayTeamId,
+      winPctForStandings(awayStandingsRow?.wins ?? 0, awayStandingsRow?.losses ?? 0),
+      awayRoster
+    ),
+  ]);
 
   return NextResponse.json({ simulated: true, game: updated });
 }

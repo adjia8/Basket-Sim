@@ -6,11 +6,20 @@ export interface SimulationResult {
   boxScore: BoxScoreEntry[];
 }
 
+// Chimie d'équipe (0-99) — optionnelle : les appelants qui n'ont pas encore
+// de TeamState sous la main (ex. pré-simulation au tout début d'une Career)
+// laissent le moteur retomber sur une valeur neutre.
+export interface SimulationOptions {
+  homeChemistry?: number;
+  awayChemistry?: number;
+}
+
 export interface SimulationEngine {
   simulateGame(
     home: Team,
     homeRoster: Player[],
     away: Team,
-    awayRoster: Player[]
+    awayRoster: Player[],
+    options?: SimulationOptions
   ): SimulationResult;
 }

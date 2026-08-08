@@ -13,12 +13,21 @@ export async function generateCareerPlayerStates(
     playerId: player.id,
     age: player.age,
     overallRating: player.overallRating,
-    scoring: player.ratings.scoring,
+    scoringInside: player.ratings.scoringInside,
+    scoringOutside: player.ratings.scoringOutside,
     playmaking: player.ratings.playmaking,
+    defenseInside: player.ratings.defenseInside,
+    defenseOutside: player.ratings.defenseOutside,
     rebounding: player.ratings.rebounding,
-    defense: player.ratings.defense,
     athleticism: player.ratings.athleticism,
+    basketballIQ: player.ratings.basketballIQ,
+    clutch: player.ratings.clutch,
+    stamina: player.ratings.stamina,
     retired: false,
+    injured: false,
+    injuryGamesRemaining: 0,
+    renown: player.renown,
+    fatigue: 0,
   }));
 
   await prisma.playerState.createMany({ data: rows });

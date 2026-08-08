@@ -17,6 +17,7 @@ import type {
   Prospect,
   Team,
 } from "@/lib/types";
+import { initialRenown } from "@/lib/careers/renown-rules";
 
 export function toDomainLeague(
   row: PrismaLeague & { conferences?: PrismaConference[] }
@@ -41,6 +42,7 @@ export function toDomainTeam(row: PrismaTeam): Team {
     abbreviation: row.abbreviation,
     primaryColor: row.primaryColor,
     secondaryColor: row.secondaryColor,
+    marketAppeal: row.marketAppeal,
   };
 }
 
@@ -57,12 +59,22 @@ export function toDomainPlayer(row: PrismaPlayer): Player {
     age: row.age,
     overallRating: row.overallRating,
     ratings: {
-      scoring: row.scoring,
+      scoringInside: row.scoringInside,
+      scoringOutside: row.scoringOutside,
       playmaking: row.playmaking,
+      defenseInside: row.defenseInside,
+      defenseOutside: row.defenseOutside,
       rebounding: row.rebounding,
-      defense: row.defense,
       athleticism: row.athleticism,
+      basketballIQ: row.basketballIQ,
+      clutch: row.clutch,
+      stamina: row.stamina,
     },
+    injuryRisk: row.injuryRisk,
+    injured: false,
+    injuryGamesRemaining: 0,
+    renown: initialRenown(row.overallRating),
+    fatigue: 0,
   };
 }
 
@@ -86,12 +98,22 @@ export function toDomainPlayerWithState(
     age: state?.age ?? row.age,
     overallRating: state?.overallRating ?? row.overallRating,
     ratings: {
-      scoring: state?.scoring ?? row.scoring,
+      scoringInside: state?.scoringInside ?? row.scoringInside,
+      scoringOutside: state?.scoringOutside ?? row.scoringOutside,
       playmaking: state?.playmaking ?? row.playmaking,
+      defenseInside: state?.defenseInside ?? row.defenseInside,
+      defenseOutside: state?.defenseOutside ?? row.defenseOutside,
       rebounding: state?.rebounding ?? row.rebounding,
-      defense: state?.defense ?? row.defense,
       athleticism: state?.athleticism ?? row.athleticism,
+      basketballIQ: state?.basketballIQ ?? row.basketballIQ,
+      clutch: state?.clutch ?? row.clutch,
+      stamina: state?.stamina ?? row.stamina,
     },
+    injuryRisk: row.injuryRisk,
+    injured: state?.injured ?? false,
+    injuryGamesRemaining: state?.injuryGamesRemaining ?? 0,
+    renown: state?.renown ?? initialRenown(row.overallRating),
+    fatigue: state?.fatigue ?? 0,
   };
 }
 
@@ -105,11 +127,16 @@ export function toDomainProspect(row: PrismaProspect): Prospect {
     age: row.age,
     overallRating: row.overallRating,
     ratings: {
-      scoring: row.scoring,
+      scoringInside: row.scoringInside,
+      scoringOutside: row.scoringOutside,
       playmaking: row.playmaking,
+      defenseInside: row.defenseInside,
+      defenseOutside: row.defenseOutside,
       rebounding: row.rebounding,
-      defense: row.defense,
       athleticism: row.athleticism,
+      basketballIQ: row.basketballIQ,
+      clutch: row.clutch,
+      stamina: row.stamina,
     },
   };
 }

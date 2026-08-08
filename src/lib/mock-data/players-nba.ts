@@ -4,7 +4,7 @@ import { mkPlayer } from "./player-helpers";
 export const playersNba: Player[] = [
   // --- Lakers ---
   mkPlayer({ id: "lebron-james", teamId: "lal", leagueId: "nba", firstName: "LeBron", lastName: "James", position: "SF", jerseyNumber: 23, heightCm: 203, age: 40, overallRating: 94 }),
-  mkPlayer({ id: "anthony-davis", teamId: "lal", leagueId: "nba", firstName: "Anthony", lastName: "Davis", position: "PF", jerseyNumber: 3, heightCm: 208, age: 32, overallRating: 93 }),
+  mkPlayer({ id: "anthony-davis", teamId: "lal", leagueId: "nba", firstName: "Anthony", lastName: "Davis", position: "PF", jerseyNumber: 3, heightCm: 208, age: 32, overallRating: 93, injuryRisk: 75 }),
   mkPlayer({ id: "austin-reaves", teamId: "lal", leagueId: "nba", firstName: "Austin", lastName: "Reaves", position: "SG", jerseyNumber: 15, heightCm: 196, age: 27, overallRating: 82 }),
   mkPlayer({ id: "rui-hachimura", teamId: "lal", leagueId: "nba", firstName: "Rui", lastName: "Hachimura", position: "PF", jerseyNumber: 28, heightCm: 203, age: 27, overallRating: 78 }),
   mkPlayer({ id: "gabe-vincent", teamId: "lal", leagueId: "nba", firstName: "Gabe", lastName: "Vincent", position: "PG", jerseyNumber: 7, heightCm: 188, age: 29, overallRating: 74 }),
@@ -15,7 +15,7 @@ export const playersNba: Player[] = [
   // --- Celtics ---
   mkPlayer({ id: "jayson-tatum", teamId: "bos", leagueId: "nba", firstName: "Jayson", lastName: "Tatum", position: "SF", jerseyNumber: 0, heightCm: 203, age: 28, overallRating: 95 }),
   mkPlayer({ id: "jaylen-brown", teamId: "bos", leagueId: "nba", firstName: "Jaylen", lastName: "Brown", position: "SG", jerseyNumber: 7, heightCm: 198, age: 29, overallRating: 91 }),
-  mkPlayer({ id: "kristaps-porzingis", teamId: "bos", leagueId: "nba", firstName: "Kristaps", lastName: "Porzingis", position: "C", jerseyNumber: 8, heightCm: 221, age: 30, overallRating: 86 }),
+  mkPlayer({ id: "kristaps-porzingis", teamId: "bos", leagueId: "nba", firstName: "Kristaps", lastName: "Porzingis", position: "C", jerseyNumber: 8, heightCm: 221, age: 30, overallRating: 86, injuryRisk: 80 }),
   mkPlayer({ id: "derrick-white", teamId: "bos", leagueId: "nba", firstName: "Derrick", lastName: "White", position: "PG", jerseyNumber: 9, heightCm: 196, age: 31, overallRating: 85 }),
   mkPlayer({ id: "jrue-holiday", teamId: "bos", leagueId: "nba", firstName: "Jrue", lastName: "Holiday", position: "PG", jerseyNumber: 4, heightCm: 193, age: 35, overallRating: 84 }),
   mkPlayer({ id: "al-horford", teamId: "bos", leagueId: "nba", firstName: "Al", lastName: "Horford", position: "C", jerseyNumber: 42, heightCm: 206, age: 39, overallRating: 76 }),
@@ -23,7 +23,7 @@ export const playersNba: Player[] = [
   mkPlayer({ id: "payton-pritchard", teamId: "bos", leagueId: "nba", firstName: "Payton", lastName: "Pritchard", position: "PG", jerseyNumber: 11, heightCm: 185, age: 28, overallRating: 77 }),
 
   // --- Warriors ---
-  mkPlayer({ id: "stephen-curry", teamId: "gsw", leagueId: "nba", firstName: "Stephen", lastName: "Curry", position: "PG", jerseyNumber: 30, heightCm: 188, age: 37, overallRating: 95 }),
+  mkPlayer({ id: "stephen-curry", teamId: "gsw", leagueId: "nba", firstName: "Stephen", lastName: "Curry", position: "PG", jerseyNumber: 30, heightCm: 188, age: 37, overallRating: 95, injuryRisk: 35 }),
   mkPlayer({ id: "draymond-green", teamId: "gsw", leagueId: "nba", firstName: "Draymond", lastName: "Green", position: "PF", jerseyNumber: 23, heightCm: 198, age: 35, overallRating: 82 }),
   mkPlayer({ id: "andrew-wiggins", teamId: "gsw", leagueId: "nba", firstName: "Andrew", lastName: "Wiggins", position: "SF", jerseyNumber: 22, heightCm: 201, age: 31, overallRating: 79 }),
   mkPlayer({ id: "jonathan-kuminga", teamId: "gsw", leagueId: "nba", firstName: "Jonathan", lastName: "Kuminga", position: "PF", jerseyNumber: 0, heightCm: 201, age: 23, overallRating: 80 }),
@@ -33,8 +33,8 @@ export const playersNba: Player[] = [
   mkPlayer({ id: "moses-moody", teamId: "gsw", leagueId: "nba", firstName: "Moses", lastName: "Moody", position: "SG", jerseyNumber: 4, heightCm: 196, age: 24, overallRating: 74 }),
 
   // --- Bucks ---
-  mkPlayer({ id: "giannis-antetokounmpo", teamId: "mil", leagueId: "nba", firstName: "Giannis", lastName: "Antetokounmpo", position: "PF", jerseyNumber: 34, heightCm: 211, age: 31, overallRating: 97 }),
-  mkPlayer({ id: "damian-lillard", teamId: "mil", leagueId: "nba", firstName: "Damian", lastName: "Lillard", position: "PG", jerseyNumber: 0, heightCm: 188, age: 35, overallRating: 89 }),
+  mkPlayer({ id: "giannis-antetokounmpo", teamId: "mil", leagueId: "nba", firstName: "Giannis", lastName: "Antetokounmpo", position: "PF", jerseyNumber: 34, heightCm: 211, age: 31, overallRating: 97, injuryRisk: 25 }),
+  mkPlayer({ id: "damian-lillard", teamId: "mil", leagueId: "nba", firstName: "Damian", lastName: "Lillard", position: "PG", jerseyNumber: 0, heightCm: 188, age: 35, overallRating: 89, injuryRisk: 55 }),
   mkPlayer({ id: "khris-middleton", teamId: "mil", leagueId: "nba", firstName: "Khris", lastName: "Middleton", position: "SF", jerseyNumber: 22, heightCm: 201, age: 34, overallRating: 80 }),
   mkPlayer({ id: "brook-lopez", teamId: "mil", leagueId: "nba", firstName: "Brook", lastName: "Lopez", position: "C", jerseyNumber: 11, heightCm: 213, age: 38, overallRating: 79 }),
   mkPlayer({ id: "bobby-portis", teamId: "mil", leagueId: "nba", firstName: "Bobby", lastName: "Portis", position: "PF", jerseyNumber: 9, heightCm: 206, age: 31, overallRating: 78 }),
@@ -43,8 +43,8 @@ export const playersNba: Player[] = [
   mkPlayer({ id: "pat-connaughton", teamId: "mil", leagueId: "nba", firstName: "Pat", lastName: "Connaughton", position: "SG", jerseyNumber: 24, heightCm: 196, age: 33, overallRating: 71 }),
 
   // --- Nuggets ---
-  mkPlayer({ id: "nikola-jokic", teamId: "den", leagueId: "nba", firstName: "Nikola", lastName: "Jokic", position: "C", jerseyNumber: 15, heightCm: 211, age: 31, overallRating: 98 }),
-  mkPlayer({ id: "jamal-murray", teamId: "den", leagueId: "nba", firstName: "Jamal", lastName: "Murray", position: "PG", jerseyNumber: 27, heightCm: 191, age: 29, overallRating: 89 }),
+  mkPlayer({ id: "nikola-jokic", teamId: "den", leagueId: "nba", firstName: "Nikola", lastName: "Jokic", position: "C", jerseyNumber: 15, heightCm: 211, age: 31, overallRating: 98, injuryRisk: 15 }),
+  mkPlayer({ id: "jamal-murray", teamId: "den", leagueId: "nba", firstName: "Jamal", lastName: "Murray", position: "PG", jerseyNumber: 27, heightCm: 191, age: 29, overallRating: 89, injuryRisk: 70 }),
   mkPlayer({ id: "michael-porter-jr", teamId: "den", leagueId: "nba", firstName: "Michael", lastName: "Porter Jr.", position: "SF", jerseyNumber: 1, heightCm: 208, age: 27, overallRating: 83 }),
   mkPlayer({ id: "aaron-gordon", teamId: "den", leagueId: "nba", firstName: "Aaron", lastName: "Gordon", position: "PF", jerseyNumber: 50, heightCm: 203, age: 30, overallRating: 82 }),
   mkPlayer({ id: "christian-braun", teamId: "den", leagueId: "nba", firstName: "Christian", lastName: "Braun", position: "SG", jerseyNumber: 0, heightCm: 196, age: 24, overallRating: 76 }),
@@ -54,9 +54,9 @@ export const playersNba: Player[] = [
 
   // --- Knicks ---
   mkPlayer({ id: "jalen-brunson", teamId: "nyk", leagueId: "nba", firstName: "Jalen", lastName: "Brunson", position: "PG", jerseyNumber: 11, heightCm: 185, age: 29, overallRating: 92 }),
-  mkPlayer({ id: "karl-anthony-towns", teamId: "nyk", leagueId: "nba", firstName: "Karl-Anthony", lastName: "Towns", position: "C", jerseyNumber: 32, heightCm: 213, age: 30, overallRating: 88 }),
+  mkPlayer({ id: "karl-anthony-towns", teamId: "nyk", leagueId: "nba", firstName: "Karl-Anthony", lastName: "Towns", position: "C", jerseyNumber: 32, heightCm: 213, age: 30, overallRating: 88, injuryRisk: 55 }),
   mkPlayer({ id: "og-anunoby", teamId: "nyk", leagueId: "nba", firstName: "OG", lastName: "Anunoby", position: "SF", jerseyNumber: 8, heightCm: 198, age: 28, overallRating: 84 }),
-  mkPlayer({ id: "mikal-bridges", teamId: "nyk", leagueId: "nba", firstName: "Mikal", lastName: "Bridges", position: "SF", jerseyNumber: 25, heightCm: 198, age: 29, overallRating: 83 }),
+  mkPlayer({ id: "mikal-bridges", teamId: "nyk", leagueId: "nba", firstName: "Mikal", lastName: "Bridges", position: "SF", jerseyNumber: 25, heightCm: 198, age: 29, overallRating: 83, injuryRisk: 10 }),
   mkPlayer({ id: "josh-hart", teamId: "nyk", leagueId: "nba", firstName: "Josh", lastName: "Hart", position: "SG", jerseyNumber: 3, heightCm: 196, age: 30, overallRating: 80 }),
   mkPlayer({ id: "mitchell-robinson", teamId: "nyk", leagueId: "nba", firstName: "Mitchell", lastName: "Robinson", position: "C", jerseyNumber: 23, heightCm: 213, age: 28, overallRating: 75 }),
   mkPlayer({ id: "miles-mcbride", teamId: "nyk", leagueId: "nba", firstName: "Miles", lastName: "McBride", position: "PG", jerseyNumber: 2, heightCm: 185, age: 25, overallRating: 74 }),
@@ -73,9 +73,9 @@ export const playersNba: Player[] = [
   mkPlayer({ id: "pelle-larsson", teamId: "mia", leagueId: "nba", firstName: "Pelle", lastName: "Larsson", position: "SG", jerseyNumber: 6, heightCm: 196, age: 24, overallRating: 70 }),
 
   // --- 76ers ---
-  mkPlayer({ id: "joel-embiid", teamId: "phi", leagueId: "nba", firstName: "Joel", lastName: "Embiid", position: "C", jerseyNumber: 21, heightCm: 213, age: 31, overallRating: 92 }),
+  mkPlayer({ id: "joel-embiid", teamId: "phi", leagueId: "nba", firstName: "Joel", lastName: "Embiid", position: "C", jerseyNumber: 21, heightCm: 213, age: 31, overallRating: 92, injuryRisk: 85 }),
   mkPlayer({ id: "tyrese-maxey", teamId: "phi", leagueId: "nba", firstName: "Tyrese", lastName: "Maxey", position: "PG", jerseyNumber: 0, heightCm: 185, age: 25, overallRating: 90 }),
-  mkPlayer({ id: "paul-george", teamId: "phi", leagueId: "nba", firstName: "Paul", lastName: "George", position: "SF", jerseyNumber: 8, heightCm: 201, age: 35, overallRating: 85 }),
+  mkPlayer({ id: "paul-george", teamId: "phi", leagueId: "nba", firstName: "Paul", lastName: "George", position: "SF", jerseyNumber: 8, heightCm: 201, age: 35, overallRating: 85, injuryRisk: 65 }),
   mkPlayer({ id: "kelly-oubre-jr", teamId: "phi", leagueId: "nba", firstName: "Kelly", lastName: "Oubre Jr.", position: "SF", jerseyNumber: 9, heightCm: 201, age: 30, overallRating: 78 }),
   mkPlayer({ id: "andre-drummond", teamId: "phi", leagueId: "nba", firstName: "Andre", lastName: "Drummond", position: "C", jerseyNumber: 3, heightCm: 208, age: 32, overallRating: 74 }),
   mkPlayer({ id: "quentin-grimes", teamId: "phi", leagueId: "nba", firstName: "Quentin", lastName: "Grimes", position: "SG", jerseyNumber: 5, heightCm: 196, age: 25, overallRating: 76 }),
@@ -195,7 +195,7 @@ export const playersNba: Player[] = [
   // --- Timberwolves ---
   mkPlayer({ id: "anthony-edwards", teamId: "min", leagueId: "nba", firstName: "Anthony", lastName: "Edwards", position: "SG", jerseyNumber: 5, heightCm: 193, age: 24, overallRating: 94 }),
   mkPlayer({ id: "julius-randle", teamId: "min", leagueId: "nba", firstName: "Julius", lastName: "Randle", position: "PF", jerseyNumber: 30, heightCm: 203, age: 30, overallRating: 84 }),
-  mkPlayer({ id: "rudy-gobert", teamId: "min", leagueId: "nba", firstName: "Rudy", lastName: "Gobert", position: "C", jerseyNumber: 27, heightCm: 213, age: 33, overallRating: 84 }),
+  mkPlayer({ id: "rudy-gobert", teamId: "min", leagueId: "nba", firstName: "Rudy", lastName: "Gobert", position: "C", jerseyNumber: 27, heightCm: 213, age: 33, overallRating: 84, injuryRisk: 18 }),
   mkPlayer({ id: "jaden-mcdaniels", teamId: "min", leagueId: "nba", firstName: "Jaden", lastName: "McDaniels", position: "SF", jerseyNumber: 3, heightCm: 203, age: 25, overallRating: 80 }),
   mkPlayer({ id: "mike-conley", teamId: "min", leagueId: "nba", firstName: "Mike", lastName: "Conley", position: "PG", jerseyNumber: 10, heightCm: 185, age: 37, overallRating: 76 }),
   mkPlayer({ id: "naz-reid", teamId: "min", leagueId: "nba", firstName: "Naz", lastName: "Reid", position: "C", jerseyNumber: 11, heightCm: 208, age: 26, overallRating: 78 }),
@@ -203,8 +203,8 @@ export const playersNba: Player[] = [
   mkPlayer({ id: "terrence-shannon-jr", teamId: "min", leagueId: "nba", firstName: "Terrence", lastName: "Shannon Jr.", position: "SG", jerseyNumber: 1, heightCm: 196, age: 24, overallRating: 73 }),
 
   // --- Mavericks ---
-  mkPlayer({ id: "kyrie-irving", teamId: "dal", leagueId: "nba", firstName: "Kyrie", lastName: "Irving", position: "PG", jerseyNumber: 11, heightCm: 191, age: 33, overallRating: 90 }),
-  mkPlayer({ id: "klay-thompson", teamId: "dal", leagueId: "nba", firstName: "Klay", lastName: "Thompson", position: "SG", jerseyNumber: 31, heightCm: 198, age: 35, overallRating: 79 }),
+  mkPlayer({ id: "kyrie-irving", teamId: "dal", leagueId: "nba", firstName: "Kyrie", lastName: "Irving", position: "PG", jerseyNumber: 11, heightCm: 191, age: 33, overallRating: 90, injuryRisk: 60 }),
+  mkPlayer({ id: "klay-thompson", teamId: "dal", leagueId: "nba", firstName: "Klay", lastName: "Thompson", position: "SG", jerseyNumber: 31, heightCm: 198, age: 35, overallRating: 79, injuryRisk: 68 }),
   mkPlayer({ id: "pj-washington", teamId: "dal", leagueId: "nba", firstName: "P.J.", lastName: "Washington", position: "PF", jerseyNumber: 25, heightCm: 203, age: 27, overallRating: 78 }),
   mkPlayer({ id: "daniel-gafford", teamId: "dal", leagueId: "nba", firstName: "Daniel", lastName: "Gafford", position: "C", jerseyNumber: 21, heightCm: 208, age: 27, overallRating: 78 }),
   mkPlayer({ id: "cooper-flagg", teamId: "dal", leagueId: "nba", firstName: "Cooper", lastName: "Flagg", position: "SF", jerseyNumber: 32, heightCm: 206, age: 19, overallRating: 83 }),
@@ -213,7 +213,7 @@ export const playersNba: Player[] = [
   mkPlayer({ id: "dangelo-russell", teamId: "dal", leagueId: "nba", firstName: "D'Angelo", lastName: "Russell", position: "PG", jerseyNumber: 4, heightCm: 193, age: 29, overallRating: 75 }),
 
   // --- Clippers ---
-  mkPlayer({ id: "kawhi-leonard", teamId: "lac", leagueId: "nba", firstName: "Kawhi", lastName: "Leonard", position: "SF", jerseyNumber: 2, heightCm: 201, age: 34, overallRating: 89 }),
+  mkPlayer({ id: "kawhi-leonard", teamId: "lac", leagueId: "nba", firstName: "Kawhi", lastName: "Leonard", position: "SF", jerseyNumber: 2, heightCm: 201, age: 34, overallRating: 89, injuryRisk: 82 }),
   mkPlayer({ id: "james-harden", teamId: "lac", leagueId: "nba", firstName: "James", lastName: "Harden", position: "PG", jerseyNumber: 1, heightCm: 196, age: 36, overallRating: 86 }),
   mkPlayer({ id: "ivica-zubac", teamId: "lac", leagueId: "nba", firstName: "Ivica", lastName: "Zubac", position: "C", jerseyNumber: 40, heightCm: 216, age: 28, overallRating: 81 }),
   mkPlayer({ id: "derrick-jones-jr", teamId: "lac", leagueId: "nba", firstName: "Derrick", lastName: "Jones Jr.", position: "SF", jerseyNumber: 55, heightCm: 201, age: 28, overallRating: 75 }),
@@ -233,7 +233,7 @@ export const playersNba: Player[] = [
   mkPlayer({ id: "collin-gillespie", teamId: "phx", leagueId: "nba", firstName: "Collin", lastName: "Gillespie", position: "PG", jerseyNumber: 2, heightCm: 185, age: 25, overallRating: 70 }),
 
   // --- Kings ---
-  mkPlayer({ id: "domantas-sabonis", teamId: "sac", leagueId: "nba", firstName: "Domantas", lastName: "Sabonis", position: "C", jerseyNumber: 10, heightCm: 211, age: 29, overallRating: 87 }),
+  mkPlayer({ id: "domantas-sabonis", teamId: "sac", leagueId: "nba", firstName: "Domantas", lastName: "Sabonis", position: "C", jerseyNumber: 10, heightCm: 211, age: 29, overallRating: 87, injuryRisk: 15 }),
   mkPlayer({ id: "zach-lavine", teamId: "sac", leagueId: "nba", firstName: "Zach", lastName: "LaVine", position: "SG", jerseyNumber: 8, heightCm: 196, age: 30, overallRating: 82 }),
   mkPlayer({ id: "demar-derozan", teamId: "sac", leagueId: "nba", firstName: "DeMar", lastName: "DeRozan", position: "SF", jerseyNumber: 10, heightCm: 201, age: 36, overallRating: 81 }),
   mkPlayer({ id: "malik-monk", teamId: "sac", leagueId: "nba", firstName: "Malik", lastName: "Monk", position: "SG", jerseyNumber: 0, heightCm: 191, age: 27, overallRating: 78 }),
@@ -253,7 +253,7 @@ export const playersNba: Player[] = [
   mkPlayer({ id: "gg-jackson-ii", teamId: "mem", leagueId: "nba", firstName: "GG", lastName: "Jackson II", position: "PF", jerseyNumber: 45, heightCm: 208, age: 21, overallRating: 73 }),
 
   // --- Pelicans ---
-  mkPlayer({ id: "zion-williamson", teamId: "nop", leagueId: "nba", firstName: "Zion", lastName: "Williamson", position: "PF", jerseyNumber: 1, heightCm: 198, age: 25, overallRating: 85 }),
+  mkPlayer({ id: "zion-williamson", teamId: "nop", leagueId: "nba", firstName: "Zion", lastName: "Williamson", position: "PF", jerseyNumber: 1, heightCm: 198, age: 25, overallRating: 85, injuryRisk: 88 }),
   mkPlayer({ id: "trey-murphy-iii", teamId: "nop", leagueId: "nba", firstName: "Trey", lastName: "Murphy III", position: "SF", jerseyNumber: 25, heightCm: 203, age: 25, overallRating: 80 }),
   mkPlayer({ id: "herbert-jones", teamId: "nop", leagueId: "nba", firstName: "Herbert", lastName: "Jones", position: "SF", jerseyNumber: 5, heightCm: 201, age: 27, overallRating: 76 }),
   mkPlayer({ id: "jordan-poole", teamId: "nop", leagueId: "nba", firstName: "Jordan", lastName: "Poole", position: "SG", jerseyNumber: 3, heightCm: 193, age: 26, overallRating: 76 }),
@@ -263,7 +263,7 @@ export const playersNba: Player[] = [
   mkPlayer({ id: "saddiq-bey", teamId: "nop", leagueId: "nba", firstName: "Saddiq", lastName: "Bey", position: "SF", jerseyNumber: 41, heightCm: 201, age: 26, overallRating: 71 }),
 
   // --- Rockets ---
-  mkPlayer({ id: "kevin-durant", teamId: "hou", leagueId: "nba", firstName: "Kevin", lastName: "Durant", position: "PF", jerseyNumber: 7, heightCm: 208, age: 37, overallRating: 93 }),
+  mkPlayer({ id: "kevin-durant", teamId: "hou", leagueId: "nba", firstName: "Kevin", lastName: "Durant", position: "PF", jerseyNumber: 7, heightCm: 208, age: 37, overallRating: 93, injuryRisk: 58 }),
   mkPlayer({ id: "alperen-sengun", teamId: "hou", leagueId: "nba", firstName: "Alperen", lastName: "Sengun", position: "C", jerseyNumber: 28, heightCm: 211, age: 23, overallRating: 85 }),
   mkPlayer({ id: "amen-thompson", teamId: "hou", leagueId: "nba", firstName: "Amen", lastName: "Thompson", position: "SF", jerseyNumber: 1, heightCm: 201, age: 22, overallRating: 79 }),
   mkPlayer({ id: "fred-vanvleet", teamId: "hou", leagueId: "nba", firstName: "Fred", lastName: "VanVleet", position: "PG", jerseyNumber: 5, heightCm: 183, age: 31, overallRating: 79 }),

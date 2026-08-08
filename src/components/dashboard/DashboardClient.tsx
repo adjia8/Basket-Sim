@@ -56,6 +56,8 @@ export function DashboardClient({
     .sort((a, b) => b.overallRating - a.overallRating)
     .slice(0, 3);
 
+  const injuredPlayers = players.filter((p) => p.injured);
+
   return (
     <div className="mx-auto max-w-5xl space-y-8 px-4 py-8">
       {seasonComplete && playoffsInProgress && (
@@ -160,6 +162,27 @@ export function DashboardClient({
           ))}
         </div>
       </section>
+
+      {injuredPlayers.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-lg font-semibold">Infirmerie</h2>
+          <div className="space-y-2">
+            {injuredPlayers.map((player) => (
+              <div
+                key={player.id}
+                className="flex items-center justify-between rounded-lg border border-black/10 px-4 py-3 text-sm dark:border-white/10"
+              >
+                <span>
+                  {player.firstName} {player.lastName}
+                </span>
+                <span className="text-red-500">
+                  🩹 Indispo. ({player.injuryGamesRemaining} matchs)
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <Link
         href={`/teams/${teamId}`}
