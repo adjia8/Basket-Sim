@@ -77,6 +77,11 @@ export interface BoxScoreEntry {
   points: number;
   rebounds: number;
   assists: number;
+  personalFouls: number;
+  technicalFouls: number;
+  flagrantFouls: number;
+  // undefined = a joué tout le match ; sinon la raison de sa sortie prématurée.
+  disqualifiedReason?: "fouled_out" | "ejected";
 }
 
 export interface Game {

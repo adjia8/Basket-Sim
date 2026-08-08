@@ -47,7 +47,8 @@ function TeamBoxScore({
             <th className="py-2 pr-4">Joueur</th>
             <th className="py-2 pr-4">Pts</th>
             <th className="py-2 pr-4">Reb</th>
-            <th className="py-2">Pd</th>
+            <th className="py-2 pr-4">Pd</th>
+            <th className="py-2">Fautes</th>
           </tr>
         </thead>
         <tbody>
@@ -57,10 +58,31 @@ function TeamBoxScore({
                 {entry.player
                   ? `${entry.player.firstName} ${entry.player.lastName}`
                   : entry.playerId}
+                {entry.technicalFouls > 0 && (
+                  <span className="ml-2 rounded-full bg-yellow-500/10 px-2 py-0.5 text-xs font-normal text-yellow-600 dark:text-yellow-400">
+                    🟨 Technique×{entry.technicalFouls}
+                  </span>
+                )}
+                {entry.flagrantFouls > 0 && (
+                  <span className="ml-2 rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-normal text-red-500">
+                    🟥 Flagrante×{entry.flagrantFouls}
+                  </span>
+                )}
+                {entry.disqualifiedReason === "fouled_out" && (
+                  <span className="ml-2 rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-normal text-red-500">
+                    Sorti sur fautes
+                  </span>
+                )}
+                {entry.disqualifiedReason === "ejected" && (
+                  <span className="ml-2 rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-normal text-red-500">
+                    Expulsé
+                  </span>
+                )}
               </td>
               <td className="py-2 pr-4 font-medium">{entry.points}</td>
               <td className="py-2 pr-4">{entry.rebounds}</td>
-              <td className="py-2">{entry.assists}</td>
+              <td className="py-2 pr-4">{entry.assists}</td>
+              <td className="py-2">{entry.personalFouls}</td>
             </tr>
           ))}
         </tbody>
