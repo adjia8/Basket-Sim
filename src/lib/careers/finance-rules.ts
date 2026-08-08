@@ -36,6 +36,13 @@ export function upgradeCost(currentLevel: number, leagueId: string): number {
 
 export const ANNUAL_DEGRADATION = 4; // points perdus chaque intersaison sans réinvestissement
 
+// Seuil de trésorerie "saine" (≈ un revenu de saison moyen) — utilisé
+// uniquement pour la coloration vert/orange/rouge de l'UI (color-scale.ts),
+// pas pour une quelconque règle de jeu.
+export function healthyFinancesThreshold(leagueId: string): number {
+  return BASE_SEASON_REVENUE[leagueId] ?? BASE_SEASON_REVENUE.nba;
+}
+
 export function clampFacilityLevel(value: number): number {
   return Math.max(10, Math.min(99, value));
 }

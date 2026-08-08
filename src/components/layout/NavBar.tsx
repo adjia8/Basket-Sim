@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { logout } from "@/app/actions/auth";
 import { getOptionalCurrentMembership } from "@/lib/auth/dal";
+import { getTeamById } from "@/lib/data-access/teams";
+import { ThemeToggle } from "./ThemeToggle";
+import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
 
 const NAV_LINKS = [
   { href: "/", label: "Dashboard" },
@@ -18,12 +21,16 @@ const NAV_LINKS = [
 
 export async function NavBar() {
   const membership = await getOptionalCurrentMembership();
+  const team = membership ? await getTeamById(membership.teamId) : null;
 
   return (
     <header className="border-b border-black/10 dark:border-white/10">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-        <Link href="/" className="font-semibold tracking-tight">
+        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
           🏀 Hoops Manager
+          {team && (
+            <TeamColorSwatch primaryColor={team.primaryColor} secondaryColor={team.secondaryColor} />
+          )}
         </Link>
 
         {membership && (
@@ -40,23 +47,26 @@ export async function NavBar() {
           </nav>
         )}
 
-        {membership ? (
-          <form action={logout}>
-            <button
-              type="submit"
+        <div className="flex items-center gap-4">
+          <ThemeToggle />
+          {membership ? (
+            <form action={logout}>
+              <button
+                type="submit"
+                className="text-sm text-black/50 underline-offset-2 hover:underline dark:text-white/50"
+              >
+                Se déconnecter
+              </button>
+            </form>
+          ) : (
+            <Link
+              href="/login"
               className="text-sm text-black/50 underline-offset-2 hover:underline dark:text-white/50"
             >
-              Se déconnecter
-            </button>
-          </form>
-        ) : (
-          <Link
-            href="/login"
-            className="text-sm text-black/50 underline-offset-2 hover:underline dark:text-white/50"
-          >
-            Connexion
-          </Link>
-        )}
+              Connexion
+            </Link>
+          )}
+        </div>
       </div>
     </header>
   );

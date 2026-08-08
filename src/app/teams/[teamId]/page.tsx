@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { RosterTable, type RosterPlayer } from "@/components/team/RosterTable";
 import { TradeProposalForm, type TradePick } from "@/components/team/TradeProposalForm";
 import { TrainingPlanForm } from "@/components/team/TrainingPlanForm";
+import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
 import { MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import {
   minAcceptableSalary,
@@ -144,10 +145,7 @@ export default async function TeamRosterPage({
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <div className="flex items-center gap-3">
-        <span
-          className="h-3 w-3 rounded-full"
-          style={{ backgroundColor: team.primaryColor }}
-        />
+        <TeamColorSwatch primaryColor={team.primaryColor} secondaryColor={team.secondaryColor} size="lg" />
         <h1 className="text-2xl font-bold">{teamFullName(team)}</h1>
         <span className="text-sm text-black/40 dark:text-white/40">
           · {managerLabel}

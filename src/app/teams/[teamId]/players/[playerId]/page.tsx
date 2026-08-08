@@ -22,6 +22,7 @@ import {
 } from "@/lib/careers/contract-type-rules";
 import { formatSalary, teamFullName } from "@/lib/utils";
 import type { PlayerRatings } from "@/lib/types";
+import { inverseRatingTone, ratingTone, toneClass, type ScaleTone } from "@/lib/color-scale";
 
 const RATING_LABELS: Record<keyof PlayerRatings, string> = {
   scoringInside: "Scoring intérieur",
@@ -116,14 +117,19 @@ export default async function PlayerDetailPage({
           Attributs
         </h2>
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
-          <Stat label="Overall" value={player.overallRating} bold />
+          <Stat label="Overall" value={player.overallRating} bold tone={ratingTone(player.overallRating)} />
           {(Object.keys(RATING_LABELS) as (keyof PlayerRatings)[]).map((key) => (
-            <Stat key={key} label={RATING_LABELS[key]} value={player.ratings[key]} />
+            <Stat
+              key={key}
+              label={RATING_LABELS[key]}
+              value={player.ratings[key]}
+              tone={ratingTone(player.ratings[key])}
+            />
           ))}
-          <Stat label="Risque blessure" value={player.injuryRisk} />
-          <Stat label="Renommé" value={player.renown} />
-          <Stat label="Fatigue" value={player.fatigue} />
-          <Stat label="Conditionnement" value={player.conditioning} />
+          <Stat label="Risque blessure" value={player.injuryRisk} tone={inverseRatingTone(player.injuryRisk)} />
+          <Stat label="Renommé" value={player.renown} tone={ratingTone(player.renown)} />
+          <Stat label="Fatigue" value={player.fatigue} tone={inverseRatingTone(player.fatigue)} />
+          <Stat label="Conditionnement" value={player.conditioning} tone={ratingTone(player.conditioning)} />
           {player.trainingBoost > 0 && player.trainingBoostFocus && (
             <Stat label="Bonus entraînement" value={`+${player.trainingBoost}`} />
           )}
@@ -212,11 +218,21 @@ export default async function PlayerDetailPage({
   );
 }
 
-function Stat({ label, value, bold = false }: { label: string; value: number | string; bold?: boolean }) {
+function Stat({
+  label,
+  value,
+  bold = false,
+  tone,
+}: {
+  label: string;
+  value: number | string;
+  bold?: boolean;
+  tone?: ScaleTone;
+}) {
   return (
     <div>
       <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">{label}</p>
-      <p className={`mt-0.5 ${bold ? "text-lg font-semibold" : ""}`}>{value}</p>
+      <p className={`mt-0.5 ${bold ? "text-lg font-semibold" : ""} ${tone ? toneClass(tone) : ""}`}>{value}</p>
     </div>
   );
 }

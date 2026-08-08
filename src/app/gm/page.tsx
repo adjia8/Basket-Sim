@@ -6,7 +6,9 @@ import { getStandings } from "@/lib/data-access/standings";
 import { getTeamsByLeague, getTeamById } from "@/lib/data-access/teams";
 import { acceptPoachOffer, declinePoachOffer } from "@/app/actions/gm";
 import { EXPECTATION_LABELS, type ExpectationTier } from "@/lib/careers/gm-rules";
+import { healthyFinancesThreshold } from "@/lib/careers/finance-rules";
 import { formatSalary, teamFullName } from "@/lib/utils";
+import { financeTone, ratingTone, toneClass, type ScaleTone } from "@/lib/color-scale";
 
 const OUTCOME_LABELS: Record<string, string> = {
   met: "Objectif atteint",
@@ -14,6 +16,14 @@ const OUTCOME_LABELS: Record<string, string> = {
   warning: "Avertissement",
   fired: "Licencié",
   poached: "Parti (dépeçage)",
+};
+
+const OUTCOME_TONES: Record<string, ScaleTone> = {
+  met: "good",
+  exceeded: "good",
+  poached: "good",
+  warning: "average",
+  fired: "bad",
 };
 
 const SEX_LABELS: Record<string, string> = { M: "Homme", F: "Femme", autre: "Autre" };
@@ -90,15 +100,25 @@ export default async function GmPage() {
       <div className="mt-6 flex flex-wrap gap-4">
         <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
           <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">Trésorerie</p>
-          <p className="mt-1 text-xl font-semibold">{formatSalary(teamState.finances)}</p>
+          <p
+            className={`mt-1 text-xl font-semibold ${toneClass(
+              financeTone(teamState.finances, healthyFinancesThreshold(membership.leagueId))
+            )}`}
+          >
+            {formatSalary(teamState.finances)}
+          </p>
         </div>
         <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
           <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">Infrastructures</p>
-          <p className="mt-1 text-xl font-semibold">{teamState.facilitiesLevel} / 99</p>
+          <p className={`mt-1 text-xl font-semibold ${toneClass(ratingTone(teamState.facilitiesLevel))}`}>
+            {teamState.facilitiesLevel} / 99
+          </p>
         </div>
         <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
           <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">Personnel de training</p>
-          <p className="mt-1 text-xl font-semibold">{teamState.trainingStaffLevel} / 99</p>
+          <p className={`mt-1 text-xl font-semibold ${toneClass(ratingTone(teamState.trainingStaffLevel))}`}>
+            {teamState.trainingStaffLevel} / 99
+          </p>
         </div>
       </div>
 
@@ -123,12 +143,12 @@ export default async function GmPage() {
         </p>
         <p className="mt-1 text-sm">
           {gm.warningsAtCurrentTeam > 0 ? (
-            <span className="text-red-500">
+            <span className={toneClass("bad")}>
               {gm.warningsAtCurrentTeam} avertissement{gm.warningsAtCurrentTeam > 1 ? "s" : ""} — la
               direction attend mieux la saison prochaine.
             </span>
           ) : (
-            <span className="text-black/50 dark:text-white/50">
+            <span className={toneClass("good")}>
               Aucun avertissement — la direction est satisfaite de ta gestion.
             </span>
           )}
@@ -166,7 +186,9 @@ export default async function GmPage() {
                     </td>
                     <td className="py-2 pr-4">{EXPECTATION_LABELS[record.expectationTier as ExpectationTier]}</td>
                     <td className="py-2 pr-4">{EXPECTATION_LABELS[record.resultTier as ExpectationTier]}</td>
-                    <td className="py-2">{OUTCOME_LABELS[record.outcome] ?? record.outcome}</td>
+                    <td className={`py-2 font-medium ${toneClass(OUTCOME_TONES[record.outcome] ?? "average")}`}>
+                      {OUTCOME_LABELS[record.outcome] ?? record.outcome}
+                    </td>
                   </tr>
                 ))}
               </tbody>

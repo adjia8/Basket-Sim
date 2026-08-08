@@ -1,8 +1,18 @@
 @import "tailwindcss";
+/* Bascule clair/sombre pilotée par la classe .dark sur <html> (voir
+   ThemeToggle.tsx + le script anti-flash dans layout.tsx) plutôt que par
+   prefers-color-scheme seul — permet à l'utilisateur de choisir
+   explicitement, tout en respectant la préférence système par défaut. */
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 @theme inline {
@@ -10,13 +20,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {

@@ -6,6 +6,7 @@ import type { Player } from "@/lib/types";
 import { formatSalary } from "@/lib/utils";
 import { setPlayingThroughInjury } from "@/app/actions/roster";
 import { PlayerAvatar } from "./PlayerAvatar";
+import { ratingTone, toneClass } from "@/lib/color-scale";
 
 const SEVERITY_LABELS: Record<NonNullable<Player["injurySeverity"]>, string> = {
   minor: "légère",
@@ -140,7 +141,9 @@ export function RosterTable({
               </td>
               <td className="py-2 pr-4">{player.position}</td>
               <td className="py-2 pr-4">{player.nationality}</td>
-              <td className="py-2 pr-4 font-semibold">{player.overallRating}</td>
+              <td className={`py-2 pr-4 font-semibold ${toneClass(ratingTone(player.overallRating))}`}>
+                {player.overallRating}
+              </td>
               <td className="py-2 pr-4">{player.heightCm} cm</td>
               <td className="py-2 pr-4">{player.age}</td>
               <td className="py-2 pr-4">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { advanceSeason } from "@/app/actions/season";
 import { formatGameDate, formatSalary, teamFullName } from "@/lib/utils";
+import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
 import type { Game, Player, StandingsRow, Team } from "@/lib/types";
 
 export function DashboardClient({
@@ -90,10 +91,7 @@ export function DashboardClient({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span
-            className="h-3 w-3 rounded-full"
-            style={{ backgroundColor: myTeam.primaryColor }}
-          />
+          <TeamColorSwatch primaryColor={myTeam.primaryColor} secondaryColor={myTeam.secondaryColor} size="lg" />
           <h1 className="text-2xl font-bold">{teamFullName(myTeam)}</h1>
         </div>
         <p className="text-sm text-black/50 dark:text-white/50">

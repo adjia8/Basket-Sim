@@ -2,9 +2,10 @@ import { getCurrentMembership } from "@/lib/auth/dal";
 import { getScheduleForCareer } from "@/lib/data-access/schedule";
 import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
-import { upgradeCost } from "@/lib/careers/finance-rules";
+import { healthyFinancesThreshold, upgradeCost } from "@/lib/careers/finance-rules";
 import { upgradeFacility } from "@/app/actions/franchise";
 import { formatSalary } from "@/lib/utils";
+import { financeTone, ratingTone, toneClass } from "@/lib/color-scale";
 
 export default async function FranchisePage() {
   const membership = await getCurrentMembership();
@@ -35,7 +36,13 @@ export default async function FranchisePage() {
         <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
           Trésorerie
         </p>
-        <p className="mt-1 text-2xl font-semibold">{formatSalary(teamState.finances)}</p>
+        <p
+          className={`mt-1 text-2xl font-semibold ${toneClass(
+            financeTone(teamState.finances, healthyFinancesThreshold(membership.leagueId))
+          )}`}
+        >
+          {formatSalary(teamState.finances)}
+        </p>
       </div>
 
       {!isOffseasonWindow && (
@@ -90,7 +97,7 @@ function FacilityCard({
     <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
       <p className="font-medium">{label}</p>
       <p className="mt-1 text-xs text-black/50 dark:text-white/50">{description}</p>
-      <p className="mt-3 text-xl font-semibold">{level} / 99</p>
+      <p className={`mt-3 text-xl font-semibold ${toneClass(ratingTone(level))}`}>{level} / 99</p>
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
         <div
           className="h-full rounded-full bg-black dark:bg-white"
