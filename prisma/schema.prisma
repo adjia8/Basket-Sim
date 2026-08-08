@@ -20,22 +20,23 @@ model User {
 }
 
 model Career {
-  id            String          @id @default(cuid())
-  inviteCode    String          @unique
-  leagueId      String
-  league        League          @relation(fields: [leagueId], references: [id])
-  season        String
-  createdAt     DateTime        @default(now())
-  memberships   Membership[]
-  games         Game[]
-  contracts     Contract[]
-  playerStates  PlayerState[]
-  prospects     Prospect[]
-  tradeOffers   TradeOffer[]
-  draftPicks    DraftPick[]
-  deadCap       DeadCap[]
-  playoffSeries PlayoffSeries[]
-  teamStates    TeamState[]
+  id               String            @id @default(cuid())
+  inviteCode       String            @unique
+  leagueId         String
+  league           League            @relation(fields: [leagueId], references: [id])
+  season           String
+  createdAt        DateTime          @default(now())
+  memberships      Membership[]
+  games            Game[]
+  contracts        Contract[]
+  playerStates     PlayerState[]
+  prospects        Prospect[]
+  tradeOffers      TradeOffer[]
+  draftPicks       DraftPick[]
+  deadCap          DeadCap[]
+  playoffSeries    PlayoffSeries[]
+  teamStates       TeamState[]
+  playerTeamStints PlayerTeamStint[]
 }
 
 // Qui gère quelle équipe dans une Career (ligue) partagée. Un compte n'est
@@ -80,37 +81,38 @@ model Conference {
 }
 
 model Team {
-  id                 String          @id
+  id                 String            @id
   leagueId           String
-  league             League          @relation(fields: [leagueId], references: [id])
+  league             League            @relation(fields: [leagueId], references: [id])
   conferenceId       String
-  conference         Conference      @relation(fields: [conferenceId], references: [id])
+  conference         Conference        @relation(fields: [conferenceId], references: [id])
   city               String
   name               String
   abbreviation       String
   primaryColor       String
   secondaryColor     String
-  marketAppeal       Int             @default(50) // 0-99, attractivité de la ville (marché, climat, style de vie)
+  marketAppeal       Int               @default(50) // 0-99, attractivité de la ville (marché, climat, style de vie)
   players            Player[]
   memberships        Membership[]
-  homeGames          Game[]          @relation("HomeTeam")
-  awayGames          Game[]          @relation("AwayTeam")
+  homeGames          Game[]            @relation("HomeTeam")
+  awayGames          Game[]            @relation("AwayTeam")
   contracts          Contract[]
-  draftPicks         DraftPick[]     @relation("DraftPickCurrentTeam")
-  originalDraftPicks DraftPick[]     @relation("DraftPickOriginalTeam")
+  draftPicks         DraftPick[]       @relation("DraftPickCurrentTeam")
+  originalDraftPicks DraftPick[]       @relation("DraftPickOriginalTeam")
   deadCap            DeadCap[]
-  homePlayoffSeries  PlayoffSeries[] @relation("PlayoffSeriesHomeTeam")
-  awayPlayoffSeries  PlayoffSeries[] @relation("PlayoffSeriesAwayTeam")
+  homePlayoffSeries  PlayoffSeries[]   @relation("PlayoffSeriesHomeTeam")
+  awayPlayoffSeries  PlayoffSeries[]   @relation("PlayoffSeriesAwayTeam")
   teamStates         TeamState[]
+  playerTeamStints   PlayerTeamStint[]
 
   @@index([leagueId])
   @@index([conferenceId])
 }
 
 model Player {
-  id             String        @id
+  id             String            @id
   teamId         String
-  team           Team          @relation(fields: [teamId], references: [id])
+  team           Team              @relation(fields: [teamId], references: [id])
   leagueId       String
   firstName      String
   lastName       String
@@ -131,9 +133,11 @@ model Player {
   basketballIQ   Int
   clutch         Int
   stamina        Int
-  injuryRisk     Int           @default(30) // 0-99, risque de blessure basé sur l'historique réel connu
+  injuryRisk     Int               @default(30) // 0-99, risque de blessure basé sur l'historique réel connu
+  nationality    String            @default("États-Unis")
   contracts      Contract[]
   playerStates   PlayerState[]
+  teamStints     PlayerTeamStint[]
 
   @@index([teamId])
 }
@@ -211,11 +215,32 @@ model Contract {
   salary         Int
   yearsRemaining Int
   guaranteed     Boolean  @default(true)
+  contractType   String   @default("standard") // "standard" | "two_way" | "development" — voir contract-type-rules.ts
   createdAt      DateTime @default(now())
 
   @@unique([careerId, playerId])
   @@index([careerId])
   @@index([careerId, teamId])
+}
+
+// Historique des équipes traversées par un joueur au sein d'une Career —
+// alimenté à partir de la mise en place de cette table (repêchage/signature/
+// trade) uniquement : impossible de reconstruire le passé d'une Career déjà
+// en cours (Contract.teamId est écrasé sur trade, supprimé sur coupure, sans
+// aucune trace).
+model PlayerTeamStint {
+  id        String   @id @default(cuid())
+  careerId  String
+  career    Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id])
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id])
+  season    String
+  reason    String // "drafted" | "signed" | "traded"
+  createdAt DateTime @default(now())
+
+  @@index([careerId, playerId])
 }
 
 model PlayerState {
@@ -278,6 +303,7 @@ model Prospect {
   clutch         Int
   stamina        Int
   scoutingNote   String? // ex. "Duke (NCAA)", "Real Madrid (Espagne)" — null pour un prospect généré
+  nationality    String  @default("États-Unis")
 
   @@index([careerId])
 }

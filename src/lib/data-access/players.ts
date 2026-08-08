@@ -31,3 +31,16 @@ export async function getPlayerById(playerId: string): Promise<Player | undefine
   const row = await prisma.player.findUnique({ where: { id: playerId } });
   return row ? toDomainPlayer(row) : undefined;
 }
+
+// Même principe que getRosterForTeam mais pour un seul joueur (fiche détail) :
+// bio fixe du catalogue + état par-Career (âge/ratings actuels) superposé.
+export async function getPlayerWithState(
+  careerId: string,
+  playerId: string
+): Promise<Player | undefined> {
+  const row = await prisma.player.findUnique({
+    where: { id: playerId },
+    include: { playerStates: { where: { careerId } } },
+  });
+  return row ? toDomainPlayerWithState(row, row.playerStates[0]) : undefined;
+}

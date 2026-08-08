@@ -4,6 +4,7 @@ import { getContractsForTeam, getPayrollForTeam } from "@/lib/data-access/contra
 import { getLeagueById } from "@/lib/data-access/leagues";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getRosterForTeam } from "@/lib/data-access/players";
+import { getSeasonStatsForPlayers, type SeasonStats } from "@/lib/data-access/season-stats";
 import { getStandings } from "@/lib/data-access/standings";
 import { isTradeDeadlinePassed } from "@/lib/data-access/season-windows";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
@@ -65,6 +66,13 @@ export default async function TeamRosterPage({
   const teamStandingsRow = standings.find((row) => row.teamId === teamId);
   const teamWinPct = winPctForStandings(teamStandingsRow?.wins ?? 0, teamStandingsRow?.losses ?? 0);
 
+  const seasonStats = await getSeasonStatsForPlayers(
+    membership.careerId,
+    membership.season,
+    roster.map((p) => p.id)
+  );
+  const emptyStats: SeasonStats = { gamesPlayed: 0, points: 0, rebounds: 0, assists: 0, ppg: 0, rpg: 0, apg: 0 };
+
   const contractByPlayerId = new Map(contracts.map((c) => [c.playerId, c]));
   const rosterWithContracts: RosterPlayer[] = roster.map((player) => {
     const contract = contractByPlayerId.get(player.id);
@@ -82,12 +90,16 @@ export default async function TeamRosterPage({
         teamFacilitiesLevel: teamState.facilitiesLevel,
       }) ||
         salary < minAcceptableSalary(player.renown, player.overallRating, team.leagueId));
+    const stats = seasonStats.get(player.id) ?? emptyStats;
     return {
       ...player,
       salary,
       yearsRemaining: contract?.yearsRemaining ?? 0,
       guaranteed: contract?.guaranteed ?? true,
       wantsTrade,
+      ppg: stats.ppg,
+      rpg: stats.rpg,
+      apg: stats.apg,
     };
   });
 
@@ -106,15 +118,24 @@ export default async function TeamRosterPage({
       getContractsForTeam(membership.careerId, membership.teamId),
       getPendingPicksForTeam(membership.careerId, membership.teamId),
     ]);
+    const mySeasonStats = await getSeasonStatsForPlayers(
+      membership.careerId,
+      membership.season,
+      myRoster.map((p) => p.id)
+    );
     const myContractByPlayerId = new Map(myContracts.map((c) => [c.playerId, c]));
     myRosterWithContracts = myRoster.map((player) => {
       const contract = myContractByPlayerId.get(player.id);
+      const stats = mySeasonStats.get(player.id) ?? emptyStats;
       return {
         ...player,
         salary: contract?.salary ?? 0,
         yearsRemaining: contract?.yearsRemaining ?? 0,
         guaranteed: contract?.guaranteed ?? true,
         wantsTrade: false, // non pertinent dans le contexte du formulaire d'échange
+        ppg: stats.ppg,
+        rpg: stats.rpg,
+        apg: stats.apg,
       };
     });
     myPicks = myPendingPicks;
@@ -175,6 +196,7 @@ export default async function TeamRosterPage({
 
       <div className="mt-6">
         <RosterTable
+          teamId={team.id}
           roster={rosterWithContracts}
           canRelease={isMyTeam && roster.length > MIN_ROSTER_SIZE}
         />

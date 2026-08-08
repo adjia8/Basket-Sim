@@ -17,6 +17,11 @@ export interface ProspectSeed {
   age: number;
   overallRating: number;
   scoutingNote: string;
+  // Renseignée pour les prospects internationaux repérables via le club dans
+  // scoutingNote (best-effort, non vérifié en direct) ; sinon "États-Unis"
+  // par défaut (voir generate-prospects.ts) — ce sont de vraies personnes
+  // identifiables, jamais de tirage aléatoire ici.
+  nationality?: string;
 }
 
 export const NBA_REAL_PROSPECTS: Record<string, ProspectSeed[]> = {
@@ -41,16 +46,16 @@ export const NBA_REAL_PROSPECTS: Record<string, ProspectSeed[]> = {
     { firstName: "Labaron", lastName: "Philon", position: "PG", heightCm: 191, age: 20, overallRating: 76, scoutingNote: "Alabama (NCAA)" },
     { firstName: "Isaiah", lastName: "Elohim", position: "SF", heightCm: 198, age: 19, overallRating: 75, scoutingNote: "UCLA (NCAA)" },
     { firstName: "Bryson", lastName: "Warren", position: "PG", heightCm: 188, age: 19, overallRating: 74, scoutingNote: "Illinois (NCAA)" },
-    { firstName: "Hugo", lastName: "González", position: "SF", heightCm: 201, age: 20, overallRating: 79, scoutingNote: "Real Madrid (Espagne)" },
-    { firstName: "Nolan", lastName: "Traoré", position: "PG", heightCm: 193, age: 19, overallRating: 78, scoutingNote: "Saint-Quentin (France)" },
-    { firstName: "Ben", lastName: "Saraf", position: "PG", heightCm: 196, age: 19, overallRating: 77, scoutingNote: "Ratiopharm Ulm (Allemagne)" },
-    { firstName: "Noa", lastName: "Essengue", position: "PF", heightCm: 206, age: 19, overallRating: 77, scoutingNote: "Ratiopharm Ulm (Allemagne)" },
-    { firstName: "Karim", lastName: "Lopez", position: "SF", heightCm: 201, age: 19, overallRating: 74, scoutingNote: "Baskonia (Espagne)" },
-    { firstName: "Nikola", lastName: "Djurisic", position: "SF", heightCm: 201, age: 19, overallRating: 73, scoutingNote: "Mega Basket (Serbie)" },
-    { firstName: "Aday", lastName: "Mara", position: "C", heightCm: 216, age: 20, overallRating: 76, scoutingNote: "Michigan (NCAA)" },
+    { firstName: "Hugo", lastName: "González", position: "SF", heightCm: 201, age: 20, overallRating: 79, scoutingNote: "Real Madrid (Espagne)", nationality: "Espagne" },
+    { firstName: "Nolan", lastName: "Traoré", position: "PG", heightCm: 193, age: 19, overallRating: 78, scoutingNote: "Saint-Quentin (France)", nationality: "France" },
+    { firstName: "Ben", lastName: "Saraf", position: "PG", heightCm: 196, age: 19, overallRating: 77, scoutingNote: "Ratiopharm Ulm (Allemagne)", nationality: "Israël" },
+    { firstName: "Noa", lastName: "Essengue", position: "PF", heightCm: 206, age: 19, overallRating: 77, scoutingNote: "Ratiopharm Ulm (Allemagne)", nationality: "France" },
+    { firstName: "Karim", lastName: "Lopez", position: "SF", heightCm: 201, age: 19, overallRating: 74, scoutingNote: "Baskonia (Espagne)", nationality: "Espagne" },
+    { firstName: "Nikola", lastName: "Djurisic", position: "SF", heightCm: 201, age: 19, overallRating: 73, scoutingNote: "Mega Basket (Serbie)", nationality: "Serbie" },
+    { firstName: "Aday", lastName: "Mara", position: "C", heightCm: 216, age: 20, overallRating: 76, scoutingNote: "Michigan (NCAA)", nationality: "Espagne" },
     { firstName: "Adou", lastName: "Thiero", position: "SF", heightCm: 198, age: 21, overallRating: 76, scoutingNote: "Arkansas (NCAA)" },
     { firstName: "Rasheer", lastName: "Fleming", position: "PF", heightCm: 206, age: 21, overallRating: 74, scoutingNote: "Saint Joseph's (NCAA)" },
-    { firstName: "Sergio", lastName: "De Larrea", position: "PG", heightCm: 193, age: 19, overallRating: 74, scoutingNote: "Valencia (Espagne)" },
+    { firstName: "Sergio", lastName: "De Larrea", position: "PG", heightCm: 193, age: 19, overallRating: 74, scoutingNote: "Valencia (Espagne)", nationality: "Espagne" },
   ],
   "2027-2028": [
     { firstName: "Tajh", lastName: "Ariza", position: "SF", heightCm: 201, age: 18, overallRating: 78, scoutingNote: "lycée (USA)" },
@@ -58,7 +63,7 @@ export const NBA_REAL_PROSPECTS: Record<string, ProspectSeed[]> = {
     { firstName: "Kiyan", lastName: "Anthony", position: "SG", heightCm: 196, age: 19, overallRating: 75, scoutingNote: "Syracuse (NCAA)" },
     { firstName: "Cameron", lastName: "Holmes", position: "PF", heightCm: 203, age: 18, overallRating: 75, scoutingNote: "Duke (NCAA, engagé)" },
     { firstName: "Chris", lastName: "Nwuli", position: "C", heightCm: 211, age: 18, overallRating: 74, scoutingNote: "lycée (USA)" },
-    { firstName: "Deniz", lastName: "Kececi", position: "PF", heightCm: 206, age: 18, overallRating: 74, scoutingNote: "Turquie" },
+    { firstName: "Deniz", lastName: "Kececi", position: "PF", heightCm: 206, age: 18, overallRating: 74, scoutingNote: "Turquie", nationality: "Turquie" },
     { firstName: "Kayden", lastName: "Mingo", position: "SG", heightCm: 193, age: 18, overallRating: 73, scoutingNote: "lycée (USA)" },
     { firstName: "Jasper", lastName: "Wilson", position: "PG", heightCm: 188, age: 18, overallRating: 73, scoutingNote: "lycée (USA)" },
     { firstName: "Brayden", lastName: "Burries", position: "SG", heightCm: 196, age: 19, overallRating: 76, scoutingNote: "Arizona (NCAA)" },

@@ -27,15 +27,17 @@ export async function getContractForPlayer(
   return row ? toDomainContract(row) : undefined;
 }
 
-// Masse salariale réelle d'une équipe : contrats actifs + argent mort restant
-// des contrats garantis coupés avant terme (DeadCap.yearsRemaining > 0).
+// Masse salariale réelle d'une équipe : contrats actifs "standard" + argent
+// mort restant des contrats garantis coupés avant terme (DeadCap.yearsRemaining
+// > 0). Les contrats alternatifs (two-way/développement) sont exclus du
+// plafond salarial — voir contract-type-rules.ts.
 export async function getPayrollForTeam(
   careerId: string,
   teamId: string
 ): Promise<number> {
   const [contracts, deadCap] = await Promise.all([
     prisma.contract.findMany({
-      where: { careerId, teamId },
+      where: { careerId, teamId, contractType: "standard" },
       select: { salary: true },
     }),
     prisma.deadCap.findMany({

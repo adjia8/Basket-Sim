@@ -51,6 +51,7 @@ async function performDraftPick(
           basketballIQ: prospect.basketballIQ,
           clutch: prospect.clutch,
           stamina: prospect.stamina,
+          nationality: prospect.nationality,
         },
       });
       await tx.contract.create({
@@ -59,6 +60,15 @@ async function performDraftPick(
           playerId: newPlayerId,
           teamId: currentPick.teamId,
           ...terms,
+        },
+      });
+      await tx.playerTeamStint.create({
+        data: {
+          careerId: currentPick.careerId,
+          playerId: newPlayerId,
+          teamId: currentPick.teamId,
+          season: currentPick.season,
+          reason: "drafted",
         },
       });
       await tx.playerState.create({

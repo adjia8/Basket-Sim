@@ -112,6 +112,12 @@ interface PlayerInput {
   // renseigné explicitement pour les joueurs dont l'historique de blessures
   // réel est notoire.
   injuryRisk?: number;
+  // Renseignée pour les joueurs dont l'origine internationale est connue
+  // (best-effort, non vérifié en direct) ; ces listes ne contiennent que de
+  // vrais joueurs identifiables, donc pas de tirage aléatoire ici (contraire-
+  // ment aux prospects fictifs générés — voir randomNationality) : défaut
+  // "États-Unis" si non renseignée.
+  nationality?: string;
 }
 
 export function mkPlayer(input: PlayerInput): Player {
@@ -126,5 +132,6 @@ export function mkPlayer(input: PlayerInput): Player {
     fatigue: 0,
     conditioning: 100,
     trainingBoost: 0,
+    nationality: input.nationality ?? "États-Unis",
   };
 }

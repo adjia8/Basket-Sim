@@ -164,6 +164,16 @@ export async function proposeTrade(
       ...theirPickIds.map((id) =>
         prisma.draftPick.updateMany({ where: { id, status: "pending" }, data: { teamId: membership.teamId } })
       ),
+      ...myPlayerIds.map((playerId) =>
+        prisma.playerTeamStint.create({
+          data: { careerId: membership.careerId, playerId, teamId: opponentTeamId, season: membership.career.season, reason: "traded" },
+        })
+      ),
+      ...theirPlayerIds.map((playerId) =>
+        prisma.playerTeamStint.create({
+          data: { careerId: membership.careerId, playerId, teamId: membership.teamId, season: membership.career.season, reason: "traded" },
+        })
+      ),
     ]);
 
     revalidatePath("/");
@@ -322,6 +332,16 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
     ),
     ...toPickIds.map((id) =>
       prisma.draftPick.updateMany({ where: { id, status: "pending" }, data: { teamId: offer.fromTeamId } })
+    ),
+    ...fromPlayerIds.map((playerId) =>
+      prisma.playerTeamStint.create({
+        data: { careerId: membership.careerId, playerId, teamId: offer.toTeamId, season: membership.career.season, reason: "traded" },
+      })
+    ),
+    ...toPlayerIds.map((playerId) =>
+      prisma.playerTeamStint.create({
+        data: { careerId: membership.careerId, playerId, teamId: offer.fromTeamId, season: membership.career.season, reason: "traded" },
+      })
     ),
   ]);
 

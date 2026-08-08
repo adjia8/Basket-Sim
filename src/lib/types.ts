@@ -71,6 +71,7 @@ export interface Player {
   conditioning: number; // 0-100, 100 = conditionnement optimal
   trainingBoost: number; // 0-8, bonus temporaire courant sur les attributs de trainingBoostFocus
   trainingBoostFocus?: "offensive" | "defensive" | "tactical" | "physical" | "chemistry" | "rest";
+  nationality: string;
 }
 
 // --- Calendrier / Match ---
@@ -106,6 +107,8 @@ export interface Game {
 }
 
 // --- Contrat ---
+export type ContractType = "standard" | "two_way" | "development";
+
 export interface Contract {
   id: string;
   playerId: string;
@@ -113,6 +116,7 @@ export interface Contract {
   salary: number; // dollars
   yearsRemaining: number;
   guaranteed: boolean;
+  contractType: ContractType;
 }
 
 // --- Prospect (draft) ---
@@ -126,6 +130,7 @@ export interface Prospect {
   overallRating: number;
   ratings: PlayerRatings;
   scoutingNote?: string; // ex. "Duke (NCAA)" — undefined pour un prospect généré
+  nationality: string;
 }
 
 // --- Classement ---

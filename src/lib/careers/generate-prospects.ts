@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { Position } from "@/lib/types";
 import { NBA_REAL_PROSPECTS, type ProspectSeed } from "@/lib/mock-data/real-prospects-nba";
 import { WNBA_REAL_PROSPECTS } from "@/lib/mock-data/real-prospects-wnba";
+import { randomNationality } from "@/lib/careers/nationality-rules";
 
 const REAL_PROSPECTS_BY_LEAGUE: Record<string, Record<string, ProspectSeed[]>> = {
   nba: NBA_REAL_PROSPECTS,
@@ -66,10 +67,13 @@ export async function generateProspectClass(
     clutch: spreadAround(p.overallRating),
     stamina: spreadAround(p.overallRating),
     scoutingNote: p.scoutingNote,
+    // Vraies personnes identifiables : pas de tirage aléatoire, "États-Unis"
+    // par défaut (dominante NCAA de ces listes) sauf annotation explicite.
+    nationality: p.nationality ?? "États-Unis",
   }));
 
   const remaining = Math.max(0, classSize - realRows.length);
-  const generatedRows = Array.from({ length: remaining }, () => {
+  const generatedRows = Array.from({ length: remaining }, (_, i) => {
     const overallRating = randomInt(55, 82); // rookies, pas encore des stars
     return {
       careerId,
@@ -91,6 +95,9 @@ export async function generateProspectClass(
       clutch: spreadAround(overallRating),
       stamina: spreadAround(overallRating),
       scoutingNote: null as string | null,
+      // Prospect entièrement fictif : tirage pondéré déterministe (pas de
+      // vraie personne à mal représenter).
+      nationality: randomNationality(`${careerId}-${leagueId}-${season}-generated-${i}`),
     };
   });
 
