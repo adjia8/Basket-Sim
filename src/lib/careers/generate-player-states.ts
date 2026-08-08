@@ -28,6 +28,8 @@ export async function generateCareerPlayerStates(
     injuryGamesRemaining: 0,
     renown: player.renown,
     fatigue: 0,
+    peakOverallRating: player.overallRating,
+    peakRenown: player.renown,
   }));
 
   await prisma.playerState.createMany({ data: rows });

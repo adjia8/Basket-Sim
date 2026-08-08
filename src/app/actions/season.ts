@@ -15,6 +15,7 @@ import {
 } from "@/lib/careers/generate-draft-picks";
 import { nextSeasonLabel } from "@/lib/careers/season-format";
 import { ageOneSeason, RETIREMENT_AGE } from "@/lib/careers/aging-rules";
+import { isHallOfFameWorthy } from "@/lib/careers/hall-of-fame-rules";
 import { toDomainLeague } from "@/lib/data-access/mappers";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { applySeasonFinancials, getOrCreateTeamState } from "@/lib/data-access/team-state";
@@ -65,6 +66,11 @@ export async function advanceSeason(): Promise<void> {
   const activeContracts = await prisma.contract.findMany({ where: { careerId: career.id } });
   const teamIdByPlayerId = new Map(activeContracts.map((c) => [c.playerId, c.teamId]));
 
+  // Calculé maintenant (pure string, avant l'écriture en base à l'étape 3) :
+  // sert de marqueur "cette intersaison" pour retiredSeason et pour la
+  // nouvelle classe de prospects réels éventuelle.
+  const newSeason = nextSeasonLabel(career.season);
+
   // 1. Contrats : décrément, résiliation à 0 (le joueur devient agent libre).
   await prisma.contract.updateMany({
     where: { careerId: career.id },
@@ -92,9 +98,25 @@ export async function advanceSeason(): Promise<void> {
     const trainingStaffLevel = teamId ? (trainingStaffByTeamId.get(teamId) ?? 50) : 50;
     const aged = ageOneSeason(state, trainingStaffLevel);
     const retiring = aged.age >= RETIREMENT_AGE;
+    // Pics de carrière : basés sur les meilleures valeurs jamais atteintes
+    // (avant le déclin de fin de carrière), déterminent l'éligibilité au
+    // Hall of Fame à la retraite.
+    const peakOverallRating = Math.max(state.peakOverallRating, aged.overallRating);
+    const peakRenown = Math.max(state.peakRenown, state.renown);
     await prisma.playerState.update({
       where: { id: state.id },
-      data: { ...aged, retired: retiring },
+      data: {
+        ...aged,
+        retired: retiring,
+        peakOverallRating,
+        peakRenown,
+        ...(retiring
+          ? {
+              retiredSeason: newSeason,
+              hallOfFame: isHallOfFameWorthy(peakOverallRating, peakRenown),
+            }
+          : {}),
+      },
     });
     if (retiring) {
       await prisma.contract.deleteMany({
@@ -113,8 +135,7 @@ export async function advanceSeason(): Promise<void> {
     await applySeasonFinancials(career.id, team.id, career.leagueId, winPct, team.marketAppeal);
   }
 
-  // 3. Nouvelle saison.
-  const newSeason = nextSeasonLabel(career.season);
+  // 3. Nouvelle saison (label déjà calculé plus haut, dans newSeason).
   await prisma.career.update({
     where: { id: career.id },
     data: { season: newSeason },
@@ -124,7 +145,7 @@ export async function advanceSeason(): Promise<void> {
   // 2 tours × nb d'équipes de la ligue : toujours assez de prospects pour
   // que chaque pick ait un candidat disponible.
   await prisma.prospect.deleteMany({ where: { careerId: career.id } });
-  await generateProspectClass(career.id, career.leagueId, draftOrderTeamIds.length * 2);
+  await generateProspectClass(career.id, career.leagueId, draftOrderTeamIds.length * 2, newSeason);
 
   // 4bis. Résout les picks de la nouvelle saison (déjà créés à l'avance, non
   // résolus, à la création de la carrière ou lors d'un rollover précédent —

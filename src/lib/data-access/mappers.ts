@@ -143,6 +143,7 @@ export function toDomainProspect(row: PrismaProspect): Prospect {
       clutch: row.clutch,
       stamina: row.stamina,
     },
+    scoutingNote: row.scoutingNote ?? undefined,
   };
 }
 

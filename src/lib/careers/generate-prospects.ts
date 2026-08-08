@@ -1,9 +1,17 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { Position } from "@/lib/types";
+import { NBA_REAL_PROSPECTS, type ProspectSeed } from "@/lib/mock-data/real-prospects-nba";
+import { WNBA_REAL_PROSPECTS } from "@/lib/mock-data/real-prospects-wnba";
+
+const REAL_PROSPECTS_BY_LEAGUE: Record<string, Record<string, ProspectSeed[]>> = {
+  nba: NBA_REAL_PROSPECTS,
+  wnba: WNBA_REAL_PROSPECTS,
+};
 
 // Noms fictifs : le catalogue Player n'a que de vrais joueurs NBA/WNBA
-// existants, il faut une petite banque à combiner pour les rookies.
+// existants, il faut une petite banque à combiner pour les rookies générés
+// (au-delà des 3 classes de vrais prospects, voir real-prospects-*.ts).
 const FIRST_NAMES = [
   "Marcus", "Devon", "Jaylen", "Tyrese", "Amara", "Zion", "Nia", "Cameron",
   "Malik", "Jada", "Trey", "Kayla", "Isaiah", "Simone", "Elijah", "Destiny",
@@ -29,9 +37,39 @@ function spreadAround(overall: number): number {
 export async function generateProspectClass(
   careerId: string,
   leagueId: string,
-  classSize: number
+  classSize: number,
+  season: string
 ): Promise<void> {
-  const rows = Array.from({ length: classSize }, () => {
+  // Les 3 premières classes de draft de la carrière utilisent de vrais
+  // prospects NCAA/Europe (voir real-prospects-nba.ts/real-prospects-wnba.ts)
+  // — complétées jusqu'à la taille réelle de la classe par le générateur
+  // fictif ci-dessous. Au-delà, aucune classe réelle n'existe pour cette
+  // saison et tout est généré, comme avant.
+  const realProspects = REAL_PROSPECTS_BY_LEAGUE[leagueId]?.[season] ?? [];
+  const realRows = realProspects.slice(0, classSize).map((p) => ({
+    careerId,
+    leagueId,
+    firstName: p.firstName,
+    lastName: p.lastName,
+    position: p.position,
+    heightCm: p.heightCm,
+    age: p.age,
+    overallRating: p.overallRating,
+    scoringInside: spreadAround(p.overallRating),
+    scoringOutside: spreadAround(p.overallRating),
+    playmaking: spreadAround(p.overallRating),
+    defenseInside: spreadAround(p.overallRating),
+    defenseOutside: spreadAround(p.overallRating),
+    rebounding: spreadAround(p.overallRating),
+    athleticism: spreadAround(p.overallRating),
+    basketballIQ: spreadAround(p.overallRating),
+    clutch: spreadAround(p.overallRating),
+    stamina: spreadAround(p.overallRating),
+    scoutingNote: p.scoutingNote,
+  }));
+
+  const remaining = Math.max(0, classSize - realRows.length);
+  const generatedRows = Array.from({ length: remaining }, () => {
     const overallRating = randomInt(55, 82); // rookies, pas encore des stars
     return {
       careerId,
@@ -52,8 +90,9 @@ export async function generateProspectClass(
       basketballIQ: spreadAround(overallRating),
       clutch: spreadAround(overallRating),
       stamina: spreadAround(overallRating),
+      scoutingNote: null as string | null,
     };
   });
 
-  await prisma.prospect.createMany({ data: rows });
+  await prisma.prospect.createMany({ data: [...realRows, ...generatedRows] });
 }

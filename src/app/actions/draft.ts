@@ -82,6 +82,8 @@ async function performDraftPick(
           // cours de carrière retombait sur le défaut plat de PlayerState.renown
           // (50) plutôt que la valeur dérivée de son overall.
           renown: initialRenown(prospect.overallRating),
+          peakOverallRating: prospect.overallRating,
+          peakRenown: initialRenown(prospect.overallRating),
         },
       });
 

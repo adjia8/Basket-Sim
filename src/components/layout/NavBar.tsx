@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { href: "/trades", label: "Échanges" },
   { href: "/playoffs", label: "Playoffs" },
   { href: "/franchise", label: "Franchise" },
+  { href: "/season-recap", label: "Bilan" },
 ];
 
 export async function NavBar() {

@@ -244,17 +244,21 @@ model PlayerState {
   conditioning         Int     @default(100) // 0-100, 100 = conditionnement optimal
   injurySeverity       String? // "minor" | "moderate" | "severe", null si sain
   playingThroughInjury Boolean @default(false) // choix du manager, valable seulement pour une blessure "minor"
+  peakOverallRating    Int     @default(0) // plus haut overallRating jamais atteint en carrière
+  peakRenown           Int     @default(50) // plus haut renommé jamais atteint en carrière
+  hallOfFame           Boolean @default(false) // fixé à la retraite si les seuils HOF sont atteints
+  retiredSeason        String? // saison (label) de la retraite, null si actif
 
   @@unique([careerId, playerId])
   @@index([careerId])
 }
 
 model Prospect {
-  id             String @id @default(cuid())
+  id             String  @id @default(cuid())
   careerId       String
-  career         Career @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  career         Career  @relation(fields: [careerId], references: [id], onDelete: Cascade)
   leagueId       String
-  league         League @relation(fields: [leagueId], references: [id])
+  league         League  @relation(fields: [leagueId], references: [id])
   firstName      String
   lastName       String
   position       String
@@ -271,6 +275,7 @@ model Prospect {
   basketballIQ   Int
   clutch         Int
   stamina        Int
+  scoutingNote   String? // ex. "Duke (NCAA)", "Real Madrid (Espagne)" — null pour un prospect généré
 
   @@index([careerId])
 }

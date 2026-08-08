@@ -123,6 +123,7 @@ export interface Prospect {
   age: number;
   overallRating: number;
   ratings: PlayerRatings;
+  scoutingNote?: string; // ex. "Duke (NCAA)" — undefined pour un prospect généré
 }
 
 // --- Classement ---
