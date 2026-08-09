@@ -163,6 +163,7 @@ export function toDomainContract(row: PrismaContract): Contract {
     guaranteed: row.guaranteed,
     contractType: row.contractType as Contract["contractType"],
     isRookieScale: row.isRookieScale,
+    developmentGamesActivated: row.developmentGamesActivated,
   };
 }
 

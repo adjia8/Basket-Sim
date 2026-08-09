@@ -290,6 +290,7 @@ model Contract {
   guaranteed     Boolean  @default(true)
   contractType   String   @default("standard") // "standard" | "two_way" | "development" — voir contract-type-rules.ts
   isRookieScale  Boolean  @default(false) // contrat rookie non renégocié — voir extendContract dans actions/roster.ts
+  developmentGamesActivated Int @default(0) // matchs activés sous CE contrat de développement (WNBA, limite 12) — voir DEVELOPMENT_CONTRACT_GAME_LIMIT dans contract-type-rules.ts
   createdAt      DateTime @default(now())
 
   @@unique([careerId, playerId])

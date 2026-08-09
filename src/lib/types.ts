@@ -118,6 +118,7 @@ export interface Contract {
   guaranteed: boolean;
   contractType: ContractType;
   isRookieScale: boolean;
+  developmentGamesActivated: number;
 }
 
 // --- Prospect (draft) ---

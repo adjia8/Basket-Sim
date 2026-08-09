@@ -11,6 +11,9 @@ export const keys = [
   "rosterAction.refusesOffer",
   "rosterAction.acceptedOne",
   "rosterAction.acceptedMany",
+  "rosterAction.alreadyStandard",
+  "rosterAction.noStandardRoom",
+  "rosterAction.promoted",
 ] as const;
 
 export type RosterActionKey = (typeof keys)[number];
@@ -28,6 +31,9 @@ export const fr: Record<RosterActionKey, string> = {
   "rosterAction.refusesOffer": "{player} refuse cette offre : il exige au moins {amount} par saison.",
   "rosterAction.acceptedOne": "{player} a accepté la prolongation : {amount} sur {years} an.",
   "rosterAction.acceptedMany": "{player} a accepté la prolongation : {amount} sur {years} ans.",
+  "rosterAction.alreadyStandard": "Ce contrat est déjà standard.",
+  "rosterAction.noStandardRoom": "Aucune place de contrat standard disponible dans l'effectif.",
+  "rosterAction.promoted": "{player} repasse en contrat standard : {amount} par saison.",
 };
 
 export const en: Record<RosterActionKey, string> = {
@@ -42,4 +48,7 @@ export const en: Record<RosterActionKey, string> = {
   "rosterAction.refusesOffer": "{player} refuses this offer: he demands at least {amount} per season.",
   "rosterAction.acceptedOne": "{player} accepted the extension: {amount} over {years} year.",
   "rosterAction.acceptedMany": "{player} accepted the extension: {amount} over {years} years.",
+  "rosterAction.alreadyStandard": "This contract is already standard.",
+  "rosterAction.noStandardRoom": "No standard contract slot available on the roster.",
+  "rosterAction.promoted": "{player} is back on a standard contract: {amount} per season.",
 };

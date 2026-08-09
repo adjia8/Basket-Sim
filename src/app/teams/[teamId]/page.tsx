@@ -14,7 +14,7 @@ import { RosterTable, type RosterPlayer } from "@/components/team/RosterTable";
 import { TradeProposalForm, type TradePick } from "@/components/team/TradeProposalForm";
 import { TrainingPlanForm } from "@/components/team/TrainingPlanForm";
 import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
-import { MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import { MAX_ROSTER_SIZE, MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import { tradeRequestReasons, winPctForStandings } from "@/lib/careers/player-demands";
 import { getTranslator, type Translator } from "@/lib/i18n/translate";
 import { formatSalary, teamFullName } from "@/lib/utils";
@@ -122,6 +122,9 @@ export default async function TeamRosterPage({
   const deadCapTotal = deadCap.reduce((sum, d) => sum + d.salary, 0);
   const salaryCap = league?.salaryCap ?? 0;
   const overCap = totalPayroll > salaryCap;
+  const standardRosterSize = contracts.filter((c) => c.contractType === "standard").length;
+  const minRosterSize = MIN_ROSTER_SIZE[team.leagueId] ?? MIN_ROSTER_SIZE.nba;
+  const maxRosterSize = MAX_ROSTER_SIZE[team.leagueId] ?? MAX_ROSTER_SIZE.nba;
   const isOpponentInMyLeague = !isMyTeam && team.leagueId === membership.leagueId;
   const managedByMe = manager?.userId === membership.userId;
   const managerLabel = managedByMe
@@ -191,7 +194,9 @@ export default async function TeamRosterPage({
           <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
             {t("team.roster")}
           </p>
-          <p className="mt-1 text-xl font-semibold">{t("team.rosterCount", { count: roster.length })}</p>
+          <p className="mt-1 text-xl font-semibold">
+            {t("team.rosterCount", { count: standardRosterSize, max: maxRosterSize })}
+          </p>
         </div>
         <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
           <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
@@ -214,7 +219,7 @@ export default async function TeamRosterPage({
         <RosterTable
           teamId={team.id}
           roster={rosterWithContracts}
-          canRelease={isMyTeam && roster.length > MIN_ROSTER_SIZE}
+          canRelease={isMyTeam && standardRosterSize > minRosterSize}
           locale={locale}
           labels={{
             player: t("roster.column.player"),

@@ -67,6 +67,9 @@ export const keys = [
   "extend.duration",
   "extend.proposeButton",
   "extend.rookieNote",
+  "player.activationCount",
+  "player.activationLimitReached",
+  "player.promoteToStandard",
 ] as const;
 
 export type TeamKey = (typeof keys)[number];
@@ -79,7 +82,7 @@ export const fr: Record<TeamKey, string> = {
   "team.overCap": "au-dessus du plafond",
   "team.deadCapNote": "(dont {amount} d'argent mort)",
   "team.roster": "Effectif",
-  "team.rosterCount": "{count} / 10 joueurs",
+  "team.rosterCount": "{count} / {max} joueurs",
   "team.chemistry": "Chimie d'équipe",
   "team.draftPicks": "Picks de draft",
   "team.tradeDeadlinePassed":
@@ -143,6 +146,9 @@ export const fr: Record<TeamKey, string> = {
   "extend.proposeButton": "Proposer la prolongation",
   "extend.rookieNote":
     "Contrat rookie : le joueur n'a aucune exigence salariale et acceptera toute offre respectant le plafond.",
+  "player.activationCount": "{count}/{limit} matchs activés",
+  "player.activationLimitReached": "🚫 Limite d'activation atteinte — doit repasser en contrat standard pour rejouer.",
+  "player.promoteToStandard": "Passer en contrat standard",
 };
 
 export const en: Record<TeamKey, string> = {
@@ -153,7 +159,7 @@ export const en: Record<TeamKey, string> = {
   "team.overCap": "over the cap",
   "team.deadCapNote": "(including {amount} of dead cap)",
   "team.roster": "Roster",
-  "team.rosterCount": "{count} / 10 players",
+  "team.rosterCount": "{count} / {max} players",
   "team.chemistry": "Team chemistry",
   "team.draftPicks": "Draft picks",
   "team.tradeDeadlinePassed": "Trade deadline has passed for this season — trades reopen next season.",
@@ -215,4 +221,7 @@ export const en: Record<TeamKey, string> = {
   "extend.duration": "Duration (yrs)",
   "extend.proposeButton": "Propose extension",
   "extend.rookieNote": "Rookie contract: the player has no salary demands and will accept any offer within the cap.",
+  "player.activationCount": "{count}/{limit} games activated",
+  "player.activationLimitReached": "🚫 Activation limit reached — must move to a standard contract to play again.",
+  "player.promoteToStandard": "Move to standard contract",
 };

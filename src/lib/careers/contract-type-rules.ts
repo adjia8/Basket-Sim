@@ -15,7 +15,8 @@ export const ALT_CONTRACT_TYPE: Record<string, ContractType> = {
 
 // Salaire fixe, largement sous le minimum standard — ces contrats n'entrent
 // pas dans le plafond salarial (voir getPayrollForTeam) ni dans le roster
-// standard de 5-10 joueurs (voir ALT_CONTRACT_SLOTS_PER_TEAM, roster-rules.ts).
+// standard (voir MAX_ROSTER_SIZE dans roster-rules.ts et
+// ALT_CONTRACT_SLOTS_PER_TEAM ci-dessous pour la limite de slots à part).
 export const ALT_CONTRACT_SALARY: Record<string, number> = {
   nba: 500_000,
   wnba: 75_000,
@@ -29,6 +30,13 @@ export const ALT_CONTRACT_SLOTS_PER_TEAM = 2;
 export function isEligibleForAlternateContract(age: number): boolean {
   return age <= ALT_CONTRACT_AGE_LIMIT;
 }
+
+// Règle CBA WNBA 2026 : une joueuse en contrat de développement ne peut être
+// activée (éligible à jouer) que pour un maximum de 12 matchs — au-delà,
+// elle doit repasser en contrat standard (voir promoteToStandardContract
+// dans actions/roster.ts). Non applicable au two-way NBA dans ce modèle
+// (la vraie limite NBA existe mais n'a pas été demandée pour l'instant).
+export const DEVELOPMENT_CONTRACT_GAME_LIMIT = 12;
 
 // Fenêtre de prolongation simplifiée : seulement quand il reste peu d'années
 // au contrat courant, pour éviter de prolonger en boucle sans jamais arriver

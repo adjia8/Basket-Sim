@@ -34,11 +34,12 @@ export async function getCurrentDraftPick(
     if (!pick || pick.pickNumber === null) return null;
 
     const [rosterSize, payroll] = await Promise.all([
-      prisma.contract.count({ where: { careerId, teamId: pick.teamId } }),
+      prisma.contract.count({ where: { careerId, teamId: pick.teamId, contractType: "standard" } }),
       getPayrollForTeam(careerId, pick.teamId),
     ]);
     const { salary } = rookieScaleContract(pick.pickNumber, picksPerRound, leagueId);
-    const canDraft = rosterSize < MAX_ROSTER_SIZE && payroll + salary <= salaryCap;
+    const maxRosterSize = MAX_ROSTER_SIZE[leagueId] ?? MAX_ROSTER_SIZE.nba;
+    const canDraft = rosterSize < maxRosterSize && payroll + salary <= salaryCap;
     if (canDraft) return pick as ResolvedDraftPick;
 
     const { count } = await prisma.draftPick.updateMany({

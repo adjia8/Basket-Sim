@@ -11,11 +11,13 @@ import { prisma } from "@/lib/prisma";
 import { minAcceptableSalary, tradeRequestReasons, winPctForStandings } from "@/lib/careers/player-demands";
 import { PlayerAvatar } from "@/components/team/PlayerAvatar";
 import { ExtendContractForm } from "@/components/team/ExtendContractForm";
+import { PromoteContractForm } from "@/components/team/PromoteContractForm";
 import { releasePlayer, offerAlternateContract } from "@/app/actions/roster";
 import { MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import {
   ALT_CONTRACT_SLOTS_PER_TEAM,
   ALT_CONTRACT_TYPE,
+  DEVELOPMENT_CONTRACT_GAME_LIMIT,
   EXTENSION_MAX_YEARS_REMAINING,
   isEligibleForAlternateContract,
 } from "@/lib/careers/contract-type-rules";
@@ -97,7 +99,9 @@ export default async function PlayerDetailPage({
   };
 
   const canRelease =
-    isMyTeam && (contract.contractType !== "standard" || standardRosterSize > MIN_ROSTER_SIZE);
+    isMyTeam &&
+    (contract.contractType !== "standard" ||
+      standardRosterSize > (MIN_ROSTER_SIZE[team.leagueId] ?? MIN_ROSTER_SIZE.nba));
   const canExtend =
     isMyTeam && contract.contractType === "standard" && contract.yearsRemaining <= EXTENSION_MAX_YEARS_REMAINING;
   const salaryRange = SALARY_RANGES[team.leagueId] ?? SALARY_RANGES.nba;
@@ -124,6 +128,10 @@ export default async function PlayerDetailPage({
     !!altType &&
     isEligibleForAlternateContract(player.age) &&
     altSlotsUsed < ALT_CONTRACT_SLOTS_PER_TEAM;
+  const canPromote = isMyTeam && contract.contractType !== "standard";
+  const activationLimitReached =
+    contract.contractType === "development" &&
+    contract.developmentGamesActivated >= DEVELOPMENT_CONTRACT_GAME_LIMIT;
 
   const ratingLabel = ratingLabels(t);
 
@@ -204,7 +212,19 @@ export default async function PlayerDetailPage({
         <p className="mt-1 text-sm text-black/50 dark:text-white/50">
           {contractTypeLabels[contract.contractType]}
           {!contract.guaranteed && t("player.notGuaranteedSuffix")}
+          {contract.contractType === "development" && (
+            <>
+              {" · "}
+              {t("player.activationCount", {
+                count: contract.developmentGamesActivated,
+                limit: DEVELOPMENT_CONTRACT_GAME_LIMIT,
+              })}
+            </>
+          )}
         </p>
+        {activationLimitReached && (
+          <p className="mt-1 text-sm text-red-500">{t("player.activationLimitReached")}</p>
+        )}
 
         {canExtend && (
           <div className="mt-4 rounded-lg border border-black/10 p-3 dark:border-white/10">
@@ -250,6 +270,12 @@ export default async function PlayerDetailPage({
                   {t("player.proposeAltContract", { type: altTypeLabel })}
                 </button>
               </form>
+            )}
+            {canPromote && (
+              <PromoteContractForm
+                playerId={player.id}
+                labels={{ button: t("player.promoteToStandard"), proposing: t("common.proposing") }}
+              />
             )}
           </div>
         )}

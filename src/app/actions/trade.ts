@@ -108,16 +108,18 @@ export async function proposeTrade(
   // Les picks n'affectent ni l'effectif ni la masse salariale tant qu'ils
   // n'ont pas été utilisés pour drafter un joueur : seuls les joueurs
   // comptent dans ces deux vérifications.
+  const minRosterSize = MIN_ROSTER_SIZE[membership.career.leagueId] ?? MIN_ROSTER_SIZE.nba;
+  const maxRosterSize = MAX_ROSTER_SIZE[membership.career.leagueId] ?? MAX_ROSTER_SIZE.nba;
   const myNewSize = myRosterSize - myPlayerIds.length + theirPlayerIds.length;
   const theirNewSize = theirRosterSize - theirPlayerIds.length + myPlayerIds.length;
   if (
-    myNewSize < MIN_ROSTER_SIZE ||
-    myNewSize > MAX_ROSTER_SIZE ||
-    theirNewSize < MIN_ROSTER_SIZE ||
-    theirNewSize > MAX_ROSTER_SIZE
+    myNewSize < minRosterSize ||
+    myNewSize > maxRosterSize ||
+    theirNewSize < minRosterSize ||
+    theirNewSize > maxRosterSize
   ) {
     return {
-      error: t("tradeAction.rosterSizeOutOfRange", { min: MIN_ROSTER_SIZE, max: MAX_ROSTER_SIZE }),
+      error: t("tradeAction.rosterSizeOutOfRange", { min: minRosterSize, max: maxRosterSize }),
     };
   }
 
@@ -287,6 +289,8 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
 
   const newFromSize = fromRosterSize - fromPlayerIds.length + toPlayerIds.length;
   const newToSize = toRosterSize - toPlayerIds.length + fromPlayerIds.length;
+  const minRosterSize = MIN_ROSTER_SIZE[membership.career.leagueId] ?? MIN_ROSTER_SIZE.nba;
+  const maxRosterSize = MAX_ROSTER_SIZE[membership.career.leagueId] ?? MAX_ROSTER_SIZE.nba;
 
   const salaryCap = league?.salaryCap ?? Infinity;
   const fromSalaryOut = fromContracts.reduce((sum, c) => sum + c.salary, 0);
@@ -300,10 +304,10 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
     toPlayersValid &&
     fromPicksValid &&
     toPicksValid &&
-    newFromSize >= MIN_ROSTER_SIZE &&
-    newFromSize <= MAX_ROSTER_SIZE &&
-    newToSize >= MIN_ROSTER_SIZE &&
-    newToSize <= MAX_ROSTER_SIZE &&
+    newFromSize >= minRosterSize &&
+    newFromSize <= maxRosterSize &&
+    newToSize >= minRosterSize &&
+    newToSize <= maxRosterSize &&
     fromNewPayroll <= salaryCap &&
     toNewPayroll <= salaryCap;
 

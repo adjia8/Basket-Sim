@@ -23,7 +23,7 @@ export default async function FreeAgentsPage() {
   const [freeAgents, rosterSize, payroll, league, faOpen, standings, myTeam, myTeamState] = await Promise.all([
     getFreeAgents(membership.careerId, membership.leagueId),
     prisma.contract.count({
-      where: { careerId: membership.careerId, teamId: membership.teamId },
+      where: { careerId: membership.careerId, teamId: membership.teamId, contractType: "standard" },
     }),
     getPayrollForTeam(membership.careerId, membership.teamId),
     getLeagueById(membership.leagueId),
@@ -33,7 +33,8 @@ export default async function FreeAgentsPage() {
     getOrCreateTeamState(membership.careerId, membership.teamId, membership.leagueId),
   ]);
 
-  const rosterFull = rosterSize >= MAX_ROSTER_SIZE;
+  const maxRosterSize = MAX_ROSTER_SIZE[membership.leagueId] ?? MAX_ROSTER_SIZE.nba;
+  const rosterFull = rosterSize >= maxRosterSize;
   const salaryCap = league?.salaryCap ?? Infinity;
   // Un contrat a toujours un salaire strictement positif : si la masse
   // salariale actuelle atteint déjà le plafond, aucune signature ne peut plus
@@ -60,7 +61,7 @@ export default async function FreeAgentsPage() {
       {!faOpen && <p className="mt-2 text-sm text-red-500">{t("freeAgents.notOpenYet")}</p>}
       {rosterFull && (
         <p className="mt-2 text-sm text-red-500">
-          {t("freeAgents.rosterFull", { size: rosterSize, max: MAX_ROSTER_SIZE })}
+          {t("freeAgents.rosterFull", { size: rosterSize, max: maxRosterSize })}
         </p>
       )}
       {capReached && <p className="mt-2 text-sm text-red-500">{t("freeAgents.capReached")}</p>}

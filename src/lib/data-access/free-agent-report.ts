@@ -47,7 +47,7 @@ export async function getFreeAgentReport(
     teams.map(async (team) => {
       const [payroll, rosterSize, teamState] = await Promise.all([
         getPayrollForTeam(careerId, team.id),
-        prisma.contract.count({ where: { careerId, teamId: team.id } }),
+        prisma.contract.count({ where: { careerId, teamId: team.id, contractType: "standard" } }),
         getOrCreateTeamState(careerId, team.id, leagueId),
       ]);
       const standingsRow = standings.find((s) => s.teamId === team.id);
@@ -63,12 +63,13 @@ export async function getFreeAgentReport(
     })
   );
 
+  const maxRosterSize = MAX_ROSTER_SIZE[leagueId] ?? MAX_ROSTER_SIZE.nba;
   return freeAgents.map((player) => {
     const desiredContract = minAcceptableSalary(player.renown, player.overallRating, leagueId);
     const interestedTeamIds = teamContext
       .filter(
         (t) =>
-          t.rosterSize < MAX_ROSTER_SIZE &&
+          t.rosterSize < maxRosterSize &&
           t.payroll + desiredContract <= salaryCap &&
           teamMeetsPlayerDemands({
             renown: player.renown,

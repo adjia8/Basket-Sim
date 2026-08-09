@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getRosterForTeam } from "@/lib/data-access/players";
+import { getContractsForTeam } from "@/lib/data-access/contracts";
 import { getGameById, setGameReady, updateGameResult } from "@/lib/data-access/schedule";
 import { getStandings } from "@/lib/data-access/standings";
 import { getTeamById } from "@/lib/data-access/teams";
@@ -16,6 +17,7 @@ import { advanceRosterTraining } from "@/lib/data-access/training";
 import { getGmBonusForTeam } from "@/lib/data-access/gm";
 import { maybeCreatePressConference } from "@/lib/data-access/press";
 import { winPctForStandings } from "@/lib/careers/player-demands";
+import { DEVELOPMENT_CONTRACT_GAME_LIMIT } from "@/lib/careers/contract-type-rules";
 import {
   chemistryTrainingBonus,
   trainingFatigueDelta,
@@ -94,20 +96,25 @@ export async function POST(request: Request) {
     const waitingManager = !homeEffectiveReady ? homeManager : awayManager;
     return NextResponse.json({
       simulated: false,
-      waitingFor: waitingManager?.email ?? "l'autre manager",
+      waitingFor: waitingManager?.email ?? t("game.otherManagerFallback"),
     });
   }
 
-  const [homeTeam, awayTeam, homeRoster, awayRoster] = await Promise.all([
+  const [homeTeam, awayTeam, homeRoster, awayRoster, homeContracts, awayContracts] = await Promise.all([
     getTeamById(updatedGame.homeTeamId),
     getTeamById(updatedGame.awayTeamId),
     getRosterForTeam(membership.careerId, updatedGame.homeTeamId),
     getRosterForTeam(membership.careerId, updatedGame.awayTeamId),
+    getContractsForTeam(membership.careerId, updatedGame.homeTeamId),
+    getContractsForTeam(membership.careerId, updatedGame.awayTeamId),
   ]);
 
   if (!homeTeam || !awayTeam) {
     return NextResponse.json({ error: t("simulateAction.teamNotFound") }, { status: 404 });
   }
+
+  const homeContractByPlayerId = new Map(homeContracts.map((c) => [c.playerId, c]));
+  const awayContractByPlayerId = new Map(awayContracts.map((c) => [c.playerId, c]));
 
   const gameDate = new Date(updatedGame.gameDate);
   const [homeRestDays, awayRestDays, homeTeamState, awayTeamState, homeGm, awayGm] = await Promise.all([
@@ -122,14 +129,30 @@ export async function POST(request: Request) {
   // Les joueurs actuellement blessés ne jouent pas : exclus du roster transmis
   // au moteur (ni minutes, ni stats de box score). Exception : une blessure
   // mineure sur laquelle le manager a choisi de faire jouer le joueur quand
-  // même (voir src/app/actions/roster.ts, setPlayingThroughInjury).
-  const canPlay = (p: (typeof homeRoster)[number]) =>
-    !p.injured || (p.playingThroughInjury && p.injurySeverity === "minor");
+  // même (voir src/app/actions/roster.ts, setPlayingThroughInjury). Une
+  // joueuse en contrat de développement ayant déjà atteint la limite
+  // d'activation (WNBA, voir DEVELOPMENT_CONTRACT_GAME_LIMIT) est bloquée
+  // jusqu'à repasser en contrat standard (promoteToStandardContract).
+  const makeCanPlay =
+    (contractByPlayerId: Map<string, (typeof homeContracts)[number]>) =>
+    (p: (typeof homeRoster)[number]) => {
+      if (p.injured && !(p.playingThroughInjury && p.injurySeverity === "minor")) return false;
+      const contract = contractByPlayerId.get(p.id);
+      if (
+        contract?.contractType === "development" &&
+        contract.developmentGamesActivated >= DEVELOPMENT_CONTRACT_GAME_LIMIT
+      ) {
+        return false;
+      }
+      return true;
+    };
+  const homeEligibleRoster = homeRoster.filter(makeCanPlay(homeContractByPlayerId));
+  const awayEligibleRoster = awayRoster.filter(makeCanPlay(awayContractByPlayerId));
   const result = simulationEngine.simulateGame(
     homeTeam,
-    homeRoster.filter(canPlay),
+    homeEligibleRoster,
     awayTeam,
-    awayRoster.filter(canPlay),
+    awayEligibleRoster,
     {
       homeChemistry: homeTeamState.chemistry + homeGm.chemistry + moraleBonus(homeTeamState.morale),
       awayChemistry: awayTeamState.chemistry + awayGm.chemistry + moraleBonus(awayTeamState.morale),
@@ -137,6 +160,25 @@ export async function POST(request: Request) {
       awayGmBonus: awayGm.strength,
     }
   );
+
+  // Activation comptée pour CHAQUE joueuse en contrat de développement
+  // effectivement éligible pour ce match (dressée), pas seulement celles qui
+  // ont fini par jouer des minutes — l'activation se joue au moment de la
+  // feuille de match, pas de la rotation choisie par le moteur.
+  const developmentPlayerIds = [
+    ...homeEligibleRoster
+      .filter((p) => homeContractByPlayerId.get(p.id)?.contractType === "development")
+      .map((p) => homeContractByPlayerId.get(p.id)!.id),
+    ...awayEligibleRoster
+      .filter((p) => awayContractByPlayerId.get(p.id)?.contractType === "development")
+      .map((p) => awayContractByPlayerId.get(p.id)!.id),
+  ];
+  if (developmentPlayerIds.length > 0) {
+    await prisma.contract.updateMany({
+      where: { id: { in: developmentPlayerIds } },
+      data: { developmentGamesActivated: { increment: 1 } },
+    });
+  }
   const updated = await updateGameResult(membership.careerId, gameId, result);
 
   if (updated?.playoffSeriesId) {
