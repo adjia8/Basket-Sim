@@ -3,16 +3,21 @@
 import { useState } from "react";
 import { useActionState } from "react";
 import { createCareer } from "@/app/actions/career";
-import { FranchiseCarousel } from "./FranchiseCarousel";
+import { FranchiseCarousel, type FranchiseCarouselLabels } from "./FranchiseCarousel";
+import type { Locale } from "@/lib/i18n/locale";
 import type { League } from "@/lib/types";
 import type { FranchiseSummary } from "@/lib/data-access/franchise-summary";
 
 export function CareerForm({
   leagues,
   summariesByLeague,
+  locale,
+  labels,
 }: {
   leagues: League[];
   summariesByLeague: Record<string, FranchiseSummary[]>;
+  locale: Locale;
+  labels: FranchiseCarouselLabels;
 }) {
   const [leagueId, setLeagueId] = useState<string>(leagues[0]?.id ?? "");
   const [state, action, pending] = useActionState(createCareer, undefined);
@@ -44,6 +49,8 @@ export function CareerForm({
         hiddenFields={{ leagueId }}
         error={state?.error}
         pending={pending}
+        locale={locale}
+        labels={labels}
       />
     </div>
   );

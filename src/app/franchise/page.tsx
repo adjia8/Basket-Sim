@@ -4,11 +4,13 @@ import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { healthyFinancesThreshold, upgradeCost } from "@/lib/careers/finance-rules";
 import { upgradeFacility } from "@/app/actions/franchise";
+import { getTranslator } from "@/lib/i18n/translate";
 import { formatSalary } from "@/lib/utils";
 import { financeTone, ratingTone, toneClass } from "@/lib/color-scale";
 
 export default async function FranchisePage() {
   const membership = await getCurrentMembership();
+  const { t, locale } = await getTranslator();
 
   const games = await getScheduleForCareer(membership.careerId, membership.season);
   const seasonComplete = games.length > 0 && games.every((g) => g.status === "final");
@@ -23,53 +25,42 @@ export default async function FranchisePage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-bold">Franchise</h1>
-      <p className="mt-1 text-black/60 dark:text-white/60">
-        Les revenus de billetterie, de maillots et de snackerie dépendent du bilan
-        de la saison écoulée et de l&apos;attractivité du marché. Investis-les dans
-        tes infrastructures et ton personnel de training pendant l&apos;intersaison —
-        ces deux composantes se dégradent un peu chaque année si tu ne les
-        entretiens pas.
-      </p>
+      <h1 className="text-2xl font-bold">{t("franchisePage.title")}</h1>
+      <p className="mt-1 text-black/60 dark:text-white/60">{t("franchisePage.description")}</p>
 
       <div className="mt-6 rounded-lg border border-black/10 p-4 dark:border-white/10">
-        <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
-          Trésorerie
-        </p>
+        <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">{t("gm.treasury")}</p>
         <p
           className={`mt-1 text-2xl font-semibold ${toneClass(
             financeTone(teamState.finances, healthyFinancesThreshold(membership.leagueId))
           )}`}
         >
-          {formatSalary(teamState.finances)}
+          {formatSalary(teamState.finances, locale)}
         </p>
       </div>
 
       {!isOffseasonWindow && (
-        <p className="mt-4 text-sm text-red-500">
-          Les améliorations ne sont possibles qu&apos;en intersaison — termine la
-          saison régulière et les playoffs pour pouvoir investir.
-        </p>
+        <p className="mt-4 text-sm text-red-500">{t("franchisePage.offseasonOnly")}</p>
       )}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <FacilityCard
-          label="Infrastructures d'entraînement"
-          description="Réduit le risque de blessure et accélère la récupération de fatigue entre les matchs."
+          label={t("franchisePage.facilitiesLabel")}
+          description={t("franchisePage.facilitiesDescription")}
           level={teamState.facilitiesLevel}
-          cost={facilitiesCost}
           canAfford={teamState.finances >= facilitiesCost}
           canUpgrade={isOffseasonWindow}
           component="facilities"
+          upgradeLabel={t("franchisePage.upgrade", { cost: formatSalary(facilitiesCost, locale) })}
         />
         <FacilityCard
-          label="Personnel de training"
-          description="Accélère la progression des joueurs de moins de 25 ans."
+          label={t("franchisePage.trainingStaffLabel")}
+          description={t("franchisePage.trainingStaffDescription")}
           level={teamState.trainingStaffLevel}
-          cost={trainingStaffCost}
           canAfford={teamState.finances >= trainingStaffCost}
           canUpgrade={isOffseasonWindow}
           component="trainingStaff"
+          upgradeLabel={t("franchisePage.upgrade", { cost: formatSalary(trainingStaffCost, locale) })}
         />
       </div>
     </div>
@@ -80,18 +71,18 @@ function FacilityCard({
   label,
   description,
   level,
-  cost,
   canAfford,
   canUpgrade,
   component,
+  upgradeLabel,
 }: {
   label: string;
   description: string;
   level: number;
-  cost: number;
   canAfford: boolean;
   canUpgrade: boolean;
   component: "facilities" | "trainingStaff";
+  upgradeLabel: string;
 }) {
   return (
     <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
@@ -112,7 +103,7 @@ function FacilityCard({
             disabled={!canAfford}
             className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-black dark:hover:bg-white/80"
           >
-            Améliorer ({formatSalary(cost)})
+            {upgradeLabel}
           </button>
         </form>
       )}

@@ -64,12 +64,8 @@ export function teamMeetsPlayerDemands(params: {
 
 export type TradeRequestReason = "salary" | "competitiveness" | "market" | "facilities";
 
-export const TRADE_REQUEST_REASON_LABELS: Record<TradeRequestReason, string> = {
-  salary: "Salaire jugé insuffisant pour son renommé",
-  competitiveness: "Équipe pas assez compétitive à son goût",
-  market: "Marché pas assez attractif à son goût",
-  facilities: "Infrastructures d'entraînement jugées insuffisantes",
-};
+// Libellés dans src/lib/i18n/dict/domain.ts (clé `domain.tradeReason.<valeur>`)
+// — pas de texte affichable dans ce fichier de règles pures.
 
 // Détaille CE QUI, précisément, pousse un joueur à vouloir être échangé —
 // mêmes seuils que minAcceptableSalary/teamMeetsPlayerDemands, mais renvoie

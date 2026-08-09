@@ -3,10 +3,12 @@ import { getCurrentMembership } from "@/lib/auth/dal";
 import { getConferencesByLeague } from "@/lib/data-access/leagues";
 import { getMembershipsForCareer } from "@/lib/data-access/memberships";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
+import { getTranslator } from "@/lib/i18n/translate";
 import { teamFullName } from "@/lib/utils";
 
 export default async function TeamsPage() {
   const membership = await getCurrentMembership();
+  const { t } = await getTranslator();
 
   const [teams, conferences, managers] = await Promise.all([
     getTeamsByLeague(membership.leagueId),
@@ -16,7 +18,7 @@ export default async function TeamsPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="text-2xl font-bold">Équipes</h1>
+      <h1 className="text-2xl font-bold">{t("teamsPage.title")}</h1>
 
       <div className="mt-6 space-y-8">
         {conferences.map((conference) => (
@@ -40,7 +42,11 @@ export default async function TeamsPage() {
                       <div className="flex flex-col">
                         <span>{teamFullName(team)}</span>
                         <span className="text-xs text-black/40 dark:text-white/40">
-                          {managedByMe ? "Géré par toi" : manager ? `Géré par ${manager.email}` : "Géré par l'IA"}
+                          {managedByMe
+                            ? t("team.managedByMe")
+                            : manager
+                              ? t("team.managedBy", { email: manager.email })
+                              : t("team.managedByAi")}
                         </span>
                       </div>
                       <span className="text-xs text-black/40 dark:text-white/40">

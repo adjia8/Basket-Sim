@@ -21,15 +21,7 @@ const TIER_ORDER: ExpectationTier[] = [
   "champion",
 ];
 
-export const EXPECTATION_LABELS: Record<ExpectationTier, string> = {
-  rebuild: "Reconstruction",
-  play_in: "Play-in",
-  playoffs: "Playoffs",
-  conf_semis: "Demi-finale de conférence",
-  conf_finals: "Finale de conférence",
-  nba_finals: "Finale (NBA/WNBA)",
-  champion: "Champion",
-};
+// Libellés dans src/lib/i18n/dict/domain.ts (clé `domain.expectationTier.<valeur>`).
 
 export function tierIndex(tier: ExpectationTier): number {
   return TIER_ORDER.indexOf(tier);

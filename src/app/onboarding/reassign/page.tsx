@@ -5,6 +5,8 @@ import { getFranchiseSummariesForCareer } from "@/lib/data-access/franchise-summ
 import { getTeamById } from "@/lib/data-access/teams";
 import { FranchiseCarousel } from "@/components/onboarding/FranchiseCarousel";
 import { reassignFranchise } from "@/app/actions/gm";
+import { getTranslator } from "@/lib/i18n/translate";
+import { franchiseCarouselLabels } from "@/lib/i18n/franchise-carousel-labels";
 import { teamFullName } from "@/lib/utils";
 
 // Ne passe volontairement pas par getCurrentMembership() : celle-ci redirige
@@ -18,6 +20,7 @@ export default async function ReassignFranchisePage() {
   });
   if (!membership?.gmProfile?.pendingReassignment) redirect("/");
 
+  const { t, locale } = await getTranslator();
   const [slides, oldTeam] = await Promise.all([
     getFranchiseSummariesForCareer(membership.careerId, membership.career.leagueId, true),
     getTeamById(membership.teamId),
@@ -25,13 +28,20 @@ export default async function ReassignFranchisePage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="text-2xl font-bold">Tu as été licencié</h1>
+      <h1 className="text-2xl font-bold">{t("onboarding.reassignTitle")}</h1>
       <p className="mt-1 text-black/60 dark:text-white/60">
-        La direction de {oldTeam ? teamFullName(oldTeam) : "ton ancienne équipe"} n&apos;a pas
-        été satisfaite de ton bilan. Choisis une nouvelle franchise à gérer dans la même ligue.
+        {t("onboarding.reassignBody", {
+          team: oldTeam ? teamFullName(oldTeam) : t("onboarding.formerTeamFallback"),
+        })}
       </p>
       <div className="mt-8">
-        <FranchiseCarousel slides={slides} mode="reassign" action={reassignFranchise} />
+        <FranchiseCarousel
+          slides={slides}
+          mode="reassign"
+          action={reassignFranchise}
+          locale={locale}
+          labels={franchiseCarouselLabels(t)}
+        />
       </div>
     </div>
   );

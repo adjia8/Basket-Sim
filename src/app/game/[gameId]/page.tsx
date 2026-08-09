@@ -6,6 +6,7 @@ import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getPlayerById } from "@/lib/data-access/players";
 import { getGameById } from "@/lib/data-access/schedule";
 import { getTeamById } from "@/lib/data-access/teams";
+import { getTranslator, type Translator } from "@/lib/i18n/translate";
 import { formatGameDate, teamFullName } from "@/lib/utils";
 import type { Team } from "@/lib/types";
 
@@ -15,6 +16,7 @@ export default async function GamePage({
   params: Promise<{ gameId: string }>;
 }) {
   const membership = await getCurrentMembership();
+  const { t, locale } = await getTranslator();
   const { gameId } = await params;
   const game = await getGameById(membership.careerId, gameId);
   if (!game) notFound();
@@ -58,7 +60,7 @@ export default async function GamePage({
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <p className="text-sm text-black/50 dark:text-white/50">
-        {formatGameDate(game.gameDate)}
+        {formatGameDate(game.gameDate, locale)}
       </p>
       <h1 className="mt-1 text-2xl font-bold">
         {teamFullName(awayTeam)} @ {teamFullName(homeTeam)}
@@ -73,20 +75,45 @@ export default async function GamePage({
       {game.status === "scheduled" ? (
         <div className="mt-6 flex flex-col items-center gap-2">
           {canAct ? (
-            <SimulateButton gameId={game.id} initialWaitingFor={initialWaitingFor} />
+            <SimulateButton
+              gameId={game.id}
+              initialWaitingFor={initialWaitingFor}
+              labels={{
+                simulate: t("game.simulate"),
+                simulating: t("game.simulating"),
+                waitingForPrefix: t("game.waitingForPrefix"),
+                simulationFailed: t("game.simulationFailed"),
+                unknownError: t("game.unknownError"),
+                otherManagerFallback: t("game.otherManagerFallback"),
+              }}
+            />
           ) : (
             <p className="text-sm text-black/50 dark:text-white/50">
-              {readinessLine(awayTeam, game.awayReady, awayManager)} · {readinessLine(homeTeam, game.homeReady, homeManager)}
+              {readinessLine(t, awayTeam, game.awayReady, awayManager)} ·{" "}
+              {readinessLine(t, homeTeam, game.homeReady, homeManager)}
             </p>
           )}
         </div>
       ) : (
         <div className="mt-10">
-          <h2 className="mb-3 text-lg font-semibold">Box score</h2>
+          <h2 className="mb-3 text-lg font-semibold">{t("game.boxScoreHeading")}</h2>
           <BoxScoreTable
             entries={boxScoreWithNames}
             homeTeamId={homeTeam.id}
             awayTeamId={awayTeam.id}
+            labels={{
+              away: t("boxScore.away"),
+              home: t("boxScore.home"),
+              player: t("boxScore.player"),
+              points: t("boxScore.points"),
+              rebounds: t("boxScore.rebounds"),
+              assists: t("boxScore.assists"),
+              fouls: t("boxScore.fouls"),
+              technical: (count) => t("boxScore.technical", { count }),
+              flagrant: (count) => t("boxScore.flagrant", { count }),
+              fouledOut: t("boxScore.fouledOut"),
+              ejected: t("boxScore.ejected"),
+            }}
           />
         </div>
       )}
@@ -95,12 +122,13 @@ export default async function GamePage({
 }
 
 function readinessLine(
+  t: Translator,
   team: Team,
   ready: boolean,
   manager: { email: string } | null
 ): string {
-  if (!manager) return `${teamFullName(team)} : IA`;
-  return `${teamFullName(team)} : ${ready ? "prêt" : "en attente"}`;
+  if (!manager) return `${teamFullName(team)} : ${t("game.ai")}`;
+  return `${teamFullName(team)} : ${ready ? t("game.ready") : t("game.waiting")}`;
 }
 
 function TeamScore({ team, score }: { team: Team; score?: number }) {

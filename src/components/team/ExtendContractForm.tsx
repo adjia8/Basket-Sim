@@ -4,6 +4,17 @@ import { useActionState } from "react";
 import { extendContract, type ExtendContractFormState } from "@/app/actions/roster";
 import { EXTENSION_MAX_OFFER_YEARS, EXTENSION_MIN_OFFER_YEARS } from "@/lib/careers/contract-type-rules";
 
+// Composant client : tout le texte arrive déjà traduit en props depuis le
+// Server Component appelant (voir players/[playerId]/page.tsx) — jamais de
+// fonction `t` passée à travers la frontière serveur/client.
+export interface ExtendContractLabels {
+  proposedSalary: string;
+  duration: string;
+  proposing: string;
+  proposeButton: string;
+  rookieNote: string;
+}
+
 export function ExtendContractForm({
   playerId,
   minSalary,
@@ -11,6 +22,7 @@ export function ExtendContractForm({
   suggestedSalary,
   suggestedYears,
   isRookieScale,
+  labels,
 }: {
   playerId: string;
   minSalary: number;
@@ -18,6 +30,7 @@ export function ExtendContractForm({
   suggestedSalary: number;
   suggestedYears: number;
   isRookieScale: boolean;
+  labels: ExtendContractLabels;
 }) {
   const [state, action, pending] = useActionState<ExtendContractFormState | undefined, FormData>(
     extendContract,
@@ -28,7 +41,7 @@ export function ExtendContractForm({
     <form action={action} className="mt-2 flex flex-wrap items-end gap-3">
       <input type="hidden" name="playerId" value={playerId} />
       <label className="text-xs text-black/50 dark:text-white/50">
-        Salaire proposé ($/an)
+        {labels.proposedSalary}
         <input
           type="number"
           name="salary"
@@ -40,7 +53,7 @@ export function ExtendContractForm({
         />
       </label>
       <label className="text-xs text-black/50 dark:text-white/50">
-        Durée (ans)
+        {labels.duration}
         <input
           type="number"
           name="years"
@@ -55,13 +68,9 @@ export function ExtendContractForm({
         disabled={pending}
         className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/80"
       >
-        {pending ? "Proposition…" : "Proposer la prolongation"}
+        {pending ? labels.proposing : labels.proposeButton}
       </button>
-      {isRookieScale && (
-        <p className="w-full text-xs text-black/50 dark:text-white/50">
-          Contrat rookie : le joueur n&apos;a aucune exigence salariale et acceptera toute offre respectant le plafond.
-        </p>
-      )}
+      {isRookieScale && <p className="w-full text-xs text-black/50 dark:text-white/50">{labels.rookieNote}</p>}
       {state?.error && <p className="w-full text-sm text-red-500">{state.error}</p>}
       {state?.success && <p className="w-full text-sm text-green-600 dark:text-green-400">{state.success}</p>}
     </form>

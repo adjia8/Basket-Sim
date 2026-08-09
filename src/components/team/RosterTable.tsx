@@ -3,17 +3,12 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Player } from "@/lib/types";
+import type { Locale } from "@/lib/i18n/locale";
 import { formatSalary } from "@/lib/utils";
 import { setPlayingThroughInjury } from "@/app/actions/roster";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { ratingTone, toneClass } from "@/lib/color-scale";
-import { TRADE_REQUEST_REASON_LABELS, type TradeRequestReason } from "@/lib/careers/player-demands";
-
-const SEVERITY_LABELS: Record<NonNullable<Player["injurySeverity"]>, string> = {
-  minor: "légère",
-  moderate: "modérée",
-  severe: "sévère",
-};
+import type { TradeRequestReason } from "@/lib/careers/player-demands";
 
 // Vue d'ensemble scannable de l'effectif — avatar/nationalité/gabarit/stats
 // de la saison. Le détail complet (les 10 attributs, contrat, historique,
@@ -31,16 +26,31 @@ export type RosterPlayer = Player & {
 
 type SortKey = "overallRating" | "age" | "heightCm" | "salary" | "yearsRemaining" | "ppg" | "rpg" | "apg";
 
-const COLUMNS: { key: SortKey; label: string }[] = [
-  { key: "overallRating", label: "Overall" },
-  { key: "heightCm", label: "Taille" },
-  { key: "age", label: "Âge" },
-  { key: "salary", label: "Salaire" },
-  { key: "yearsRemaining", label: "Ann. restantes" },
-  { key: "ppg", label: "Pts/match" },
-  { key: "rpg", label: "Reb/match" },
-  { key: "apg", label: "Pd/match" },
-];
+// Composant client : ne peut pas appeler getTranslator() (server-only), donc
+// tout le texte affiché arrive déjà traduit depuis le Server Component
+// appelant (voir teams/[teamId]/page.tsx) — jamais de fonction `t` passée en
+// prop à travers la frontière serveur/client, seulement des chaînes.
+export interface RosterTableLabels {
+  player: string;
+  position: string;
+  nationality: string;
+  overall: string;
+  height: string;
+  age: string;
+  salary: string;
+  yearsRemaining: string;
+  ppg: string;
+  rpg: string;
+  apg: string;
+  unavailable: string;
+  games: string;
+  rest: string;
+  playThroughInjury: string;
+  wantsTrade: string;
+  notGuaranteed: string;
+  severity: Record<NonNullable<Player["injurySeverity"]>, string>;
+  tradeReason: Record<TradeRequestReason, string>;
+}
 
 function valueFor(player: RosterPlayer, key: SortKey): number {
   return player[key];
@@ -50,11 +60,25 @@ export function RosterTable({
   teamId,
   roster,
   canRelease = false,
+  locale,
+  labels,
 }: {
   teamId: string;
   roster: RosterPlayer[];
   canRelease?: boolean;
+  locale: Locale;
+  labels: RosterTableLabels;
 }) {
+  const COLUMNS: { key: SortKey; label: string }[] = [
+    { key: "overallRating", label: labels.overall },
+    { key: "heightCm", label: labels.height },
+    { key: "age", label: labels.age },
+    { key: "salary", label: labels.salary },
+    { key: "yearsRemaining", label: labels.yearsRemaining },
+    { key: "ppg", label: labels.ppg },
+    { key: "rpg", label: labels.rpg },
+    { key: "apg", label: labels.apg },
+  ];
   const [sortKey, setSortKey] = useState<SortKey>("overallRating");
   const [descending, setDescending] = useState(true);
 
@@ -82,9 +106,9 @@ export function RosterTable({
         <thead>
           <tr className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
             <th className="py-2 pr-4" />
-            <th className="py-2 pr-4">Joueur</th>
-            <th className="py-2 pr-4">Poste</th>
-            <th className="py-2 pr-4">Nationalité</th>
+            <th className="py-2 pr-4">{labels.player}</th>
+            <th className="py-2 pr-4">{labels.position}</th>
+            <th className="py-2 pr-4">{labels.nationality}</th>
             {COLUMNS.map((col) => (
               <th key={col.key} className="py-2 pr-4">
                 <button
@@ -114,9 +138,9 @@ export function RosterTable({
                 </Link>
                 {player.injured && (
                   <span className="ml-2 rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-normal text-red-500">
-                    🩹 Indispo.{" "}
-                    {player.injurySeverity ? `(${SEVERITY_LABELS[player.injurySeverity]}, ` : "("}
-                    {player.injuryGamesRemaining} matchs)
+                    {labels.unavailable}{" "}
+                    {player.injurySeverity ? `(${labels.severity[player.injurySeverity]}, ` : "("}
+                    {player.injuryGamesRemaining} {labels.games})
                   </span>
                 )}
                 {player.injured && player.injurySeverity === "minor" && canRelease && (
@@ -131,16 +155,16 @@ export function RosterTable({
                       type="submit"
                       className="rounded-full border border-black/10 px-2 py-0.5 text-xs font-normal hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
                     >
-                      {player.playingThroughInjury ? "Mettre au repos" : "Jouer malgré la blessure"}
+                      {player.playingThroughInjury ? labels.rest : labels.playThroughInjury}
                     </button>
                   </form>
                 )}
                 {player.wantsTrade && (
                   <span
-                    title={player.tradeReasons.map((r) => TRADE_REQUEST_REASON_LABELS[r]).join(" · ")}
+                    title={player.tradeReasons.map((r) => labels.tradeReason[r]).join(" · ")}
                     className="ml-2 rounded-full bg-orange-500/10 px-2 py-0.5 text-xs font-normal text-orange-500"
                   >
-                    🚩 Veut être échangé
+                    {labels.wantsTrade}
                   </span>
                 )}
               </td>
@@ -152,10 +176,10 @@ export function RosterTable({
               <td className="py-2 pr-4">{player.heightCm} cm</td>
               <td className="py-2 pr-4">{player.age}</td>
               <td className="py-2 pr-4">
-                {formatSalary(player.salary)}
+                {formatSalary(player.salary, locale)}
                 {!player.guaranteed && (
                   <span className="ml-1 text-xs text-black/40 dark:text-white/40">
-                    (non garanti)
+                    {labels.notGuaranteed}
                   </span>
                 )}
               </td>

@@ -8,46 +8,37 @@ import { getStandings } from "@/lib/data-access/standings";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getTeamById } from "@/lib/data-access/teams";
 import { prisma } from "@/lib/prisma";
-import {
-  TRADE_REQUEST_REASON_LABELS,
-  minAcceptableSalary,
-  tradeRequestReasons,
-  winPctForStandings,
-} from "@/lib/careers/player-demands";
+import { minAcceptableSalary, tradeRequestReasons, winPctForStandings } from "@/lib/careers/player-demands";
 import { PlayerAvatar } from "@/components/team/PlayerAvatar";
 import { ExtendContractForm } from "@/components/team/ExtendContractForm";
 import { releasePlayer, offerAlternateContract } from "@/app/actions/roster";
 import { MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import {
-  ALT_CONTRACT_LABEL,
   ALT_CONTRACT_SLOTS_PER_TEAM,
   ALT_CONTRACT_TYPE,
   EXTENSION_MAX_YEARS_REMAINING,
   isEligibleForAlternateContract,
 } from "@/lib/careers/contract-type-rules";
 import { SALARY_RANGES } from "@/lib/careers/salary-rules";
+import { getTranslator, type Translator } from "@/lib/i18n/translate";
 import { formatSalary, teamFullName } from "@/lib/utils";
 import type { PlayerRatings } from "@/lib/types";
 import { inverseRatingTone, ratingTone, toneClass, type ScaleTone } from "@/lib/color-scale";
 
-const RATING_LABELS: Record<keyof PlayerRatings, string> = {
-  scoringInside: "Scoring intérieur",
-  scoringOutside: "Scoring extérieur",
-  playmaking: "Playmaking",
-  defenseInside: "Défense intérieure",
-  defenseOutside: "Défense extérieure",
-  rebounding: "Rebonds",
-  athleticism: "Athlétisme",
-  basketballIQ: "QI basket",
-  clutch: "Clutch",
-  stamina: "Stamina",
-};
-
-const REASON_LABELS: Record<string, string> = {
-  drafted: "Repêché",
-  signed: "Signé",
-  traded: "Échangé",
-};
+function ratingLabels(t: Translator): Record<keyof PlayerRatings, string> {
+  return {
+    scoringInside: t("rating.scoringInside"),
+    scoringOutside: t("rating.scoringOutside"),
+    playmaking: t("rating.playmaking"),
+    defenseInside: t("rating.defenseInside"),
+    defenseOutside: t("rating.defenseOutside"),
+    rebounding: t("rating.rebounding"),
+    athleticism: t("rating.athleticism"),
+    basketballIQ: t("rating.basketballIQ"),
+    clutch: t("rating.clutch"),
+    stamina: t("rating.stamina"),
+  };
+}
 
 export default async function PlayerDetailPage({
   params,
@@ -56,6 +47,7 @@ export default async function PlayerDetailPage({
 }) {
   const membership = await getCurrentMembership();
   const { teamId, playerId } = await params;
+  const { t, locale } = await getTranslator();
 
   const [team, player, contract] = await Promise.all([
     getTeamById(teamId),
@@ -97,6 +89,12 @@ export default async function PlayerDetailPage({
         isRookieScale: contract.isRookieScale,
       })
     : [];
+  const tradeReasonLabels: Record<(typeof reasons)[number], string> = {
+    salary: t("domain.tradeReason.salary"),
+    competitiveness: t("domain.tradeReason.competitiveness"),
+    market: t("domain.tradeReason.market"),
+    facilities: t("domain.tradeReason.facilities"),
+  };
 
   const canRelease =
     isMyTeam && (contract.contractType !== "standard" || standardRosterSize > MIN_ROSTER_SIZE);
@@ -109,12 +107,25 @@ export default async function PlayerDetailPage({
     ? contract.salary
     : minAcceptableSalary(player.renown, player.overallRating, team.leagueId);
   const altType = ALT_CONTRACT_TYPE[team.leagueId];
+  const altTypeLabel = altType ? t(`domain.contractType.${altType}` as const) : "";
+  const contractTypeLabels: Record<string, string> = {
+    standard: t("domain.contractType.standard"),
+    two_way: t("domain.contractType.two_way"),
+    development: t("domain.contractType.development"),
+  };
+  const stintReasonLabels: Record<string, string> = {
+    drafted: t("domain.stintReason.drafted"),
+    signed: t("domain.stintReason.signed"),
+    traded: t("domain.stintReason.traded"),
+  };
   const canOfferAlternate =
     isMyTeam &&
     contract.contractType === "standard" &&
     !!altType &&
     isEligibleForAlternateContract(player.age) &&
     altSlotsUsed < ALT_CONTRACT_SLOTS_PER_TEAM;
+
+  const ratingLabel = ratingLabels(t);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -125,17 +136,18 @@ export default async function PlayerDetailPage({
             #{player.jerseyNumber} {player.firstName} {player.lastName}
           </h1>
           <p className="text-sm text-black/50 dark:text-white/50">
-            {teamFullName(team)} · {player.position} · {player.heightCm} cm · {player.age} ans · {player.nationality}
+            {teamFullName(team)} · {player.position} · {player.heightCm} cm ·{" "}
+            {t("player.ageLabel", { age: player.age })} · {player.nationality}
           </p>
         </div>
       </div>
 
       {reasons.length > 0 && (
         <div className="mt-4 rounded-lg border border-orange-500/30 bg-orange-500/5 p-3 text-sm text-orange-600 dark:text-orange-400">
-          <p className="font-medium">🚩 Veut être échangé</p>
+          <p className="font-medium">{t("player.wantsTradeHeading")}</p>
           <ul className="mt-1 list-inside list-disc">
             {reasons.map((reason) => (
-              <li key={reason}>{TRADE_REQUEST_REASON_LABELS[reason]}</li>
+              <li key={reason}>{tradeReasonLabels[reason]}</li>
             ))}
           </ul>
         </div>
@@ -143,59 +155,60 @@ export default async function PlayerDetailPage({
 
       <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
-          Statistiques de la saison
+          {t("player.seasonStats")}
         </h2>
         <div className="flex flex-wrap gap-6">
-          <Stat label="Matchs joués" value={stats.gamesPlayed} />
-          <Stat label="Points/match" value={stats.ppg} />
-          <Stat label="Rebonds/match" value={stats.rpg} />
-          <Stat label="Passes/match" value={stats.apg} />
+          <Stat label={t("player.gamesPlayed")} value={stats.gamesPlayed} />
+          <Stat label={t("player.pointsPerGame")} value={stats.ppg} />
+          <Stat label={t("player.reboundsPerGame")} value={stats.rpg} />
+          <Stat label={t("player.assistsPerGame")} value={stats.apg} />
         </div>
       </div>
 
       <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
-          Attributs
+          {t("player.attributes")}
         </h2>
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
-          <Stat label="Overall" value={player.overallRating} bold tone={ratingTone(player.overallRating)} />
-          {(Object.keys(RATING_LABELS) as (keyof PlayerRatings)[]).map((key) => (
+          <Stat label={t("player.overall")} value={player.overallRating} bold tone={ratingTone(player.overallRating)} />
+          {(Object.keys(ratingLabel) as (keyof PlayerRatings)[]).map((key) => (
             <Stat
               key={key}
-              label={RATING_LABELS[key]}
+              label={ratingLabel[key]}
               value={player.ratings[key]}
               tone={ratingTone(player.ratings[key])}
             />
           ))}
-          <Stat label="Risque blessure" value={player.injuryRisk} tone={inverseRatingTone(player.injuryRisk)} />
-          <Stat label="Renommé" value={player.renown} tone={ratingTone(player.renown)} />
-          <Stat label="Fatigue" value={player.fatigue} tone={inverseRatingTone(player.fatigue)} />
-          <Stat label="Conditionnement" value={player.conditioning} tone={ratingTone(player.conditioning)} />
+          <Stat label={t("player.injuryRisk")} value={player.injuryRisk} tone={inverseRatingTone(player.injuryRisk)} />
+          <Stat label={t("player.renown")} value={player.renown} tone={ratingTone(player.renown)} />
+          <Stat label={t("player.fatigue")} value={player.fatigue} tone={inverseRatingTone(player.fatigue)} />
+          <Stat label={t("player.conditioning")} value={player.conditioning} tone={ratingTone(player.conditioning)} />
           {player.trainingBoost > 0 && player.trainingBoostFocus && (
-            <Stat label="Bonus entraînement" value={`+${player.trainingBoost}`} />
+            <Stat label={t("player.trainingBonus")} value={`+${player.trainingBoost}`} />
           )}
         </div>
       </div>
 
       <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
-          Contrat
+          {t("player.contract")}
         </h2>
         <p className="text-xl font-semibold">
-          {formatSalary(contract.salary)}
+          {formatSalary(contract.salary, locale)}
           <span className="ml-2 text-sm font-normal text-black/50 dark:text-white/50">
-            {contract.yearsRemaining} an{contract.yearsRemaining > 1 ? "s" : ""} restant
-            {contract.yearsRemaining > 1 ? "s" : ""}
+            {t(contract.yearsRemaining > 1 ? "player.yearsRemainingMany" : "player.yearRemainingOne", {
+              count: contract.yearsRemaining,
+            })}
           </span>
         </p>
         <p className="mt-1 text-sm text-black/50 dark:text-white/50">
-          {ALT_CONTRACT_LABEL[contract.contractType]}
-          {!contract.guaranteed && " · non garanti"}
+          {contractTypeLabels[contract.contractType]}
+          {!contract.guaranteed && t("player.notGuaranteedSuffix")}
         </p>
 
         {canExtend && (
           <div className="mt-4 rounded-lg border border-black/10 p-3 dark:border-white/10">
-            <p className="text-sm font-medium">Proposer une prolongation</p>
+            <p className="text-sm font-medium">{t("player.proposeExtension")}</p>
             <ExtendContractForm
               playerId={player.id}
               minSalary={salaryRange.min}
@@ -203,6 +216,13 @@ export default async function PlayerDetailPage({
               suggestedSalary={suggestedSalary}
               suggestedYears={2}
               isRookieScale={contract.isRookieScale}
+              labels={{
+                proposedSalary: t("extend.proposedSalary"),
+                duration: t("extend.duration"),
+                proposing: t("common.proposing"),
+                proposeButton: t("extend.proposeButton"),
+                rookieNote: t("extend.rookieNote"),
+              }}
             />
           </div>
         )}
@@ -216,7 +236,7 @@ export default async function PlayerDetailPage({
                   type="submit"
                   className="rounded-full border border-red-500/30 px-4 py-1.5 text-sm font-medium text-red-500 hover:bg-red-500/10"
                 >
-                  Couper
+                  {t("player.cut")}
                 </button>
               </form>
             )}
@@ -227,7 +247,7 @@ export default async function PlayerDetailPage({
                   type="submit"
                   className="rounded-full border border-black/10 px-4 py-1.5 text-sm font-medium hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
                 >
-                  Proposer un contrat {ALT_CONTRACT_LABEL[altType]}
+                  {t("player.proposeAltContract", { type: altTypeLabel })}
                 </button>
               </form>
             )}
@@ -237,12 +257,10 @@ export default async function PlayerDetailPage({
 
       <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
-          Anciens clubs
+          {t("player.formerClubs")}
         </h2>
         {stints.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">
-            Aucun historique enregistré (disponible à partir du prochain repêchage/signature/échange).
-          </p>
+          <p className="text-sm text-black/50 dark:text-white/50">{t("player.noHistory")}</p>
         ) : (
           <ul className="space-y-1 text-sm">
             {stints.map((stint) => (
@@ -251,7 +269,7 @@ export default async function PlayerDetailPage({
                   {stint.teamCity} {stint.teamName} ({stint.teamAbbreviation})
                 </span>
                 <span className="text-black/50 dark:text-white/50">
-                  {stint.season} · {REASON_LABELS[stint.reason] ?? stint.reason}
+                  {stint.season} · {stintReasonLabels[stint.reason] ?? stint.reason}
                 </span>
               </li>
             ))}

@@ -30,15 +30,15 @@ function setTheme(dark: boolean): void {
   listeners.forEach((listener) => listener());
 }
 
-export function ThemeToggle() {
+export function ThemeToggle({ toLightLabel, toDarkLabel }: { toLightLabel: string; toDarkLabel: string }) {
   const isDark = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   return (
     <button
       type="button"
       onClick={() => setTheme(!isDark)}
-      aria-label={isDark ? "Passer en thème clair" : "Passer en thème sombre"}
-      title={isDark ? "Thème clair" : "Thème sombre"}
+      aria-label={isDark ? toLightLabel : toDarkLabel}
+      title={isDark ? toLightLabel : toDarkLabel}
       className="text-sm text-black/50 transition hover:text-black dark:text-white/50 dark:hover:text-white"
     >
       {isDark ? "☀️" : "🌙"}

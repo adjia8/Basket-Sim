@@ -3,18 +3,20 @@ import { getCurrentMembership } from "@/lib/auth/dal";
 import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { prisma } from "@/lib/prisma";
+import { getTranslator } from "@/lib/i18n/translate";
+import type { DictionaryKey } from "@/lib/i18n/dictionary";
 import { teamFullName } from "@/lib/utils";
 import type { Team } from "@/lib/types";
 
-const ROUND_LABELS: Record<string, string> = {
-  "play-in-7-8": "Play-in (7 vs 8)",
-  "play-in-9-10": "Play-in (9 vs 10)",
-  "play-in-final": "Play-in (finale — 8e place)",
-  "round-1": "1er tour",
-  "conf-semis": "Demi-finale de conférence",
-  "conf-finals": "Finale de conférence",
-  semifinals: "Demi-finale",
-  finals: "Finale",
+const ROUND_KEYS: Record<string, DictionaryKey> = {
+  "play-in-7-8": "playoffsPage.round.playIn78",
+  "play-in-9-10": "playoffsPage.round.playIn910",
+  "play-in-final": "playoffsPage.round.playInFinal",
+  "round-1": "playoffsPage.round.round1",
+  "conf-semis": "playoffsPage.round.confSemis",
+  "conf-finals": "playoffsPage.round.confFinals",
+  semifinals: "playoffsPage.round.semifinals",
+  finals: "playoffsPage.round.finals",
 };
 
 const NBA_ROUND_ORDER = [
@@ -28,13 +30,14 @@ const NBA_ROUND_ORDER = [
 ];
 const WNBA_ROUND_ORDER = ["round-1", "semifinals", "finals"];
 
-const CONFERENCE_LABELS: Record<string, string> = {
-  "nba-east": "Conférence Est",
-  "nba-west": "Conférence Ouest",
+const CONFERENCE_KEYS: Record<string, DictionaryKey> = {
+  "nba-east": "playoffsPage.conference.nbaEast",
+  "nba-west": "playoffsPage.conference.nbaWest",
 };
 
 export default async function PlayoffsPage() {
   const membership = await getCurrentMembership();
+  const { t } = await getTranslator();
   const playoffs = await getOrAdvancePlayoffs(
     membership.careerId,
     membership.season,
@@ -44,10 +47,8 @@ export default async function PlayoffsPage() {
   if (!playoffs) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="text-2xl font-bold">Playoffs</h1>
-        <p className="mt-4 text-sm text-black/50 dark:text-white/50">
-          La saison régulière n&apos;est pas encore terminée.
-        </p>
+        <h1 className="text-2xl font-bold">{t("playoffsPage.title")}</h1>
+        <p className="mt-4 text-sm text-black/50 dark:text-white/50">{t("playoffsPage.regularSeasonNotOver")}</p>
       </div>
     );
   }
@@ -71,10 +72,10 @@ export default async function PlayoffsPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-8 px-4 py-8">
       <div>
-        <h1 className="text-2xl font-bold">Playoffs</h1>
+        <h1 className="text-2xl font-bold">{t("playoffsPage.title")}</h1>
         {championTeam && (
           <p className="mt-2 text-sm font-medium">
-            🏆 Champion : {teamFullName(championTeam)}
+            {t("playoffsPage.championPrefix")} {teamFullName(championTeam)}
           </p>
         )}
       </div>
@@ -91,7 +92,7 @@ export default async function PlayoffsPage() {
 
         return (
           <section key={round}>
-            <h2 className="mb-3 text-lg font-semibold">{ROUND_LABELS[round] ?? round}</h2>
+            <h2 className="mb-3 text-lg font-semibold">{ROUND_KEYS[round] ? t(ROUND_KEYS[round]) : round}</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               {roundSeries.map((series) => {
                 const homeTeam = teamsById.get(series.homeTeamId);
@@ -106,7 +107,7 @@ export default async function PlayoffsPage() {
                   >
                     {series.conference && (
                       <p className="mb-1 text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
-                        {CONFERENCE_LABELS[series.conference] ?? series.conference}
+                        {CONFERENCE_KEYS[series.conference] ? t(CONFERENCE_KEYS[series.conference]) : series.conference}
                       </p>
                     )}
                     <SeriesLine
@@ -123,17 +124,17 @@ export default async function PlayoffsPage() {
                     />
                     <p className="mt-2 text-xs text-black/50 dark:text-white/50">
                       {series.bestOf === 1
-                        ? "Match unique"
-                        : `Au meilleur des ${series.bestOf}`}
+                        ? t("playoffsPage.singleGame")
+                        : `${t("playoffsPage.bestOfPrefix")} ${series.bestOf}`}
                     </p>
                     {series.winnerTeamId ? (
-                      <p className="mt-2 text-sm font-medium">Série terminée</p>
+                      <p className="mt-2 text-sm font-medium">{t("playoffsPage.seriesOver")}</p>
                     ) : nextGame ? (
                       <Link
                         href={`/game/${nextGame.id}`}
                         className="mt-2 inline-block text-sm underline underline-offset-2"
                       >
-                        Voir le prochain match →
+                        {t("playoffsPage.viewNextGame")}
                       </Link>
                     ) : null}
                   </div>

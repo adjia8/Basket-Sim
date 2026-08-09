@@ -3,12 +3,25 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+// Composant client : tout le texte arrive déjà traduit en props depuis le
+// Server Component appelant (voir game/[gameId]/page.tsx).
+export interface SimulateButtonLabels {
+  simulate: string;
+  simulating: string;
+  waitingForPrefix: string;
+  simulationFailed: string;
+  unknownError: string;
+  otherManagerFallback: string;
+}
+
 export function SimulateButton({
   gameId,
   initialWaitingFor,
+  labels,
 }: {
   gameId: string;
   initialWaitingFor?: string | null;
+  labels: SimulateButtonLabels;
 }) {
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,15 +39,15 @@ export function SimulateButton({
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error(data?.error ?? "La simulation a échoué");
+        throw new Error(data?.error ?? labels.simulationFailed);
       }
       if (data?.simulated) {
         router.refresh();
       } else {
-        setWaitingFor(data?.waitingFor ?? "l'autre manager");
+        setWaitingFor(data?.waitingFor ?? labels.otherManagerFallback);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur inconnue");
+      setError(err instanceof Error ? err.message : labels.unknownError);
     } finally {
       setIsPending(false);
     }
@@ -43,7 +56,7 @@ export function SimulateButton({
   if (waitingFor) {
     return (
       <p className="text-sm text-black/50 dark:text-white/50">
-        En attente de {waitingFor}…
+        {labels.waitingForPrefix} {waitingFor}…
       </p>
     );
   }
@@ -56,7 +69,7 @@ export function SimulateButton({
         disabled={isPending}
         className="rounded-full bg-black px-6 py-2 font-medium text-white transition hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/80"
       >
-        {isPending ? "Simulation…" : "Simuler le match"}
+        {isPending ? labels.simulating : labels.simulate}
       </button>
       {error && <p className="text-sm text-red-500">{error}</p>}
     </div>

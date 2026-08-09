@@ -27,6 +27,7 @@ import {
   EXTENSION_MIN_OFFER_YEARS,
   isEligibleForAlternateContract,
 } from "@/lib/careers/contract-type-rules";
+import { getTranslator } from "@/lib/i18n/translate";
 import { formatSalary } from "@/lib/utils";
 
 function revalidateRosterPaths(teamId: string) {
@@ -209,6 +210,7 @@ export async function extendContract(
   formData: FormData
 ): Promise<ExtendContractFormState> {
   const { userId } = await verifySession();
+  const { t, locale } = await getTranslator();
   const playerId = String(formData.get("playerId") ?? "");
   const salary = Math.round(Number(formData.get("salary")));
   const years = Math.round(Number(formData.get("years")));
@@ -217,15 +219,15 @@ export async function extendContract(
     where: { userId },
     include: { career: true },
   });
-  if (!membership) return { error: "Aucune carrière." };
+  if (!membership) return { error: t("rosterAction.noCareer") };
 
   const contract = await prisma.contract.findUnique({
     where: { careerId_playerId: { careerId: membership.careerId, playerId } },
   });
-  if (!contract || contract.teamId !== membership.teamId) return { error: "Contrat introuvable." };
-  if (contract.contractType !== "standard") return { error: "Seul un contrat standard peut être prolongé." };
+  if (!contract || contract.teamId !== membership.teamId) return { error: t("rosterAction.contractNotFound") };
+  if (contract.contractType !== "standard") return { error: t("rosterAction.onlyStandardExtendable") };
   if (contract.yearsRemaining > EXTENSION_MAX_YEARS_REMAINING) {
-    return { error: "Ce joueur n'est pas encore éligible à une prolongation." };
+    return { error: t("rosterAction.notYetEligible") };
   }
   if (
     !Number.isFinite(salary) ||
@@ -234,7 +236,7 @@ export async function extendContract(
     years < EXTENSION_MIN_OFFER_YEARS ||
     years > EXTENSION_MAX_OFFER_YEARS
   ) {
-    return { error: "Offre invalide." };
+    return { error: t("rosterAction.invalidOffer") };
   }
 
   const [player, playerState, currentPayroll, league, standings, myTeam, myTeamState] = await Promise.all([
@@ -248,14 +250,14 @@ export async function extendContract(
     getTeamById(membership.teamId),
     getOrCreateTeamState(membership.careerId, membership.teamId, membership.career.leagueId),
   ]);
-  if (!player || !myTeam) return { error: "Données introuvables." };
+  if (!player || !myTeam) return { error: t("rosterAction.dataNotFound") };
 
   const playerName = `${player.firstName} ${player.lastName}`;
   const salaryCap = league?.salaryCap ?? Infinity;
   // L'ancien salaire de ce joueur est déjà compté dans currentPayroll (contrat
   // standard) — on le retire avant d'ajouter le nouveau montant proposé.
   if (currentPayroll - contract.salary + salary > salaryCap) {
-    return { error: `Cette offre ferait dépasser le plafond salarial (${formatSalary(salaryCap)}).` };
+    return { error: t("rosterAction.exceedsCap", { cap: formatSalary(salaryCap, locale) }) };
   }
 
   const overallRating = playerState?.overallRating ?? player.overallRating;
@@ -272,15 +274,13 @@ export async function extendContract(
         teamFacilitiesLevel: myTeamState.facilitiesLevel,
       })
     ) {
-      return {
-        error: `${playerName} refuse de négocier : il n'est pas satisfait du projet sportif de l'équipe.`,
-      };
+      return { error: t("rosterAction.refusesToNegotiate", { player: playerName }) };
     }
 
     const floor = minAcceptableSalary(renown, overallRating, membership.career.leagueId);
     if (salary < floor) {
       return {
-        error: `${playerName} refuse cette offre : il exige au moins ${formatSalary(floor)} par saison.`,
+        error: t("rosterAction.refusesOffer", { player: playerName, amount: formatSalary(floor, locale) }),
       };
     }
   }
@@ -294,7 +294,11 @@ export async function extendContract(
 
   revalidateRosterPaths(membership.teamId);
   return {
-    success: `${playerName} a accepté la prolongation : ${formatSalary(salary)} sur ${years} an${years > 1 ? "s" : ""}.`,
+    success: t(years > 1 ? "rosterAction.acceptedMany" : "rosterAction.acceptedOne", {
+      player: playerName,
+      amount: formatSalary(salary, locale),
+      years,
+    }),
   };
 }
 

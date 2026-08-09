@@ -23,34 +23,36 @@ import {
   type TrainingIntensity,
 } from "@/lib/careers/training-rules";
 import { moraleBonus } from "@/lib/careers/press-rules";
+import { getTranslator } from "@/lib/i18n/translate";
 
 export async function POST(request: Request) {
+  const { t, locale } = await getTranslator();
   const session = await getSession();
   if (!session?.userId) {
-    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+    return NextResponse.json({ error: t("simulateAction.notAuthenticated") }, { status: 401 });
   }
 
   const membership = await prisma.membership.findUnique({
     where: { userId: session.userId },
   });
   if (!membership) {
-    return NextResponse.json({ error: "Aucune carrière" }, { status: 404 });
+    return NextResponse.json({ error: t("simulateAction.noCareer") }, { status: 404 });
   }
 
   const body = await request.json().catch(() => null);
   const gameId = body?.gameId;
 
   if (!gameId || typeof gameId !== "string") {
-    return NextResponse.json({ error: "gameId manquant" }, { status: 400 });
+    return NextResponse.json({ error: t("simulateAction.missingGameId") }, { status: 400 });
   }
 
   const game = await getGameById(membership.careerId, gameId);
   if (!game) {
-    return NextResponse.json({ error: "Match introuvable" }, { status: 404 });
+    return NextResponse.json({ error: t("simulateAction.gameNotFound") }, { status: 404 });
   }
   if (game.status === "final") {
     return NextResponse.json(
-      { error: "Ce match a déjà été joué" },
+      { error: t("simulateAction.alreadyPlayed") },
       { status: 409 }
     );
   }
@@ -72,7 +74,7 @@ export async function POST(request: Request) {
   // je suis un simple spectateur du match d'un autre manager.
   if (!side && (homeManager || awayManager)) {
     return NextResponse.json(
-      { error: "Tu ne gères aucune des deux équipes de ce match" },
+      { error: t("simulateAction.notYourGame") },
       { status: 403 }
     );
   }
@@ -81,7 +83,7 @@ export async function POST(request: Request) {
     ? await setGameReady(membership.careerId, gameId, side)
     : game;
   if (!updatedGame) {
-    return NextResponse.json({ error: "Match introuvable" }, { status: 404 });
+    return NextResponse.json({ error: t("simulateAction.gameNotFound") }, { status: 404 });
   }
 
   // Un camp géré par l'IA est toujours "prêt".
@@ -104,7 +106,7 @@ export async function POST(request: Request) {
   ]);
 
   if (!homeTeam || !awayTeam) {
-    return NextResponse.json({ error: "Équipe introuvable" }, { status: 404 });
+    return NextResponse.json({ error: t("simulateAction.teamNotFound") }, { status: 404 });
   }
 
   const gameDate = new Date(updatedGame.gameDate);
@@ -215,10 +217,10 @@ export async function POST(request: Request) {
   // pour les équipes gérées par un humain, jamais pour un match IA-vs-IA.
   await Promise.all([
     homeManager
-      ? maybeCreatePressConference(membership.careerId, updatedGame.homeTeamId, updatedGame.leagueId, gameDate)
+      ? maybeCreatePressConference(membership.careerId, updatedGame.homeTeamId, updatedGame.leagueId, gameDate, locale)
       : Promise.resolve(),
     awayManager
-      ? maybeCreatePressConference(membership.careerId, updatedGame.awayTeamId, updatedGame.leagueId, gameDate)
+      ? maybeCreatePressConference(membership.careerId, updatedGame.awayTeamId, updatedGame.leagueId, gameDate, locale)
       : Promise.resolve(),
   ]);
 

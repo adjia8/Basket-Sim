@@ -3,10 +3,12 @@ import { getFreeAgentReport } from "@/lib/data-access/free-agent-report";
 import { getProspectsForCareer } from "@/lib/data-access/prospects";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { prisma } from "@/lib/prisma";
+import { getTranslator } from "@/lib/i18n/translate";
 import { formatSalary } from "@/lib/utils";
 
 export default async function SeasonRecapPage() {
   const membership = await getCurrentMembership();
+  const { t, locale } = await getTranslator();
 
   const [freeAgentReport, prospects, teams, retirees] = await Promise.all([
     getFreeAgentReport(membership.careerId, membership.leagueId, membership.season),
@@ -24,28 +26,25 @@ export default async function SeasonRecapPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-10 px-4 py-8">
       <div>
-        <h1 className="text-2xl font-bold">Bilan de fin de saison</h1>
-        <p className="mt-1 text-black/60 dark:text-white/60">
-          Agents libres, prochaine classe de draft, et retraites/Hall of Fame — le
-          plus pertinent juste après avoir basculé sur une nouvelle saison.
-        </p>
+        <h1 className="text-2xl font-bold">{t("seasonRecap.title")}</h1>
+        <p className="mt-1 text-black/60 dark:text-white/60">{t("seasonRecap.subtitle")}</p>
       </div>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Agents libres</h2>
+        <h2 className="mb-3 text-lg font-semibold">{t("seasonRecap.freeAgentsHeading")}</h2>
         {freeAgentReport.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">Aucun agent libre pour le moment.</p>
+          <p className="text-sm text-black/50 dark:text-white/50">{t("seasonRecap.noFreeAgents")}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead>
                 <tr className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
-                  <th className="py-2 pr-4">Joueur</th>
-                  <th className="py-2 pr-4">Overall</th>
-                  <th className="py-2 pr-4">Renommé</th>
-                  <th className="py-2 pr-4">Contrat visé</th>
-                  <th className="py-2 pr-4">Préférences</th>
-                  <th className="py-2">Équipes intéressées</th>
+                  <th className="py-2 pr-4">{t("seasonRecap.colPlayer")}</th>
+                  <th className="py-2 pr-4">{t("seasonRecap.colOverall")}</th>
+                  <th className="py-2 pr-4">{t("seasonRecap.colRenown")}</th>
+                  <th className="py-2 pr-4">{t("seasonRecap.colDesiredContract")}</th>
+                  <th className="py-2 pr-4">{t("seasonRecap.colPreferences")}</th>
+                  <th className="py-2">{t("seasonRecap.colInterestedTeams")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -56,19 +55,19 @@ export default async function SeasonRecapPage() {
                     </td>
                     <td className="py-2 pr-4">{player.overallRating}</td>
                     <td className="py-2 pr-4">{player.renown}</td>
-                    <td className="py-2 pr-4">{formatSalary(desiredContract)}</td>
+                    <td className="py-2 pr-4">{formatSalary(desiredContract, locale)}</td>
                     <td className="py-2 pr-4 text-xs text-black/60 dark:text-white/60">
                       {[
-                        wantsCompetitiveTeam && "compétitive",
-                        wantsAttractiveMarket && "grand marché",
-                        wantsGoodFacilities && "bonnes infrastructures",
+                        wantsCompetitiveTeam && t("seasonRecap.prefCompetitive"),
+                        wantsAttractiveMarket && t("seasonRecap.prefBigMarket"),
+                        wantsGoodFacilities && t("seasonRecap.prefGoodFacilities"),
                       ]
                         .filter(Boolean)
                         .join(", ") || "—"}
                     </td>
                     <td className="py-2 text-xs">
                       {interestedTeamIds.length === 0
-                        ? "Aucune"
+                        ? t("seasonRecap.none")
                         : interestedTeamIds
                             .map((id) => teamById.get(id)?.abbreviation ?? id)
                             .join(", ")}
@@ -82,22 +81,19 @@ export default async function SeasonRecapPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Prochaine classe de draft</h2>
+        <h2 className="mb-3 text-lg font-semibold">{t("seasonRecap.nextDraftClassHeading")}</h2>
         {prospects.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">
-            Aucune classe de draft générée pour le moment — passe à la saison
-            suivante pour en obtenir une.
-          </p>
+          <p className="text-sm text-black/50 dark:text-white/50">{t("seasonRecap.noDraftClass")}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px] text-left text-sm">
               <thead>
                 <tr className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
-                  <th className="py-2 pr-4">Prospect</th>
-                  <th className="py-2 pr-4">Poste</th>
-                  <th className="py-2 pr-4">Overall</th>
-                  <th className="py-2 pr-4">Âge</th>
-                  <th className="py-2">Scouting</th>
+                  <th className="py-2 pr-4">{t("seasonRecap.colProspect")}</th>
+                  <th className="py-2 pr-4">{t("seasonRecap.colPosition")}</th>
+                  <th className="py-2 pr-4">{t("seasonRecap.colOverall")}</th>
+                  <th className="py-2 pr-4">{t("seasonRecap.colAge")}</th>
+                  <th className="py-2">{t("seasonRecap.colScouting")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -121,11 +117,9 @@ export default async function SeasonRecapPage() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Hall of Fame &amp; retraites</h2>
+        <h2 className="mb-3 text-lg font-semibold">{t("seasonRecap.hallOfFameHeading")}</h2>
         {retirees.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">
-            Personne n&apos;a pris sa retraite à la dernière intersaison.
-          </p>
+          <p className="text-sm text-black/50 dark:text-white/50">{t("seasonRecap.noRetirees")}</p>
         ) : (
           <div className="space-y-2">
             {retirees.map((state) => (
@@ -136,15 +130,15 @@ export default async function SeasonRecapPage() {
                 <span>
                   {state.player.firstName} {state.player.lastName}
                   <span className="ml-2 text-xs text-black/50 dark:text-white/50">
-                    (overall au sommet : {state.peakOverallRating})
+                    ({t("seasonRecap.peakOverallPrefix")} {state.peakOverallRating})
                   </span>
                 </span>
                 {state.hallOfFame ? (
                   <span className="rounded-full bg-yellow-500/10 px-2 py-0.5 text-xs font-medium text-yellow-600 dark:text-yellow-400">
-                    🏆 Hall of Fame
+                    {t("seasonRecap.hallOfFame")}
                   </span>
                 ) : (
-                  <span className="text-xs text-black/40 dark:text-white/40">Retraite</span>
+                  <span className="text-xs text-black/40 dark:text-white/40">{t("seasonRecap.retired")}</span>
                 )}
               </div>
             ))}
@@ -152,11 +146,7 @@ export default async function SeasonRecapPage() {
         )}
       </section>
 
-      <p className="text-xs text-black/40 dark:text-white/40">
-        Les équipes intéressées et les préférences affichées sont indicatives
-        — elles reflètent les règles de signature déjà en vigueur
-        (compétitivité, marché, infrastructures, salaire).
-      </p>
+      <p className="text-xs text-black/40 dark:text-white/40">{t("seasonRecap.footnote")}</p>
     </div>
   );
 }

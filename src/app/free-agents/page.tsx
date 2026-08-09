@@ -13,10 +13,12 @@ import {
   teamMeetsPlayerDemands,
   winPctForStandings,
 } from "@/lib/careers/player-demands";
+import { getTranslator } from "@/lib/i18n/translate";
 import { formatSalary } from "@/lib/utils";
 
 export default async function FreeAgentsPage() {
   const membership = await getCurrentMembership();
+  const { t, locale } = await getTranslator();
 
   const [freeAgents, rosterSize, payroll, league, faOpen, standings, myTeam, myTeamState] = await Promise.all([
     getFreeAgents(membership.careerId, membership.leagueId),
@@ -45,49 +47,36 @@ export default async function FreeAgentsPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="text-2xl font-bold">Agents libres</h1>
-      <p className="mt-1 text-black/60 dark:text-white/60">
-        Joueurs de ta ligue actuellement sans contrat.
-      </p>
+      <h1 className="text-2xl font-bold">{t("freeAgents.title")}</h1>
+      <p className="mt-1 text-black/60 dark:text-white/60">{t("freeAgents.subtitle")}</p>
 
       <p className="mt-4 text-sm text-black/60 dark:text-white/60">
-        Masse salariale :{" "}
+        {t("freeAgents.payrollPrefix")}{" "}
         <span className={capReached ? "font-semibold text-red-500" : "font-semibold"}>
-          {formatSalary(payroll)} / {formatSalary(salaryCap)}
+          {formatSalary(payroll, locale)} / {formatSalary(salaryCap, locale)}
         </span>
       </p>
 
-      {!faOpen && (
-        <p className="mt-2 text-sm text-red-500">
-          Free agency pas encore ouverte — termine le draft de cette saison
-          avant de pouvoir signer des agents libres.
-        </p>
-      )}
+      {!faOpen && <p className="mt-2 text-sm text-red-500">{t("freeAgents.notOpenYet")}</p>}
       {rosterFull && (
         <p className="mt-2 text-sm text-red-500">
-          Effectif complet ({rosterSize} / {MAX_ROSTER_SIZE}) — libère un joueur
-          pour pouvoir en signer un autre.
+          {t("freeAgents.rosterFull", { size: rosterSize, max: MAX_ROSTER_SIZE })}
         </p>
       )}
-      {capReached && (
-        <p className="mt-2 text-sm text-red-500">
-          Plafond salarial atteint — libère un joueur pour dégager de la marge
-          avant de signer.
-        </p>
-      )}
+      {capReached && <p className="mt-2 text-sm text-red-500">{t("freeAgents.capReached")}</p>}
 
       <div className="mt-6 overflow-x-auto">
         <table className="w-full min-w-[560px] text-left text-sm">
           <thead>
             <tr className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
-              <th className="py-2 pr-4">Joueur</th>
-              <th className="py-2 pr-4">Poste</th>
-              <th className="py-2 pr-4">Overall</th>
-              <th className="py-2 pr-4">Âge</th>
-              <th className="py-2 pr-4">Risque blessure</th>
-              <th className="py-2 pr-4">Renommé</th>
-              <th className="py-2 pr-4">Exigence salariale</th>
-              {canSign && <th className="py-2">Action</th>}
+              <th className="py-2 pr-4">{t("freeAgents.colPlayer")}</th>
+              <th className="py-2 pr-4">{t("freeAgents.colPosition")}</th>
+              <th className="py-2 pr-4">{t("freeAgents.colOverall")}</th>
+              <th className="py-2 pr-4">{t("freeAgents.colAge")}</th>
+              <th className="py-2 pr-4">{t("freeAgents.colInjuryRisk")}</th>
+              <th className="py-2 pr-4">{t("freeAgents.colRenown")}</th>
+              <th className="py-2 pr-4">{t("freeAgents.colSalaryDemand")}</th>
+              {canSign && <th className="py-2">{t("freeAgents.colAction")}</th>}
             </tr>
           </thead>
           <tbody>
@@ -116,12 +105,12 @@ export default async function FreeAgentsPage() {
                     {player.injuryRisk}
                     {player.injured && (
                       <span className="ml-1 text-xs text-red-500">
-                        🩹 indispo. ({player.injuryGamesRemaining})
+                        {t("roster.unavailable")} ({player.injuryGamesRemaining})
                       </span>
                     )}
                   </td>
                   <td className="py-2 pr-4">{player.renown}</td>
-                  <td className="py-2 pr-4">{formatSalary(expectedSalary)}</td>
+                  <td className="py-2 pr-4">{formatSalary(expectedSalary, locale)}</td>
                   {canSign && (
                     <td className="py-2">
                       {meetsDemands ? (
@@ -131,13 +120,11 @@ export default async function FreeAgentsPage() {
                             type="submit"
                             className="rounded-full bg-black px-3 py-1 text-xs font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
                           >
-                            Signer
+                            {t("freeAgents.sign")}
                           </button>
                         </form>
                       ) : (
-                        <span className="text-xs text-red-500">
-                          Refuse : équipe pas assez compétitive, marché ou infrastructures pas assez attractifs
-                        </span>
+                        <span className="text-xs text-red-500">{t("freeAgents.refuses")}</span>
                       )}
                     </td>
                   )}
@@ -147,9 +134,7 @@ export default async function FreeAgentsPage() {
           </tbody>
         </table>
         {freeAgents.length === 0 && (
-          <p className="mt-4 text-sm text-black/50 dark:text-white/50">
-            Aucun agent libre pour le moment.
-          </p>
+          <p className="mt-4 text-sm text-black/50 dark:text-white/50">{t("freeAgents.none")}</p>
         )}
       </div>
     </div>

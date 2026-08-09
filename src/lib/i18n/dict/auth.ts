@@ -1,0 +1,55 @@
+export const keys = [
+  "auth.email",
+  "auth.password",
+  "auth.passwordMinLength",
+  "auth.loginButton",
+  "auth.loggingIn",
+  "auth.noAccountYet",
+  "auth.createAccount",
+  "auth.registerButton",
+  "auth.registering",
+  "auth.alreadyAccount",
+  "auth.loginPageTitle",
+  "auth.invalidEmail",
+  "auth.passwordTooShort",
+  "auth.emailTaken",
+  "auth.invalidCredentials",
+] as const;
+
+export type AuthKey = (typeof keys)[number];
+
+export const fr: Record<AuthKey, string> = {
+  "auth.email": "Email",
+  "auth.password": "Mot de passe",
+  "auth.passwordMinLength": "8 caractères minimum.",
+  "auth.loginButton": "Se connecter",
+  "auth.loggingIn": "Connexion…",
+  "auth.noAccountYet": "Pas encore de compte ?",
+  "auth.createAccount": "Créer un compte",
+  "auth.registerButton": "Créer mon compte",
+  "auth.registering": "Création…",
+  "auth.alreadyAccount": "Déjà un compte ?",
+  "auth.loginPageTitle": "Connexion",
+  "auth.invalidEmail": "Email invalide.",
+  "auth.passwordTooShort": "Le mot de passe doit faire au moins 8 caractères.",
+  "auth.emailTaken": "Un compte existe déjà avec cet email.",
+  "auth.invalidCredentials": "Email ou mot de passe incorrect.",
+};
+
+export const en: Record<AuthKey, string> = {
+  "auth.email": "Email",
+  "auth.password": "Password",
+  "auth.passwordMinLength": "Minimum 8 characters.",
+  "auth.loginButton": "Log in",
+  "auth.loggingIn": "Logging in…",
+  "auth.noAccountYet": "No account yet?",
+  "auth.createAccount": "Create an account",
+  "auth.registerButton": "Create my account",
+  "auth.registering": "Creating…",
+  "auth.alreadyAccount": "Already have an account?",
+  "auth.loginPageTitle": "Log in",
+  "auth.invalidEmail": "Invalid email.",
+  "auth.passwordTooShort": "Password must be at least 8 characters.",
+  "auth.emailTaken": "An account already exists with this email.",
+  "auth.invalidCredentials": "Incorrect email or password.",
+};

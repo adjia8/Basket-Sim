@@ -11,11 +11,7 @@ export const ALT_CONTRACT_TYPE: Record<string, ContractType> = {
   wnba: "development",
 };
 
-export const ALT_CONTRACT_LABEL: Record<ContractType, string> = {
-  standard: "Standard",
-  two_way: "Two-way",
-  development: "Développement",
-};
+// Libellés dans src/lib/i18n/dict/domain.ts (clé `domain.contractType.<valeur>`).
 
 // Salaire fixe, largement sous le minimum standard — ces contrats n'entrent
 // pas dans le plafond salarial (voir getPayrollForTeam) ni dans le roster

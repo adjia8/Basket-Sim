@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { createSession, deleteSession } from "@/lib/auth/session";
+import { getTranslator } from "@/lib/i18n/translate";
 
 export interface AuthFormState {
   error?: string;
@@ -18,19 +19,20 @@ export async function signup(
   _prevState: AuthFormState | undefined,
   formData: FormData
 ): Promise<AuthFormState> {
+  const { t } = await getTranslator();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
   if (!isValidEmail(email)) {
-    return { error: "Email invalide." };
+    return { error: t("auth.invalidEmail") };
   }
   if (password.length < 8) {
-    return { error: "Le mot de passe doit faire au moins 8 caractères." };
+    return { error: t("auth.passwordTooShort") };
   }
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    return { error: "Un compte existe déjà avec cet email." };
+    return { error: t("auth.emailTaken") };
   }
 
   const user = await prisma.user.create({
@@ -46,12 +48,13 @@ export async function login(
   _prevState: AuthFormState | undefined,
   formData: FormData
 ): Promise<AuthFormState> {
+  const { t } = await getTranslator();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
-    return { error: "Email ou mot de passe incorrect." };
+    return { error: t("auth.invalidCredentials") };
   }
 
   await createSession(user.id);

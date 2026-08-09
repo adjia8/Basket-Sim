@@ -7,10 +7,12 @@ import { getTeamById, getTeamsByLeague } from "@/lib/data-access/teams";
 import { prisma } from "@/lib/prisma";
 import { draftForAiTeam, draftProspect } from "@/app/actions/draft";
 import { rookieScaleContract } from "@/lib/careers/rookie-scale";
+import { getTranslator } from "@/lib/i18n/translate";
 import { formatSalary, teamFullName } from "@/lib/utils";
 
 export default async function DraftPage() {
   const membership = await getCurrentMembership();
+  const { t, locale } = await getTranslator();
 
   const [prospects, teams, league] = await Promise.all([
     getProspectsForCareer(membership.careerId),
@@ -34,11 +36,9 @@ export default async function DraftPage() {
     });
     return (
       <div className="mx-auto max-w-5xl px-4 py-8">
-        <h1 className="text-2xl font-bold">Draft</h1>
+        <h1 className="text-2xl font-bold">{t("draft.title")}</h1>
         <p className="mt-4 text-sm text-black/50 dark:text-white/50">
-          {hasDraftPicks > 0
-            ? "Draft terminé pour cette saison."
-            : "Aucun draft en cours pour l'instant — termine la saison en cours pour ouvrir le prochain."}
+          {hasDraftPicks > 0 ? t("draft.overForSeason") : t("draft.noneInProgress")}
         </p>
       </div>
     );
@@ -54,18 +54,22 @@ export default async function DraftPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="text-2xl font-bold">Draft</h1>
+      <h1 className="text-2xl font-bold">{t("draft.title")}</h1>
       <p className="mt-1 text-black/60 dark:text-white/60">
-        Pick {currentPick.pickNumber} (Tour {currentPick.round}) —{" "}
-        {pickTeam ? teamFullName(pickTeam) : "?"} · {formatSalary(pickTerms.salary)} ·{" "}
-        {pickTerms.guaranteed ? "contrat garanti" : "contrat non garanti"}
+        {t("draft.pickLine", {
+          number: currentPick.pickNumber,
+          round: currentPick.round,
+          team: pickTeam ? teamFullName(pickTeam) : "?",
+          salary: formatSalary(pickTerms.salary, locale),
+        })}{" "}
+        {pickTerms.guaranteed ? t("draft.guaranteed") : t("draft.notGuaranteed")}
       </p>
 
       {isMyTurn ? (
-        <p className="mt-3 text-sm font-medium">C&apos;est à toi de choisir !</p>
+        <p className="mt-3 text-sm font-medium">{t("draft.yourTurn")}</p>
       ) : manager ? (
         <p className="mt-3 text-sm text-black/50 dark:text-white/50">
-          En attente de {manager.email}…
+          {t("draft.waitingForPrefix")} {manager.email}…
         </p>
       ) : (
         <form action={draftForAiTeam} className="mt-4">
@@ -73,25 +77,23 @@ export default async function DraftPage() {
             type="submit"
             className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
           >
-            Faire drafter {pickTeam ? teamFullName(pickTeam) : "l'IA"}
+            {t("draft.draftForAi", { team: pickTeam ? teamFullName(pickTeam) : t("draft.aiFallback") })}
           </button>
         </form>
       )}
 
       {prospects.length === 0 ? (
-        <p className="mt-6 text-sm text-black/50 dark:text-white/50">
-          Aucun prospect disponible pour l&apos;instant.
-        </p>
+        <p className="mt-6 text-sm text-black/50 dark:text-white/50">{t("draft.noProspects")}</p>
       ) : (
         <div className="mt-6 overflow-x-auto">
           <table className="w-full min-w-[560px] text-left text-sm">
             <thead>
               <tr className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
-                <th className="py-2 pr-4">Prospect</th>
-                <th className="py-2 pr-4">Poste</th>
-                <th className="py-2 pr-4">Overall</th>
-                <th className="py-2 pr-4">Âge</th>
-                {isMyTurn && <th className="py-2">Action</th>}
+                <th className="py-2 pr-4">{t("draft.colProspect")}</th>
+                <th className="py-2 pr-4">{t("draft.colPosition")}</th>
+                <th className="py-2 pr-4">{t("draft.colOverall")}</th>
+                <th className="py-2 pr-4">{t("draft.colAge")}</th>
+                {isMyTurn && <th className="py-2">{t("draft.colAction")}</th>}
               </tr>
             </thead>
             <tbody>
@@ -111,7 +113,7 @@ export default async function DraftPage() {
                           type="submit"
                           className="rounded-full bg-black px-3 py-1 text-xs font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
                         >
-                          Drafter
+                          {t("draft.draftButton")}
                         </button>
                       </form>
                     </td>

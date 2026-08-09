@@ -3,11 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { getTeamById } from "@/lib/data-access/teams";
 import { isTradeDeadlinePassed } from "@/lib/data-access/season-windows";
 import { cancelTradeOffer, respondToTradeOffer } from "@/app/actions/trade";
+import { getTranslator, type Translator } from "@/lib/i18n/translate";
 import { teamFullName } from "@/lib/utils";
 import type { Team } from "@/lib/types";
 
 export default async function TradesPage() {
   const membership = await getCurrentMembership();
+  const { t } = await getTranslator();
 
   const [received, sent, tradeDeadlinePassed] = await Promise.all([
     prisma.tradeOffer.findMany({
@@ -45,7 +47,7 @@ export default async function TradesPage() {
     teamRows.filter((t): t is Team => Boolean(t)).map((t) => [t.id, t])
   );
 
-  function assetLabels(offer: (typeof allOffers)[number], side: "from" | "to") {
+  function assetLabels(t: Translator, offer: (typeof allOffers)[number], side: "from" | "to") {
     const items = offer.items.filter((i) => i.side === side);
     const playerLabels = items
       .map((i) => (i.playerId ? playerById.get(i.playerId) : undefined))
@@ -56,30 +58,26 @@ export default async function TradesPage() {
       .filter((p): p is NonNullable<typeof p> => Boolean(p))
       .map((p) =>
         p.pickNumber !== null
-          ? `Pick ${p.pickNumber} (Tour ${p.round}, ${p.season})`
-          : `Tour ${p.round} ${p.season} (${p.originalTeam.abbreviation})`
+          ? t("common.draftPick.full", { number: p.pickNumber, round: p.round, season: p.season }) +
+            t("common.draftPick.via", { abbr: p.originalTeam.abbreviation })
+          : t("common.draftPick.roundOnly", { round: p.round, season: p.season }) +
+            ` (${p.originalTeam.abbreviation})`
       );
     return [...playerLabels, ...pickLabels].join(", ");
   }
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="text-2xl font-bold">Échanges</h1>
+      <h1 className="text-2xl font-bold">{t("tradeOffers.title")}</h1>
 
       {tradeDeadlinePassed && (
-        <p className="mt-4 text-sm text-red-500">
-          Date limite des échanges dépassée pour cette saison — les offres en
-          attente ne peuvent plus être acceptées, seulement refusées ou
-          annulées.
-        </p>
+        <p className="mt-4 text-sm text-red-500">{t("tradeOffers.deadlinePassedNotice")}</p>
       )}
 
       <section className="mt-8">
-        <h2 className="text-lg font-semibold">Propositions reçues</h2>
+        <h2 className="text-lg font-semibold">{t("tradeOffers.received")}</h2>
         {received.length === 0 ? (
-          <p className="mt-2 text-sm text-black/50 dark:text-white/50">
-            Aucune proposition en attente.
-          </p>
+          <p className="mt-2 text-sm text-black/50 dark:text-white/50">{t("tradeOffers.noneePending")}</p>
         ) : (
           <div className="mt-4 space-y-3">
             {received.map((offer) => {
@@ -88,8 +86,8 @@ export default async function TradesPage() {
                 <div key={offer.id} className="rounded-lg border border-black/10 p-4 dark:border-white/10">
                   <p className="text-sm">
                     <span className="font-medium">{fromTeam ? teamFullName(fromTeam) : "?"}</span>{" "}
-                    propose <strong>{assetLabels(offer, "from")}</strong> contre{" "}
-                    <strong>{assetLabels(offer, "to")}</strong>
+                    {t("tradeOffers.proposesVerb")} <strong>{assetLabels(t, offer, "from")}</strong>{" "}
+                    {t("tradeOffers.forVerb")} <strong>{assetLabels(t, offer, "to")}</strong>
                   </p>
                   <div className="mt-3 flex gap-2">
                     {!tradeDeadlinePassed && (
@@ -100,7 +98,7 @@ export default async function TradesPage() {
                           type="submit"
                           className="rounded-full bg-black px-4 py-1.5 text-xs font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
                         >
-                          Accepter
+                          {t("tradeOffers.accept")}
                         </button>
                       </form>
                     )}
@@ -111,7 +109,7 @@ export default async function TradesPage() {
                         type="submit"
                         className="rounded-full bg-black/5 px-4 py-1.5 text-xs font-medium transition hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20"
                       >
-                        Refuser
+                        {t("tradeOffers.reject")}
                       </button>
                     </form>
                   </div>
@@ -123,11 +121,9 @@ export default async function TradesPage() {
       </section>
 
       <section className="mt-10">
-        <h2 className="text-lg font-semibold">Propositions envoyées</h2>
+        <h2 className="text-lg font-semibold">{t("tradeOffers.sent")}</h2>
         {sent.length === 0 ? (
-          <p className="mt-2 text-sm text-black/50 dark:text-white/50">
-            Aucune proposition en attente.
-          </p>
+          <p className="mt-2 text-sm text-black/50 dark:text-white/50">{t("tradeOffers.noneePending")}</p>
         ) : (
           <div className="mt-4 space-y-3">
             {sent.map((offer) => {
@@ -135,9 +131,9 @@ export default async function TradesPage() {
               return (
                 <div key={offer.id} className="rounded-lg border border-black/10 p-4 dark:border-white/10">
                   <p className="text-sm">
-                    À <span className="font-medium">{toTeam ? teamFullName(toTeam) : "?"}</span> :{" "}
-                    <strong>{assetLabels(offer, "from")}</strong> contre{" "}
-                    <strong>{assetLabels(offer, "to")}</strong>
+                    {t("tradeOffers.sentTo", { team: toTeam ? teamFullName(toTeam) : "?" })}{" "}
+                    <strong>{assetLabels(t, offer, "from")}</strong> {t("tradeOffers.forVerb")}{" "}
+                    <strong>{assetLabels(t, offer, "to")}</strong>
                   </p>
                   <form action={cancelTradeOffer} className="mt-3">
                     <input type="hidden" name="tradeOfferId" value={offer.id} />
@@ -145,7 +141,7 @@ export default async function TradesPage() {
                       type="submit"
                       className="rounded-full bg-black/5 px-4 py-1.5 text-xs font-medium transition hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20"
                     >
-                      Annuler
+                      {t("tradeOffers.cancel")}
                     </button>
                   </form>
                 </div>

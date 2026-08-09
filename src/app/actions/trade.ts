@@ -13,6 +13,7 @@ import {
   MIN_ROSTER_SIZE,
 } from "@/lib/careers/roster-rules";
 import { draftPickTradeValue, TRADE_ACCEPT_TOLERANCE, tradeValue } from "@/lib/careers/trade-rules";
+import { getTranslator } from "@/lib/i18n/translate";
 import { formatSalary } from "@/lib/utils";
 
 export interface TradeFormState {
@@ -25,6 +26,7 @@ export async function proposeTrade(
   formData: FormData
 ): Promise<TradeFormState> {
   const { userId } = await verifySession();
+  const { t, locale } = await getTranslator();
   const opponentTeamId = String(formData.get("opponentTeamId") ?? "");
   const myPlayerIds = formData.getAll("myPlayerIds").map(String);
   const theirPlayerIds = formData.getAll("theirPlayerIds").map(String);
@@ -35,17 +37,17 @@ export async function proposeTrade(
     where: { userId },
     include: { career: true },
   });
-  if (!membership) return { error: "Aucune carrière." };
+  if (!membership) return { error: t("tradeAction.noCareer") };
 
   if (await isTradeDeadlinePassed(membership.careerId, membership.career.season)) {
-    return { error: "La date limite des échanges est dépassée pour cette saison." };
+    return { error: t("tradeAction.deadlinePassed") };
   }
 
   if (
     myPlayerIds.length + myPickIds.length === 0 ||
     theirPlayerIds.length + theirPickIds.length === 0
   ) {
-    return { error: "Sélectionne au moins un actif de chaque côté." };
+    return { error: t("tradeAction.selectAtLeastOne") };
   }
 
   const opponentTeam = await prisma.team.findUnique({
@@ -56,7 +58,7 @@ export async function proposeTrade(
     opponentTeam.leagueId !== membership.career.leagueId ||
     opponentTeamId === membership.teamId
   ) {
-    return { error: "Équipe adverse invalide." };
+    return { error: t("tradeAction.invalidOpponent") };
   }
 
   const [myContracts, theirContracts, myPicks, theirPicks] = await Promise.all([
@@ -89,7 +91,7 @@ export async function proposeTrade(
       (p) => p.careerId === membership.careerId && p.teamId === opponentTeamId && p.status === "pending"
     );
   if (!myPlayersValid || !theirPlayersValid || !myPicksValid || !theirPicksValid) {
-    return { error: "Sélection invalide." };
+    return { error: t("tradeAction.invalidSelection") };
   }
 
   const [myRosterSize, theirRosterSize, league, myCurrentPayroll, theirCurrentPayroll] = await Promise.all([
@@ -115,7 +117,7 @@ export async function proposeTrade(
     theirNewSize > MAX_ROSTER_SIZE
   ) {
     return {
-      error: `Cet échange ferait sortir un effectif de la fourchette ${MIN_ROSTER_SIZE}-${MAX_ROSTER_SIZE} joueurs.`,
+      error: t("tradeAction.rosterSizeOutOfRange", { min: MIN_ROSTER_SIZE, max: MAX_ROSTER_SIZE }),
     };
   }
 
@@ -125,9 +127,7 @@ export async function proposeTrade(
   const myNewPayroll = myCurrentPayroll - mySalaryOut + theirSalaryOut;
   const theirNewPayroll = theirCurrentPayroll - theirSalaryOut + mySalaryOut;
   if (myNewPayroll > salaryCap || theirNewPayroll > salaryCap) {
-    return {
-      error: `Cet échange ferait dépasser le plafond salarial (${formatSalary(salaryCap)}) pour l'une des deux équipes.`,
-    };
+    return { error: t("tradeAction.exceedsCap", { cap: formatSalary(salaryCap, locale) }) };
   }
 
   const opponentManager = await getMembershipForTeam(membership.careerId, opponentTeamId);
@@ -142,7 +142,7 @@ export async function proposeTrade(
       myContracts.reduce((sum, c) => sum + tradeValue(c.player.overallRating), 0) +
       myPicks.reduce((sum, p) => sum + draftPickTradeValue(p.round, p.pickNumber, picksPerRound), 0);
     if (valueReceivedByAi < valueGivenByAi * TRADE_ACCEPT_TOLERANCE) {
-      return { error: "L'IA refuse : échange trop déséquilibré en ta faveur." };
+      return { error: t("tradeAction.aiRefuses") };
     }
 
     await prisma.$transaction([
@@ -181,7 +181,7 @@ export async function proposeTrade(
     revalidatePath(`/teams/${opponentTeamId}`);
     revalidatePath("/draft");
 
-    return { success: "Échange accepté !" };
+    return { success: t("tradeAction.accepted") };
   }
 
   // Adversaire humain : l'échange doit être confirmé par lui, pas exécuté immédiatement.
@@ -202,7 +202,7 @@ export async function proposeTrade(
   });
 
   revalidatePath("/trades");
-  return { success: `Proposition envoyée à ${opponentManager.email}, en attente de réponse.` };
+  return { success: t("tradeAction.sentAwaitingResponse", { email: opponentManager.email }) };
 }
 
 export async function respondToTradeOffer(formData: FormData): Promise<void> {

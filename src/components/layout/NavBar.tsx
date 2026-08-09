@@ -3,26 +3,29 @@ import { logout } from "@/app/actions/auth";
 import { getOptionalCurrentMembership } from "@/lib/auth/dal";
 import { getTeamById } from "@/lib/data-access/teams";
 import { ThemeToggle } from "./ThemeToggle";
+import { LanguageToggle } from "./LanguageToggle";
 import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
-
-const NAV_LINKS = [
-  { href: "/", label: "Dashboard" },
-  { href: "/teams", label: "Équipes" },
-  { href: "/schedule", label: "Calendrier" },
-  { href: "/standings", label: "Classement" },
-  { href: "/free-agents", label: "Agents libres" },
-  { href: "/draft", label: "Draft" },
-  { href: "/trades", label: "Échanges" },
-  { href: "/playoffs", label: "Playoffs" },
-  { href: "/franchise", label: "Franchise" },
-  { href: "/gm", label: "GM" },
-  { href: "/press", label: "Presse" },
-  { href: "/season-recap", label: "Bilan" },
-];
+import { getTranslator } from "@/lib/i18n/translate";
 
 export async function NavBar() {
   const membership = await getOptionalCurrentMembership();
   const team = membership ? await getTeamById(membership.teamId) : null;
+  const { t, locale } = await getTranslator();
+
+  const NAV_LINKS = [
+    { href: "/", label: t("common.nav.dashboard") },
+    { href: "/teams", label: t("common.nav.teams") },
+    { href: "/schedule", label: t("common.nav.schedule") },
+    { href: "/standings", label: t("common.nav.standings") },
+    { href: "/free-agents", label: t("common.nav.freeAgents") },
+    { href: "/draft", label: t("common.nav.draft") },
+    { href: "/trades", label: t("common.nav.trades") },
+    { href: "/playoffs", label: t("common.nav.playoffs") },
+    { href: "/franchise", label: t("common.nav.franchise") },
+    { href: "/gm", label: t("common.nav.gm") },
+    { href: "/press", label: t("common.nav.press") },
+    { href: "/season-recap", label: t("common.nav.recap") },
+  ];
 
   return (
     <header className="border-b border-black/10 dark:border-white/10">
@@ -49,14 +52,15 @@ export async function NavBar() {
         )}
 
         <div className="flex items-center gap-4">
-          <ThemeToggle />
+          <LanguageToggle locale={locale} label={t("common.languageToggle.label")} />
+          <ThemeToggle toLightLabel={t("common.themeToggle.toLight")} toDarkLabel={t("common.themeToggle.toDark")} />
           {membership ? (
             <form action={logout}>
               <button
                 type="submit"
                 className="text-sm text-black/50 underline-offset-2 hover:underline dark:text-white/50"
               >
-                Se déconnecter
+                {t("common.logout")}
               </button>
             </form>
           ) : (
@@ -64,7 +68,7 @@ export async function NavBar() {
               href="/login"
               className="text-sm text-black/50 underline-offset-2 hover:underline dark:text-white/50"
             >
-              Connexion
+              {t("common.login")}
             </Link>
           )}
         </div>

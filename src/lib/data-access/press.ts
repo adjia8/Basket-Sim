@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getStandings } from "@/lib/data-access/standings";
 import { winPctForStandings } from "@/lib/careers/player-demands";
+import type { Locale } from "@/lib/i18n/locale";
 import {
   generateQuestions,
   pressAnswerEffects,
@@ -63,7 +64,8 @@ export async function maybeCreatePressConference(
   careerId: string,
   teamId: string,
   leagueId: string,
-  gameDate: Date
+  gameDate: Date,
+  locale: Locale
 ): Promise<void> {
   const state = await getOrCreateTeamState(careerId, teamId, leagueId);
 
@@ -79,7 +81,7 @@ export async function maybeCreatePressConference(
   if (Math.random() >= PRESS_CONFERENCE_CHANCE) return;
 
   const count = Math.random() < 0.5 ? 3 : 4;
-  const generated = generateQuestions(count);
+  const generated = generateQuestions(count, locale);
 
   await prisma.$transaction([
     prisma.pressConference.create({

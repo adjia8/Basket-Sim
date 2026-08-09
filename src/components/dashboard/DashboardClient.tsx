@@ -1,8 +1,37 @@
 import Link from "next/link";
 import { advanceSeason } from "@/app/actions/season";
+import type { Locale } from "@/lib/i18n/locale";
 import { formatGameDate, formatSalary, teamFullName } from "@/lib/utils";
 import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
 import type { Game, Player, StandingsRow, Team } from "@/lib/types";
+
+// Composant client : tout le texte arrive déjà traduit en props depuis le
+// Server Component appelant (voir app/page.tsx) — jamais de fonction `t`
+// passée à travers la frontière serveur/client.
+export interface DashboardLabels {
+  pressConferencePending: string;
+  answerMedia: string;
+  regularSeasonOverPlayoffs: string;
+  viewPlayoffs: string;
+  seasonOverChampionPrefix: string;
+  advanceSeason: string;
+  inviteCode: string;
+  conferenceRank: string;
+  record: string;
+  streak: string;
+  payroll: string;
+  nextGame: string;
+  noGameScheduled: string;
+  recentForm: string;
+  noGamePlayedYet: string;
+  topPlayers: string;
+  overallLabel: string;
+  infirmary: string;
+  unavailable: string;
+  gamesUnit: string;
+  viewFullRoster: string;
+  preseasonTag: string;
+}
 
 export function DashboardClient({
   teamId,
@@ -18,6 +47,8 @@ export function DashboardClient({
   championTeamName,
   inviteCode,
   hasPendingPressConference,
+  locale,
+  labels,
 }: {
   teamId: string;
   teams: Team[];
@@ -32,6 +63,8 @@ export function DashboardClient({
   championTeamName?: string;
   inviteCode: string;
   hasPendingPressConference: boolean;
+  locale: Locale;
+  labels: DashboardLabels;
 }) {
   const myTeam = teams.find((t) => t.id === teamId);
   if (!myTeam) return null;
@@ -72,24 +105,24 @@ export function DashboardClient({
     <div className="mx-auto max-w-5xl space-y-8 px-4 py-8">
       {hasPendingPressConference && (
         <div className="flex items-center justify-between rounded-lg border border-black/10 bg-black/5 px-4 py-3 dark:border-white/10 dark:bg-white/10">
-          <p className="text-sm font-medium">Conférence de presse en attente.</p>
+          <p className="text-sm font-medium">{labels.pressConferencePending}</p>
           <Link
             href="/press"
             className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
           >
-            Répondre aux médias
+            {labels.answerMedia}
           </Link>
         </div>
       )}
 
       {seasonComplete && playoffsInProgress && (
         <div className="flex items-center justify-between rounded-lg border border-black/10 bg-black/5 px-4 py-3 dark:border-white/10 dark:bg-white/10">
-          <p className="text-sm font-medium">Saison régulière terminée — playoffs en cours.</p>
+          <p className="text-sm font-medium">{labels.regularSeasonOverPlayoffs}</p>
           <Link
             href="/playoffs"
             className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
           >
-            Voir les playoffs
+            {labels.viewPlayoffs}
           </Link>
         </div>
       )}
@@ -97,14 +130,14 @@ export function DashboardClient({
       {seasonComplete && !playoffsInProgress && (
         <div className="flex items-center justify-between rounded-lg border border-black/10 bg-black/5 px-4 py-3 dark:border-white/10 dark:bg-white/10">
           <p className="text-sm font-medium">
-            Saison terminée ! Champion : {championTeamName ?? "-"}
+            {labels.seasonOverChampionPrefix} {championTeamName ?? "-"}
           </p>
           <form action={advanceSeason}>
             <button
               type="submit"
               className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
             >
-              Passer à la saison suivante
+              {labels.advanceSeason}
             </button>
           </form>
         </div>
@@ -116,7 +149,7 @@ export function DashboardClient({
           <h1 className="text-2xl font-bold">{teamFullName(myTeam)}</h1>
         </div>
         <p className="text-sm text-black/50 dark:text-white/50">
-          Code d&apos;invitation :{" "}
+          {labels.inviteCode}{" "}
           <span className="font-mono font-semibold tracking-widest text-black dark:text-white">
             {inviteCode}
           </span>
@@ -124,37 +157,37 @@ export function DashboardClient({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-4">
-        <StatCard label="Classement conférence" value={myRank ? `#${myRank}` : "-"} />
+        <StatCard label={labels.conferenceRank} value={myRank ? `#${myRank}` : "-"} />
         <StatCard
-          label="Bilan"
+          label={labels.record}
           value={myStandingsRow ? `${myStandingsRow.wins}-${myStandingsRow.losses}` : "0-0"}
         />
-        <StatCard label="Série" value={myStandingsRow?.streak ?? "-"} />
+        <StatCard label={labels.streak} value={myStandingsRow?.streak ?? "-"} />
         <StatCard
-          label="Masse salariale"
-          value={formatSalary(payroll)}
+          label={labels.payroll}
+          value={formatSalary(payroll, locale)}
           warning={payroll > salaryCap}
         />
       </div>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Prochain match</h2>
+        <h2 className="mb-3 text-lg font-semibold">{labels.nextGame}</h2>
         {nextGame ? (
           <GameLine
             game={nextGame}
             teams={teams}
             myTeamId={teamId}
             isPreseason={preseasonGameIds.has(nextGame.id)}
+            locale={locale}
+            preseasonTag={labels.preseasonTag}
           />
         ) : (
-          <p className="text-sm text-black/50 dark:text-white/50">
-            Aucun match programmé pour le moment.
-          </p>
+          <p className="text-sm text-black/50 dark:text-white/50">{labels.noGameScheduled}</p>
         )}
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Forme récente</h2>
+        <h2 className="mb-3 text-lg font-semibold">{labels.recentForm}</h2>
         {recentGames.length > 0 ? (
           <div className="space-y-2">
             {recentGames.map((game) => (
@@ -164,18 +197,18 @@ export function DashboardClient({
                 teams={teams}
                 myTeamId={teamId}
                 isPreseason={preseasonGameIds.has(game.id)}
+                locale={locale}
+                preseasonTag={labels.preseasonTag}
               />
             ))}
           </div>
         ) : (
-          <p className="text-sm text-black/50 dark:text-white/50">
-            Pas encore de match joué.
-          </p>
+          <p className="text-sm text-black/50 dark:text-white/50">{labels.noGamePlayedYet}</p>
         )}
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Meilleurs joueurs</h2>
+        <h2 className="mb-3 text-lg font-semibold">{labels.topPlayers}</h2>
         <div className="grid gap-3 sm:grid-cols-3">
           {topPlayers.map((player) => (
             <div
@@ -186,7 +219,7 @@ export function DashboardClient({
                 {player.firstName} {player.lastName}
               </p>
               <p className="text-sm text-black/50 dark:text-white/50">
-                {player.position} · overall {player.overallRating}
+                {player.position} · {labels.overallLabel} {player.overallRating}
               </p>
             </div>
           ))}
@@ -195,7 +228,7 @@ export function DashboardClient({
 
       {injuredPlayers.length > 0 && (
         <section>
-          <h2 className="mb-3 text-lg font-semibold">Infirmerie</h2>
+          <h2 className="mb-3 text-lg font-semibold">{labels.infirmary}</h2>
           <div className="space-y-2">
             {injuredPlayers.map((player) => (
               <div
@@ -206,7 +239,7 @@ export function DashboardClient({
                   {player.firstName} {player.lastName}
                 </span>
                 <span className="text-red-500">
-                  🩹 Indispo. ({player.injuryGamesRemaining} matchs)
+                  {labels.unavailable} ({player.injuryGamesRemaining} {labels.gamesUnit})
                 </span>
               </div>
             ))}
@@ -218,7 +251,7 @@ export function DashboardClient({
         href={`/teams/${teamId}`}
         className="inline-block text-sm underline underline-offset-2"
       >
-        Voir le roster complet →
+        {labels.viewFullRoster}
       </Link>
     </div>
   );
@@ -250,11 +283,15 @@ function GameLine({
   teams,
   myTeamId,
   isPreseason,
+  locale,
+  preseasonTag,
 }: {
   game: Game;
   teams: Team[];
   myTeamId: string;
   isPreseason?: boolean;
+  locale: Locale;
+  preseasonTag: string;
 }) {
   const home = teams.find((t) => t.id === game.homeTeamId);
   const away = teams.find((t) => t.id === game.awayTeamId);
@@ -270,7 +307,7 @@ function GameLine({
         {isHome ? "vs" : "@"} {opponent ? teamFullName(opponent) : "?"}
         {isPreseason && (
           <span className="ml-2 rounded-full bg-black/5 px-2 py-0.5 text-xs font-normal text-black/50 dark:bg-white/10 dark:text-white/50">
-            Pré-saison
+            {preseasonTag}
           </span>
         )}
       </span>
@@ -280,7 +317,7 @@ function GameLine({
             {game.homeScore}-{game.awayScore}
           </span>
         ) : (
-          <span>{formatGameDate(game.gameDate)}</span>
+          <span>{formatGameDate(game.gameDate, locale)}</span>
         )}
       </span>
     </Link>

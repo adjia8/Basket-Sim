@@ -1,0 +1,62 @@
+export const keys = [
+  "freeAgents.title",
+  "freeAgents.subtitle",
+  "freeAgents.payrollPrefix",
+  "freeAgents.notOpenYet",
+  "freeAgents.rosterFull",
+  "freeAgents.capReached",
+  "freeAgents.colPlayer",
+  "freeAgents.colPosition",
+  "freeAgents.colOverall",
+  "freeAgents.colAge",
+  "freeAgents.colInjuryRisk",
+  "freeAgents.colRenown",
+  "freeAgents.colSalaryDemand",
+  "freeAgents.colAction",
+  "freeAgents.sign",
+  "freeAgents.refuses",
+  "freeAgents.none",
+] as const;
+
+export type FreeAgentsKey = (typeof keys)[number];
+
+export const fr: Record<FreeAgentsKey, string> = {
+  "freeAgents.title": "Agents libres",
+  "freeAgents.subtitle": "Joueurs de ta ligue actuellement sans contrat.",
+  "freeAgents.payrollPrefix": "Masse salariale :",
+  "freeAgents.notOpenYet":
+    "Free agency pas encore ouverte — termine le draft de cette saison avant de pouvoir signer des agents libres.",
+  "freeAgents.rosterFull": "Effectif complet ({size} / {max}) — libère un joueur pour pouvoir en signer un autre.",
+  "freeAgents.capReached": "Plafond salarial atteint — libère un joueur pour dégager de la marge avant de signer.",
+  "freeAgents.colPlayer": "Joueur",
+  "freeAgents.colPosition": "Poste",
+  "freeAgents.colOverall": "Overall",
+  "freeAgents.colAge": "Âge",
+  "freeAgents.colInjuryRisk": "Risque blessure",
+  "freeAgents.colRenown": "Renommé",
+  "freeAgents.colSalaryDemand": "Exigence salariale",
+  "freeAgents.colAction": "Action",
+  "freeAgents.sign": "Signer",
+  "freeAgents.refuses": "Refuse : équipe pas assez compétitive, marché ou infrastructures pas assez attractifs",
+  "freeAgents.none": "Aucun agent libre pour le moment.",
+};
+
+export const en: Record<FreeAgentsKey, string> = {
+  "freeAgents.title": "Free Agents",
+  "freeAgents.subtitle": "Players in your league currently without a contract.",
+  "freeAgents.payrollPrefix": "Payroll:",
+  "freeAgents.notOpenYet": "Free agency not open yet — finish this season's draft before you can sign free agents.",
+  "freeAgents.rosterFull": "Roster full ({size} / {max}) — release a player to be able to sign another.",
+  "freeAgents.capReached": "Salary cap reached — release a player to free up room before signing.",
+  "freeAgents.colPlayer": "Player",
+  "freeAgents.colPosition": "Pos",
+  "freeAgents.colOverall": "Overall",
+  "freeAgents.colAge": "Age",
+  "freeAgents.colInjuryRisk": "Injury risk",
+  "freeAgents.colRenown": "Renown",
+  "freeAgents.colSalaryDemand": "Salary demand",
+  "freeAgents.colAction": "Action",
+  "freeAgents.sign": "Sign",
+  "freeAgents.refuses": "Refuses: team not competitive, market or facilities not attractive enough",
+  "freeAgents.none": "No free agents right now.",
+};

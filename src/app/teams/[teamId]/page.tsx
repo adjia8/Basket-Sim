@@ -16,23 +16,37 @@ import { TrainingPlanForm } from "@/components/team/TrainingPlanForm";
 import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
 import { MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import { tradeRequestReasons, winPctForStandings } from "@/lib/careers/player-demands";
+import { getTranslator, type Translator } from "@/lib/i18n/translate";
 import { formatSalary, teamFullName } from "@/lib/utils";
 
-async function getPendingPicksForTeam(careerId: string, teamId: string): Promise<TradePick[]> {
+function pickLabel(t: Translator, pick: Pick<TradePick, "pickNumber" | "round" | "season" | "originalTeamId" | "teamId" | "originalTeamAbbreviation">): string {
+  const base =
+    pick.pickNumber !== null
+      ? t("common.draftPick.full", { number: pick.pickNumber, round: pick.round, season: pick.season })
+      : t("common.draftPick.roundOnly", { round: pick.round, season: pick.season });
+  return pick.originalTeamId !== pick.teamId
+    ? base + t("common.draftPick.via", { abbr: pick.originalTeamAbbreviation })
+    : base;
+}
+
+async function getPendingPicksForTeam(t: Translator, careerId: string, teamId: string): Promise<TradePick[]> {
   const rows = await prisma.draftPick.findMany({
     where: { careerId, teamId, status: "pending" },
     include: { originalTeam: true },
     orderBy: [{ season: "asc" }, { round: "asc" }],
   });
-  return rows.map((row) => ({
-    id: row.id,
-    season: row.season,
-    round: row.round,
-    pickNumber: row.pickNumber,
-    originalTeamId: row.originalTeamId,
-    teamId: row.teamId,
-    originalTeamAbbreviation: row.originalTeam.abbreviation,
-  }));
+  return rows.map((row) => {
+    const pick = {
+      id: row.id,
+      season: row.season,
+      round: row.round,
+      pickNumber: row.pickNumber,
+      originalTeamId: row.originalTeamId,
+      teamId: row.teamId,
+      originalTeamAbbreviation: row.originalTeam.abbreviation,
+    };
+    return { ...pick, label: pickLabel(t, pick) };
+  });
 }
 
 export default async function TeamRosterPage({
@@ -44,6 +58,7 @@ export default async function TeamRosterPage({
   const { teamId } = await params;
   const team = await getTeamById(teamId);
   if (!team) notFound();
+  const { t, locale } = await getTranslator();
 
   const [roster, contracts, league, manager, totalPayroll, deadCap, picks, tradeDeadlinePassed, standings, teamState] =
     await Promise.all([
@@ -53,7 +68,7 @@ export default async function TeamRosterPage({
       getMembershipForTeam(membership.careerId, teamId),
       getPayrollForTeam(membership.careerId, teamId),
       prisma.deadCap.findMany({ where: { careerId: membership.careerId, teamId } }),
-      getPendingPicksForTeam(membership.careerId, teamId),
+      getPendingPicksForTeam(t, membership.careerId, teamId),
       isTradeDeadlinePassed(membership.careerId, membership.season),
       getStandings(membership.careerId, team.leagueId, membership.season),
       getOrCreateTeamState(membership.careerId, teamId, team.leagueId),
@@ -109,7 +124,11 @@ export default async function TeamRosterPage({
   const overCap = totalPayroll > salaryCap;
   const isOpponentInMyLeague = !isMyTeam && team.leagueId === membership.leagueId;
   const managedByMe = manager?.userId === membership.userId;
-  const managerLabel = managedByMe ? "Géré par toi" : manager ? `Géré par ${manager.email}` : "Géré par l'IA";
+  const managerLabel = managedByMe
+    ? t("team.managedByMe")
+    : manager
+      ? t("team.managedBy", { email: manager.email })
+      : t("team.managedByAi");
 
   let myRosterWithContracts: RosterPlayer[] = [];
   let myPicks: TradePick[] = [];
@@ -117,7 +136,7 @@ export default async function TeamRosterPage({
     const [myRoster, myContracts, myPendingPicks] = await Promise.all([
       getRosterForTeam(membership.careerId, membership.teamId),
       getContractsForTeam(membership.careerId, membership.teamId),
-      getPendingPicksForTeam(membership.careerId, membership.teamId),
+      getPendingPicksForTeam(t, membership.careerId, membership.teamId),
     ]);
     const mySeasonStats = await getSeasonStatsForPlayers(
       membership.careerId,
@@ -156,29 +175,27 @@ export default async function TeamRosterPage({
       <div className="mt-4 flex flex-wrap gap-4">
         <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
           <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
-            Masse salariale
+            {t("team.payroll")}
           </p>
           <p className={`mt-1 text-xl font-semibold ${overCap ? "text-red-500" : ""}`}>
-            {formatSalary(totalPayroll)} / {formatSalary(salaryCap)}
-            {overCap && (
-              <span className="ml-2 text-sm font-normal">au-dessus du plafond</span>
-            )}
+            {formatSalary(totalPayroll, locale)} / {formatSalary(salaryCap, locale)}
+            {overCap && <span className="ml-2 text-sm font-normal">{t("team.overCap")}</span>}
           </p>
           {deadCapTotal > 0 && (
             <p className="mt-1 text-xs text-black/50 dark:text-white/50">
-              (dont {formatSalary(deadCapTotal)} d&apos;argent mort)
+              {t("team.deadCapNote", { amount: formatSalary(deadCapTotal, locale) })}
             </p>
           )}
         </div>
         <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
           <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
-            Effectif
+            {t("team.roster")}
           </p>
-          <p className="mt-1 text-xl font-semibold">{roster.length} / 10 joueurs</p>
+          <p className="mt-1 text-xl font-semibold">{t("team.rosterCount", { count: roster.length })}</p>
         </div>
         <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
           <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
-            Chimie d&apos;équipe
+            {t("team.chemistry")}
           </p>
           <p className="mt-1 text-xl font-semibold">{teamState.chemistry} / 99</p>
         </div>
@@ -198,13 +215,44 @@ export default async function TeamRosterPage({
           teamId={team.id}
           roster={rosterWithContracts}
           canRelease={isMyTeam && roster.length > MIN_ROSTER_SIZE}
+          locale={locale}
+          labels={{
+            player: t("roster.column.player"),
+            position: t("roster.column.position"),
+            nationality: t("roster.column.nationality"),
+            overall: t("roster.column.overall"),
+            height: t("roster.column.height"),
+            age: t("roster.column.age"),
+            salary: t("roster.column.salary"),
+            yearsRemaining: t("roster.column.yearsRemaining"),
+            ppg: t("roster.column.ppg"),
+            rpg: t("roster.column.rpg"),
+            apg: t("roster.column.apg"),
+            unavailable: t("roster.unavailable"),
+            games: t("roster.games"),
+            rest: t("roster.rest"),
+            playThroughInjury: t("roster.playThroughInjury"),
+            wantsTrade: t("roster.wantsTrade"),
+            notGuaranteed: t("roster.notGuaranteed"),
+            severity: {
+              minor: t("domain.injurySeverity.minor"),
+              moderate: t("domain.injurySeverity.moderate"),
+              severe: t("domain.injurySeverity.severe"),
+            },
+            tradeReason: {
+              salary: t("domain.tradeReason.salary"),
+              competitiveness: t("domain.tradeReason.competitiveness"),
+              market: t("domain.tradeReason.market"),
+              facilities: t("domain.tradeReason.facilities"),
+            },
+          }}
         />
       </div>
 
       {picks.length > 0 && (
         <div className="mt-6">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
-            Picks de draft
+            {t("team.draftPicks")}
           </h2>
           <ul className="flex flex-wrap gap-2 text-sm">
             {picks.map((pick) => (
@@ -212,12 +260,7 @@ export default async function TeamRosterPage({
                 key={pick.id}
                 className="rounded-full border border-black/10 px-3 py-1 dark:border-white/10"
               >
-                {pick.pickNumber !== null
-                  ? `Pick ${pick.pickNumber} (Tour ${pick.round}, ${pick.season})`
-                  : `Tour ${pick.round} ${pick.season}`}
-                {pick.originalTeamId !== pick.teamId && (
-                  <span className="text-black/40 dark:text-white/40"> (via {pick.originalTeamAbbreviation})</span>
-                )}
+                {pick.label}
               </li>
             ))}
           </ul>
@@ -226,8 +269,7 @@ export default async function TeamRosterPage({
 
       {isOpponentInMyLeague && tradeDeadlinePassed && (
         <p className="mt-8 rounded-lg border border-black/10 p-4 text-sm text-red-500 dark:border-white/10">
-          Date limite des échanges dépassée pour cette saison — les échanges
-          rouvriront à la saison prochaine.
+          {t("team.tradeDeadlinePassed")}
         </p>
       )}
 
@@ -238,6 +280,16 @@ export default async function TeamRosterPage({
           myPicks={myPicks}
           theirPicks={picks}
           opponentTeamId={team.id}
+          locale={locale}
+          labels={{
+            title: t("trade.proposeTitle"),
+            myPlayersToOffer: t("trade.myPlayersToOffer"),
+            myPicksToOffer: t("trade.myPicksToOffer"),
+            theirPlayersToReceive: t("trade.theirPlayersToReceive"),
+            theirPicksToReceive: t("trade.theirPicksToReceive"),
+            proposing: t("common.proposing"),
+            proposeButton: t("trade.proposeButton"),
+          }}
         />
       )}
     </div>

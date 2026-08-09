@@ -2,10 +2,12 @@ import { getCurrentMembership } from "@/lib/auth/dal";
 import { getConferencesByLeague } from "@/lib/data-access/leagues";
 import { getStandings } from "@/lib/data-access/standings";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
+import { getTranslator } from "@/lib/i18n/translate";
 import { teamFullName } from "@/lib/utils";
 
 export default async function StandingsPage() {
   const membership = await getCurrentMembership();
+  const { t } = await getTranslator();
 
   const [conferences, teams, standings] = await Promise.all([
     getConferencesByLeague(membership.leagueId),
@@ -17,7 +19,7 @@ export default async function StandingsPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="text-2xl font-bold">Classement</h1>
+      <h1 className="text-2xl font-bold">{t("standingsPage.title")}</h1>
 
       <div className="mt-6 space-y-8">
         {conferences.map((conference) => {
@@ -33,12 +35,12 @@ export default async function StandingsPage() {
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
-                    <th className="py-2 pr-4">#</th>
-                    <th className="py-2 pr-4">Équipe</th>
-                    <th className="py-2 pr-4">V</th>
-                    <th className="py-2 pr-4">D</th>
-                    <th className="py-2 pr-4">Diff.</th>
-                    <th className="py-2">Série</th>
+                    <th className="py-2 pr-4">{t("standingsPage.colRank")}</th>
+                    <th className="py-2 pr-4">{t("standingsPage.colTeam")}</th>
+                    <th className="py-2 pr-4">{t("standingsPage.colWins")}</th>
+                    <th className="py-2 pr-4">{t("standingsPage.colLosses")}</th>
+                    <th className="py-2 pr-4">{t("standingsPage.colDiff")}</th>
+                    <th className="py-2">{t("standingsPage.colStreak")}</th>
                   </tr>
                 </thead>
                 <tbody>

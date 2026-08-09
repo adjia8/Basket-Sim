@@ -9,10 +9,12 @@ import { getStandings } from "@/lib/data-access/standings";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { getPendingPressConference } from "@/lib/data-access/press";
 import { preseasonSeasonLabel } from "@/lib/careers/schedule-rules";
+import { getTranslator } from "@/lib/i18n/translate";
 import { teamFullName } from "@/lib/utils";
 
 export default async function DashboardPage() {
   const membership = await getCurrentMembership();
+  const { t, locale } = await getTranslator();
 
   const [teams, players, standings, games, preseasonGames, payroll, league, pendingPressConference] =
     await Promise.all([
@@ -49,6 +51,31 @@ export default async function DashboardPage() {
       championTeamName={championTeam ? teamFullName(championTeam) : undefined}
       inviteCode={membership.inviteCode}
       hasPendingPressConference={pendingPressConference !== null}
+      locale={locale}
+      labels={{
+        pressConferencePending: t("dashboard.pressConferencePending"),
+        answerMedia: t("dashboard.answerMedia"),
+        regularSeasonOverPlayoffs: t("dashboard.regularSeasonOverPlayoffs"),
+        viewPlayoffs: t("dashboard.viewPlayoffs"),
+        seasonOverChampionPrefix: t("dashboard.seasonOverChampionPrefix"),
+        advanceSeason: t("dashboard.advanceSeason"),
+        inviteCode: t("dashboard.inviteCode"),
+        conferenceRank: t("dashboard.conferenceRank"),
+        record: t("dashboard.record"),
+        streak: t("dashboard.streak"),
+        payroll: t("dashboard.payroll"),
+        nextGame: t("dashboard.nextGame"),
+        noGameScheduled: t("dashboard.noGameScheduled"),
+        recentForm: t("dashboard.recentForm"),
+        noGamePlayedYet: t("dashboard.noGamePlayedYet"),
+        topPlayers: t("dashboard.topPlayers"),
+        overallLabel: t("player.overall"),
+        infirmary: t("dashboard.infirmary"),
+        unavailable: t("roster.unavailable"),
+        gamesUnit: t("roster.games"),
+        viewFullRoster: t("common.viewFullRoster"),
+        preseasonTag: t("dashboard.preseasonTag"),
+      }}
     />
   );
 }

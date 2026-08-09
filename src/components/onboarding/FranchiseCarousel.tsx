@@ -1,23 +1,47 @@
 "use client";
 
 import { useState } from "react";
+import type { Locale } from "@/lib/i18n/locale";
 import { teamFullName, formatSalary } from "@/lib/utils";
-import { EXPECTATION_LABELS, GM_POINT_POOL } from "@/lib/careers/gm-rules";
+import { GM_POINT_POOL, type ExpectationTier } from "@/lib/careers/gm-rules";
 import type { FranchiseSummary } from "@/lib/data-access/franchise-summary";
 
-const SEX_OPTIONS: { value: string; label: string }[] = [
-  { value: "M", label: "Homme" },
-  { value: "F", label: "Femme" },
-  { value: "autre", label: "Autre" },
-];
-
-const GM_CATEGORIES: { key: "offense" | "defense" | "physical" | "tactical" | "chemistry"; label: string }[] = [
-  { key: "offense", label: "Offensif" },
-  { key: "defense", label: "Défensif" },
-  { key: "physical", label: "Physique" },
-  { key: "tactical", label: "Tactique" },
-  { key: "chemistry", label: "Cohésion d'équipe" },
-];
+// Composant client : tout le texte arrive déjà traduit en props depuis le
+// Server Component appelant (voir onboarding/page.tsx, onboarding/reassign/
+// page.tsx) — jamais de fonction `t` passée à travers la frontière
+// serveur/client. Les phrases avec variable sont scindées en un préfixe
+// traduit + la donnée brute, plutôt qu'interpolées ici.
+export interface FranchiseCarouselLabels {
+  noneAvailable: string;
+  objectivePrefix: string;
+  alreadyTakenPrefix: string;
+  treasury: string;
+  roster: string;
+  playersUnit: string;
+  avgOverallSuffix: string;
+  facilities: string;
+  trainingStaff: string;
+  topPlayers: string;
+  draftPicksHeading: string;
+  pickNumberPrefix: string;
+  pickRoundPrefix: string;
+  previous: string;
+  next: string;
+  chooseThis: string;
+  confirm: string;
+  createGm: string;
+  firstName: string;
+  lastName: string;
+  age: string;
+  sex: string;
+  pointsAllocationPrefix: string;
+  pointsDescription: string;
+  changeFranchise: string;
+  takeCommand: string;
+  expectationTier: Record<ExpectationTier, string>;
+  sexOptions: { value: string; label: string }[];
+  gmCategories: { key: "offense" | "defense" | "physical" | "tactical" | "chemistry"; label: string }[];
+}
 
 function Bar({ level }: { level: number }) {
   return (
@@ -34,6 +58,8 @@ export function FranchiseCarousel({
   hiddenFields,
   error,
   pending,
+  locale,
+  labels,
 }: {
   slides: FranchiseSummary[];
   mode: "create" | "join" | "reassign";
@@ -41,6 +67,8 @@ export function FranchiseCarousel({
   hiddenFields?: Record<string, string>;
   error?: string;
   pending?: boolean;
+  locale: Locale;
+  labels: FranchiseCarouselLabels;
 }) {
   const [index, setIndex] = useState(0);
   const [step, setStep] = useState<"team" | "gm">("team");
@@ -66,7 +94,7 @@ export function FranchiseCarousel({
   }
 
   if (!slide) {
-    return <p className="text-sm text-black/50 dark:text-white/50">Aucune franchise disponible.</p>;
+    return <p className="text-sm text-black/50 dark:text-white/50">{labels.noneAvailable}</p>;
   }
 
   return (
@@ -83,38 +111,40 @@ export function FranchiseCarousel({
             <h3 className="text-xl font-bold">{teamFullName(slide.team)}</h3>
           </div>
           <span className="rounded-full bg-black/5 px-3 py-1 text-xs font-medium dark:bg-white/10">
-            Objectif : {EXPECTATION_LABELS[slide.expectationTier]}
+            {labels.objectivePrefix} {labels.expectationTier[slide.expectationTier]}
           </span>
         </div>
 
         {slide.managedByEmail && (
-          <p className="mt-2 text-xs text-black/40 dark:text-white/40">Déjà prise par {slide.managedByEmail}</p>
+          <p className="mt-2 text-xs text-black/40 dark:text-white/40">
+            {labels.alreadyTakenPrefix} {slide.managedByEmail}
+          </p>
         )}
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
-            <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">Trésorerie</p>
-            <p className="mt-0.5 text-lg font-semibold">{formatSalary(slide.finances)}</p>
+            <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">{labels.treasury}</p>
+            <p className="mt-0.5 text-lg font-semibold">{formatSalary(slide.finances, locale)}</p>
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">Effectif</p>
+            <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">{labels.roster}</p>
             <p className="mt-0.5 text-lg font-semibold">
-              {slide.rosterSize} joueurs · {Math.round(slide.averageOverall)} overall moy.
+              {slide.rosterSize} {labels.playersUnit} · {Math.round(slide.averageOverall)} {labels.avgOverallSuffix}
             </p>
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">Infrastructures</p>
+            <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">{labels.facilities}</p>
             <Bar level={slide.facilitiesLevel} />
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">Personnel de training</p>
+            <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">{labels.trainingStaff}</p>
             <Bar level={slide.trainingStaffLevel} />
           </div>
         </div>
 
         {slide.topPlayers.length > 0 && (
           <div className="mt-4">
-            <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">Meilleurs joueurs</p>
+            <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">{labels.topPlayers}</p>
             <ul className="mt-1 flex flex-wrap gap-2 text-sm">
               {slide.topPlayers.map((p, i) => (
                 <li key={i} className="rounded-full border border-black/10 px-2 py-0.5 dark:border-white/10">
@@ -127,11 +157,16 @@ export function FranchiseCarousel({
 
         {slide.draftPicks.length > 0 && (
           <div className="mt-4">
-            <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">Picks de draft</p>
+            <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
+              {labels.draftPicksHeading}
+            </p>
             <ul className="mt-1 flex flex-wrap gap-2 text-sm">
               {slide.draftPicks.map((pick, i) => (
                 <li key={i} className="rounded-full border border-black/10 px-2 py-0.5 dark:border-white/10">
-                  {pick.pickNumber !== null ? `Pick ${pick.pickNumber}` : `Tour ${pick.round}`} ({pick.season})
+                  {pick.pickNumber !== null
+                    ? `${labels.pickNumberPrefix} ${pick.pickNumber}`
+                    : `${labels.pickRoundPrefix} ${pick.round}`}{" "}
+                  ({pick.season})
                 </li>
               ))}
             </ul>
@@ -146,7 +181,7 @@ export function FranchiseCarousel({
           disabled={index === 0}
           className="rounded-full border border-black/10 px-3 py-1.5 text-sm disabled:opacity-30 dark:border-white/10"
         >
-          ← Précédent
+          {labels.previous}
         </button>
         <span className="text-xs text-black/40 dark:text-white/40">
           {index + 1} / {slides.length}
@@ -157,7 +192,7 @@ export function FranchiseCarousel({
           disabled={index === slides.length - 1}
           className="rounded-full border border-black/10 px-3 py-1.5 text-sm disabled:opacity-30 dark:border-white/10"
         >
-          Suivant →
+          {labels.next}
         </button>
       </div>
 
@@ -168,7 +203,7 @@ export function FranchiseCarousel({
           onClick={() => setStep("gm")}
           className="w-full rounded-full bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-black dark:hover:bg-white/80"
         >
-          Choisir cette franchise
+          {labels.chooseThis}
         </button>
       )}
 
@@ -184,7 +219,7 @@ export function FranchiseCarousel({
             disabled={pending || Boolean(slide.managedByEmail)}
             className="w-full rounded-full bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-black dark:hover:bg-white/80"
           >
-            Confirmer
+            {labels.confirm}
           </button>
         </form>
       )}
@@ -197,11 +232,11 @@ export function FranchiseCarousel({
             ))}
           <input type="hidden" name="teamId" value={slide.team.id} />
 
-          <h3 className="text-lg font-semibold">Crée ton GM</h3>
+          <h3 className="text-lg font-semibold">{labels.createGm}</h3>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm">
-              Prénom
+              {labels.firstName}
               <input
                 type="text"
                 name="gmFirstName"
@@ -212,7 +247,7 @@ export function FranchiseCarousel({
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              Nom
+              {labels.lastName}
               <input
                 type="text"
                 name="gmLastName"
@@ -223,7 +258,7 @@ export function FranchiseCarousel({
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              Âge
+              {labels.age}
               <input
                 type="number"
                 name="gmAge"
@@ -236,14 +271,14 @@ export function FranchiseCarousel({
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              Sexe
+              {labels.sex}
               <select
                 name="gmSex"
                 value={sex}
                 onChange={(e) => setSex(e.target.value)}
                 className="rounded-lg border border-black/10 bg-transparent px-3 py-1.5 text-sm dark:border-white/10"
               >
-                {SEX_OPTIONS.map((opt) => (
+                {labels.sexOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
@@ -254,13 +289,11 @@ export function FranchiseCarousel({
 
           <div>
             <p className="text-sm font-medium">
-              Répartition des points d&apos;attributs — Points restants : {pointsRemaining}/{GM_POINT_POOL}
+              {labels.pointsAllocationPrefix} {pointsRemaining}/{GM_POINT_POOL}
             </p>
-            <p className="mt-1 text-xs text-black/50 dark:text-white/50">
-              Donne un bonus permanent à ton équipe dans les catégories correspondantes.
-            </p>
+            <p className="mt-1 text-xs text-black/50 dark:text-white/50">{labels.pointsDescription}</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {GM_CATEGORIES.map((cat) => (
+              {labels.gmCategories.map((cat) => (
                 <label key={cat.key} className="flex items-center justify-between gap-3 text-sm">
                   {cat.label}
                   <input
@@ -283,14 +316,14 @@ export function FranchiseCarousel({
               onClick={() => setStep("team")}
               className="rounded-full border border-black/10 px-4 py-2 text-sm dark:border-white/10"
             >
-              ← Changer de franchise
+              {labels.changeFranchise}
             </button>
             <button
               type="submit"
               disabled={pending || pointsRemaining !== 0}
               className="flex-1 rounded-full bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-black dark:hover:bg-white/80"
             >
-              Prendre les commandes
+              {labels.takeCommand}
             </button>
           </div>
         </form>
