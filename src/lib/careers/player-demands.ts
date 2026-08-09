@@ -61,3 +61,37 @@ export function teamMeetsPlayerDemands(params: {
     params.teamFacilitiesLevel >= ATTRACTIVE_FACILITIES_THRESHOLD
   );
 }
+
+export type TradeRequestReason = "salary" | "competitiveness" | "market" | "facilities";
+
+export const TRADE_REQUEST_REASON_LABELS: Record<TradeRequestReason, string> = {
+  salary: "Salaire jugé insuffisant pour son renommé",
+  competitiveness: "Équipe pas assez compétitive à son goût",
+  market: "Marché pas assez attractif à son goût",
+  facilities: "Infrastructures d'entraînement jugées insuffisantes",
+};
+
+// Détaille CE QUI, précisément, pousse un joueur à vouloir être échangé —
+// mêmes seuils que minAcceptableSalary/teamMeetsPlayerDemands, mais renvoie
+// la liste des raisons plutôt qu'un simple booléen (affiché sur la fiche
+// joueur). Un joueur peut cumuler plusieurs raisons à la fois.
+export function tradeRequestReasons(params: {
+  renown: number;
+  overallRating: number;
+  salary: number;
+  leagueId: string;
+  teamWinPct: number;
+  teamMarketAppeal: number;
+  teamFacilitiesLevel: number;
+}): TradeRequestReason[] {
+  const reasons: TradeRequestReason[] = [];
+  if (params.salary < minAcceptableSalary(params.renown, params.overallRating, params.leagueId)) {
+    reasons.push("salary");
+  }
+  if (params.renown >= STAR_RENOWN_THRESHOLD) {
+    if (params.teamWinPct < COMPETITIVE_WIN_PCT_THRESHOLD) reasons.push("competitiveness");
+    if (params.teamMarketAppeal < ATTRACTIVE_MARKET_THRESHOLD) reasons.push("market");
+    if (params.teamFacilitiesLevel < ATTRACTIVE_FACILITIES_THRESHOLD) reasons.push("facilities");
+  }
+  return reasons;
+}

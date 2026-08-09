@@ -4,8 +4,15 @@ import { getContractForPlayer } from "@/lib/data-access/contracts";
 import { getPlayerWithState } from "@/lib/data-access/players";
 import { getSeasonStatsForPlayers } from "@/lib/data-access/season-stats";
 import { getStintsForPlayer } from "@/lib/data-access/player-history";
+import { getStandings } from "@/lib/data-access/standings";
+import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getTeamById } from "@/lib/data-access/teams";
 import { prisma } from "@/lib/prisma";
+import {
+  TRADE_REQUEST_REASON_LABELS,
+  tradeRequestReasons,
+  winPctForStandings,
+} from "@/lib/careers/player-demands";
 import { PlayerAvatar } from "@/components/team/PlayerAvatar";
 import {
   releasePlayer,
@@ -60,7 +67,7 @@ export default async function PlayerDetailPage({
 
   const isMyTeam = team.id === membership.teamId;
 
-  const [seasonStats, stints, standardRosterSize, altSlotsUsed] = await Promise.all([
+  const [seasonStats, stints, standardRosterSize, altSlotsUsed, standings, teamState] = await Promise.all([
     getSeasonStatsForPlayers(membership.careerId, membership.season, [playerId]),
     getStintsForPlayer(membership.careerId, playerId),
     prisma.contract.count({
@@ -69,10 +76,27 @@ export default async function PlayerDetailPage({
     prisma.contract.count({
       where: { careerId: membership.careerId, teamId, contractType: { not: "standard" } },
     }),
+    getStandings(membership.careerId, team.leagueId, membership.season),
+    getOrCreateTeamState(membership.careerId, teamId, team.leagueId),
   ]);
   const stats = seasonStats.get(playerId) ?? {
     gamesPlayed: 0, points: 0, rebounds: 0, assists: 0, ppg: 0, rpg: 0, apg: 0,
   };
+
+  // Visible seulement pour mon équipe — même convention que le badge dans
+  // RosterTable (données purement informatives, sans effet sur le gameplay).
+  const teamStandingsRow = standings.find((row) => row.teamId === teamId);
+  const reasons = isMyTeam
+    ? tradeRequestReasons({
+        renown: player.renown,
+        overallRating: player.overallRating,
+        salary: contract.salary,
+        leagueId: team.leagueId,
+        teamWinPct: winPctForStandings(teamStandingsRow?.wins ?? 0, teamStandingsRow?.losses ?? 0),
+        teamMarketAppeal: team.marketAppeal,
+        teamFacilitiesLevel: teamState.facilitiesLevel,
+      })
+    : [];
 
   const canRelease =
     isMyTeam && (contract.contractType !== "standard" || standardRosterSize > MIN_ROSTER_SIZE);
@@ -99,6 +123,17 @@ export default async function PlayerDetailPage({
           </p>
         </div>
       </div>
+
+      {reasons.length > 0 && (
+        <div className="mt-4 rounded-lg border border-orange-500/30 bg-orange-500/5 p-3 text-sm text-orange-600 dark:text-orange-400">
+          <p className="font-medium">🚩 Veut être échangé</p>
+          <ul className="mt-1 list-inside list-disc">
+            {reasons.map((reason) => (
+              <li key={reason}>{TRADE_REQUEST_REASON_LABELS[reason]}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">

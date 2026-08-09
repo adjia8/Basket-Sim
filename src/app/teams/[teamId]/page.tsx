@@ -15,11 +15,7 @@ import { TradeProposalForm, type TradePick } from "@/components/team/TradePropos
 import { TrainingPlanForm } from "@/components/team/TrainingPlanForm";
 import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
 import { MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
-import {
-  minAcceptableSalary,
-  teamMeetsPlayerDemands,
-  winPctForStandings,
-} from "@/lib/careers/player-demands";
+import { tradeRequestReasons, winPctForStandings } from "@/lib/careers/player-demands";
 import { formatSalary, teamFullName } from "@/lib/utils";
 
 async function getPendingPicksForTeam(careerId: string, teamId: string): Promise<TradePick[]> {
@@ -82,22 +78,25 @@ export default async function TeamRosterPage({
     // joueur mécontent (équipe pas assez compétitive/attractive pour son
     // standing, ou sous-payé par rapport à son exigence) — purement
     // informatif, n'affecte aucune mécanique.
-    const wantsTrade =
-      isMyTeam &&
-      (!teamMeetsPlayerDemands({
-        renown: player.renown,
-        teamWinPct,
-        teamMarketAppeal: team.marketAppeal,
-        teamFacilitiesLevel: teamState.facilitiesLevel,
-      }) ||
-        salary < minAcceptableSalary(player.renown, player.overallRating, team.leagueId));
+    const reasons = isMyTeam
+      ? tradeRequestReasons({
+          renown: player.renown,
+          overallRating: player.overallRating,
+          salary,
+          leagueId: team.leagueId,
+          teamWinPct,
+          teamMarketAppeal: team.marketAppeal,
+          teamFacilitiesLevel: teamState.facilitiesLevel,
+        })
+      : [];
     const stats = seasonStats.get(player.id) ?? emptyStats;
     return {
       ...player,
       salary,
       yearsRemaining: contract?.yearsRemaining ?? 0,
       guaranteed: contract?.guaranteed ?? true,
-      wantsTrade,
+      wantsTrade: reasons.length > 0,
+      tradeReasons: reasons,
       ppg: stats.ppg,
       rpg: stats.rpg,
       apg: stats.apg,
@@ -134,6 +133,7 @@ export default async function TeamRosterPage({
         yearsRemaining: contract?.yearsRemaining ?? 0,
         guaranteed: contract?.guaranteed ?? true,
         wantsTrade: false, // non pertinent dans le contexte du formulaire d'échange
+        tradeReasons: [],
         ppg: stats.ppg,
         rpg: stats.rpg,
         apg: stats.apg,

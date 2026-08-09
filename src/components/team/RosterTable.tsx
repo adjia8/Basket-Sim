@@ -7,6 +7,7 @@ import { formatSalary } from "@/lib/utils";
 import { setPlayingThroughInjury } from "@/app/actions/roster";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { ratingTone, toneClass } from "@/lib/color-scale";
+import { TRADE_REQUEST_REASON_LABELS, type TradeRequestReason } from "@/lib/careers/player-demands";
 
 const SEVERITY_LABELS: Record<NonNullable<Player["injurySeverity"]>, string> = {
   minor: "légère",
@@ -22,6 +23,7 @@ export type RosterPlayer = Player & {
   yearsRemaining: number;
   guaranteed: boolean;
   wantsTrade: boolean;
+  tradeReasons: TradeRequestReason[];
   ppg: number;
   rpg: number;
   apg: number;
@@ -134,7 +136,10 @@ export function RosterTable({
                   </form>
                 )}
                 {player.wantsTrade && (
-                  <span className="ml-2 rounded-full bg-orange-500/10 px-2 py-0.5 text-xs font-normal text-orange-500">
+                  <span
+                    title={player.tradeReasons.map((r) => TRADE_REQUEST_REASON_LABELS[r]).join(" · ")}
+                    className="ml-2 rounded-full bg-orange-500/10 px-2 py-0.5 text-xs font-normal text-orange-500"
+                  >
                     🚩 Veut être échangé
                   </span>
                 )}
