@@ -25,6 +25,16 @@ export function inverseRatingTone(value: number): ScaleTone {
   return "bad";
 }
 
+// Échelle centrée sur 50 (valeur neutre de départ) — pour les jauges qui
+// démarrent au milieu plutôt qu'au minimum (moral, opinion publique,
+// perception des dirigeants), contrairement à ratingTone où 50 est déjà une
+// note médiocre sur une échelle de compétence 0-99.
+export function neutralTone(value: number): ScaleTone {
+  if (value >= 65) return "good";
+  if (value >= 35) return "average";
+  return "bad";
+}
+
 // Trésorerie : négative = mauvaise, positive mais sous le seuil "sain" =
 // moyenne, au-dessus = bonne (voir healthyFinancesThreshold, finance-rules.ts).
 export function financeTone(finances: number, healthyThreshold: number): ScaleTone {

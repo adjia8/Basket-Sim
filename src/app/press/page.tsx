@@ -2,7 +2,7 @@ import { getCurrentMembership } from "@/lib/auth/dal";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getPendingPressConference, getPressHistory } from "@/lib/data-access/press";
 import { submitPressAnswers } from "@/app/actions/press";
-import { toneClass, ratingTone } from "@/lib/color-scale";
+import { toneClass, neutralTone } from "@/lib/color-scale";
 
 const CATEGORY_LABELS: Record<string, string> = {
   results: "Résultats",
@@ -27,13 +27,13 @@ export default async function PressPage() {
       <div className="mt-6 flex flex-wrap gap-4">
         <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
           <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">Moral</p>
-          <p className={`mt-1 text-xl font-semibold ${toneClass(ratingTone(teamState.morale))}`}>
+          <p className={`mt-1 text-xl font-semibold ${toneClass(neutralTone(teamState.morale))}`}>
             {teamState.morale} / 99
           </p>
         </div>
         <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
           <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">Opinion publique</p>
-          <p className={`mt-1 text-xl font-semibold ${toneClass(ratingTone(teamState.publicOpinion))}`}>
+          <p className={`mt-1 text-xl font-semibold ${toneClass(neutralTone(teamState.publicOpinion))}`}>
             {teamState.publicOpinion} / 99
           </p>
         </div>
