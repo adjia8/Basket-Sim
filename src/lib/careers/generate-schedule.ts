@@ -88,12 +88,10 @@ export interface GenerateScheduleOptions {
   // Étiquette de saison à appliquer aux Game générés (Career.season courant,
   // pas forcément league.season une fois qu'on a dépassé la 1ère saison).
   seasonLabel: string;
-  // Date du 1er match généré. Par défaut aujourd'hui - 8 jours (comportement
-  // historique du rollover de saison, laisse une poignée de matchs déjà
-  // "dus" à la date du jour sans que ça pose problème puisqu'ils restent
-  // "scheduled"). La création de Career la surcharge explicitement pour
-  // positionner la saison régulière après la pré-saison (voir actions/career.ts).
-  startDate?: Date;
+  // Date du 1er match généré — toujours juste après la pré-saison
+  // correspondante (voir generateCareerPreseasonSchedule), appelée par tous
+  // les appelants (création de Career et rollover de saison).
+  startDate: Date;
 }
 
 export async function generateCareerSchedule(
@@ -127,7 +125,7 @@ export async function generateCareerSchedule(
   const pairs = seededShuffle(allPairs, `${careerId}-${options.seasonLabel}`);
   const roundOfPair = assignRounds(pairs);
   const totalRounds = Math.max(...roundOfPair) + 1;
-  const startDate = options.startDate ?? addDays(new Date(), -8);
+  const startDate = options.startDate;
   const seasonDays = SEASON_LENGTH_DAYS[league.id] ?? SEASON_LENGTH_DAYS.nba;
 
   // Étale les tours sur toute la durée de la saison (plusieurs équipes jouent
