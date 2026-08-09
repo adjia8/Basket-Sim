@@ -22,9 +22,12 @@ import {
   ALT_CONTRACT_SALARY,
   ALT_CONTRACT_SLOTS_PER_TEAM,
   ALT_CONTRACT_TYPE,
+  EXTENSION_MAX_OFFER_YEARS,
   EXTENSION_MAX_YEARS_REMAINING,
+  EXTENSION_MIN_OFFER_YEARS,
   isEligibleForAlternateContract,
 } from "@/lib/careers/contract-type-rules";
+import { formatSalary } from "@/lib/utils";
 
 function revalidateRosterPaths(teamId: string) {
   revalidatePath("/");
@@ -190,26 +193,49 @@ export async function setPlayingThroughInjury(formData: FormData): Promise<void>
   revalidateRosterPaths(membership.teamId);
 }
 
+export interface ExtendContractFormState {
+  error?: string;
+  success?: string;
+}
+
 // Prolongation d'un contrat standard proche de son terme (fenêtre simplifiée :
 // EXTENSION_MAX_YEARS_REMAINING années ou moins restantes, sinon pas encore
-// éligible). Recalcule salaire/durée avec la même courbe que la signature
-// d'agent libre, revalide plafond salarial et exigences du joueur.
-export async function extendContract(formData: FormData): Promise<void> {
+// éligible). Le GM propose lui-même salaire + durée ; le joueur accepte ou
+// refuse selon ses exigences (même barème que la signature d'agent libre) —
+// sauf s'il est encore sous son contrat rookie (isRookieScale), auquel cas il
+// n'a aucun levier de négociation salariale et accepte toute offre valide.
+export async function extendContract(
+  _prevState: ExtendContractFormState | undefined,
+  formData: FormData
+): Promise<ExtendContractFormState> {
   const { userId } = await verifySession();
   const playerId = String(formData.get("playerId") ?? "");
+  const salary = Math.round(Number(formData.get("salary")));
+  const years = Math.round(Number(formData.get("years")));
 
   const membership = await prisma.membership.findUnique({
     where: { userId },
     include: { career: true },
   });
-  if (!membership) return;
+  if (!membership) return { error: "Aucune carrière." };
 
   const contract = await prisma.contract.findUnique({
     where: { careerId_playerId: { careerId: membership.careerId, playerId } },
   });
-  if (!contract || contract.teamId !== membership.teamId) return;
-  if (contract.contractType !== "standard") return;
-  if (contract.yearsRemaining > EXTENSION_MAX_YEARS_REMAINING) return;
+  if (!contract || contract.teamId !== membership.teamId) return { error: "Contrat introuvable." };
+  if (contract.contractType !== "standard") return { error: "Seul un contrat standard peut être prolongé." };
+  if (contract.yearsRemaining > EXTENSION_MAX_YEARS_REMAINING) {
+    return { error: "Ce joueur n'est pas encore éligible à une prolongation." };
+  }
+  if (
+    !Number.isFinite(salary) ||
+    salary <= 0 ||
+    !Number.isInteger(years) ||
+    years < EXTENSION_MIN_OFFER_YEARS ||
+    years > EXTENSION_MAX_OFFER_YEARS
+  ) {
+    return { error: "Offre invalide." };
+  }
 
   const [player, playerState, currentPayroll, league, standings, myTeam, myTeamState] = await Promise.all([
     prisma.player.findUnique({ where: { id: playerId } }),
@@ -222,39 +248,54 @@ export async function extendContract(formData: FormData): Promise<void> {
     getTeamById(membership.teamId),
     getOrCreateTeamState(membership.careerId, membership.teamId, membership.career.leagueId),
   ]);
-  if (!player || !myTeam) return;
+  if (!player || !myTeam) return { error: "Données introuvables." };
+
+  const playerName = `${player.firstName} ${player.lastName}`;
+  const salaryCap = league?.salaryCap ?? Infinity;
+  // L'ancien salaire de ce joueur est déjà compté dans currentPayroll (contrat
+  // standard) — on le retire avant d'ajouter le nouveau montant proposé.
+  if (currentPayroll - contract.salary + salary > salaryCap) {
+    return { error: `Cette offre ferait dépasser le plafond salarial (${formatSalary(salaryCap)}).` };
+  }
 
   const overallRating = playerState?.overallRating ?? player.overallRating;
   const renown = playerState?.renown ?? initialRenown(player.overallRating);
-  const myStandingsRow = standings.find((row) => row.teamId === membership.teamId);
-  const teamWinPct = winPctForStandings(myStandingsRow?.wins ?? 0, myStandingsRow?.losses ?? 0);
-  if (
-    !teamMeetsPlayerDemands({
-      renown,
-      teamWinPct,
-      teamMarketAppeal: myTeam.marketAppeal,
-      teamFacilitiesLevel: myTeamState.facilitiesLevel,
-    })
-  ) {
-    return;
-  }
 
-  const terms = generateContractTerms(overallRating, membership.career.leagueId);
-  const salary = Math.max(
-    terms.salary,
-    minAcceptableSalary(renown, overallRating, membership.career.leagueId)
-  );
-  const salaryCap = league?.salaryCap ?? Infinity;
-  // L'ancien salaire de ce joueur est déjà compté dans currentPayroll (contrat
-  // standard) — on le retire avant d'ajouter le nouveau montant.
-  if (currentPayroll - contract.salary + salary > salaryCap) return;
+  if (!contract.isRookieScale) {
+    const myStandingsRow = standings.find((row) => row.teamId === membership.teamId);
+    const teamWinPct = winPctForStandings(myStandingsRow?.wins ?? 0, myStandingsRow?.losses ?? 0);
+    if (
+      !teamMeetsPlayerDemands({
+        renown,
+        teamWinPct,
+        teamMarketAppeal: myTeam.marketAppeal,
+        teamFacilitiesLevel: myTeamState.facilitiesLevel,
+      })
+    ) {
+      return {
+        error: `${playerName} refuse de négocier : il n'est pas satisfait du projet sportif de l'équipe.`,
+      };
+    }
+
+    const floor = minAcceptableSalary(renown, overallRating, membership.career.leagueId);
+    if (salary < floor) {
+      return {
+        error: `${playerName} refuse cette offre : il exige au moins ${formatSalary(floor)} par saison.`,
+      };
+    }
+  }
+  // Contrat rookie encore en cours : aucune exigence salariale, le joueur
+  // accepte toute offre valide (plafond respecté) sans pouvoir en demander plus.
 
   await prisma.contract.update({
     where: { id: contract.id },
-    data: { salary, yearsRemaining: terms.yearsRemaining, guaranteed: true },
+    data: { salary, yearsRemaining: years, guaranteed: true, isRookieScale: false },
   });
 
   revalidateRosterPaths(membership.teamId);
+  return {
+    success: `${playerName} a accepté la prolongation : ${formatSalary(salary)} sur ${years} an${years > 1 ? "s" : ""}.`,
+  };
 }
 
 // Convertit un contrat standard en contrat alternatif (two-way NBA /

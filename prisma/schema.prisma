@@ -289,6 +289,7 @@ model Contract {
   yearsRemaining Int
   guaranteed     Boolean  @default(true)
   contractType   String   @default("standard") // "standard" | "two_way" | "development" — voir contract-type-rules.ts
+  isRookieScale  Boolean  @default(false) // contrat rookie non renégocié — voir extendContract dans actions/roster.ts
   createdAt      DateTime @default(now())
 
   @@unique([careerId, playerId])

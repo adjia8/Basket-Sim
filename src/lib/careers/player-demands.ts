@@ -74,7 +74,9 @@ export const TRADE_REQUEST_REASON_LABELS: Record<TradeRequestReason, string> = {
 // Détaille CE QUI, précisément, pousse un joueur à vouloir être échangé —
 // mêmes seuils que minAcceptableSalary/teamMeetsPlayerDemands, mais renvoie
 // la liste des raisons plutôt qu'un simple booléen (affiché sur la fiche
-// joueur). Un joueur peut cumuler plusieurs raisons à la fois.
+// joueur). Un joueur peut cumuler plusieurs raisons à la fois. Un rookie
+// encore sous son contrat rookie (isRookieScale) n'a aucune exigence
+// salariale (voir extendContract) : jamais de raison "salary" pour lui.
 export function tradeRequestReasons(params: {
   renown: number;
   overallRating: number;
@@ -83,9 +85,13 @@ export function tradeRequestReasons(params: {
   teamWinPct: number;
   teamMarketAppeal: number;
   teamFacilitiesLevel: number;
+  isRookieScale?: boolean;
 }): TradeRequestReason[] {
   const reasons: TradeRequestReason[] = [];
-  if (params.salary < minAcceptableSalary(params.renown, params.overallRating, params.leagueId)) {
+  if (
+    !params.isRookieScale &&
+    params.salary < minAcceptableSalary(params.renown, params.overallRating, params.leagueId)
+  ) {
     reasons.push("salary");
   }
   if (params.renown >= STAR_RENOWN_THRESHOLD) {

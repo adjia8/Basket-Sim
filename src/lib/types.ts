@@ -117,6 +117,7 @@ export interface Contract {
   yearsRemaining: number;
   guaranteed: boolean;
   contractType: ContractType;
+  isRookieScale: boolean;
 }
 
 // --- Prospect (draft) ---

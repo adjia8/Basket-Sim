@@ -60,6 +60,7 @@ async function performDraftPick(
           playerId: newPlayerId,
           teamId: currentPick.teamId,
           ...terms,
+          isRookieScale: true,
         },
       });
       await tx.playerTeamStint.create({

@@ -87,6 +87,7 @@ export default async function TeamRosterPage({
           teamWinPct,
           teamMarketAppeal: team.marketAppeal,
           teamFacilitiesLevel: teamState.facilitiesLevel,
+          isRookieScale: contract?.isRookieScale ?? false,
         })
       : [];
     const stats = seasonStats.get(player.id) ?? emptyStats;

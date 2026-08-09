@@ -38,3 +38,9 @@ export function isEligibleForAlternateContract(age: number): boolean {
 // au contrat courant, pour éviter de prolonger en boucle sans jamais arriver
 // à échéance.
 export const EXTENSION_MAX_YEARS_REMAINING = 2;
+
+// Bornes de l'offre que le GM peut soumettre au joueur (négociation manuelle,
+// voir extendContract dans actions/roster.ts) — mêmes bornes qu'un contrat
+// vétéran généré aléatoirement (generate-contracts.ts).
+export const EXTENSION_MIN_OFFER_YEARS = 1;
+export const EXTENSION_MAX_OFFER_YEARS = 4;

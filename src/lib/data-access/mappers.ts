@@ -162,6 +162,7 @@ export function toDomainContract(row: PrismaContract): Contract {
     yearsRemaining: row.yearsRemaining,
     guaranteed: row.guaranteed,
     contractType: row.contractType as Contract["contractType"],
+    isRookieScale: row.isRookieScale,
   };
 }
 

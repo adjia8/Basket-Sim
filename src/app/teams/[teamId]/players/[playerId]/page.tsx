@@ -10,15 +10,13 @@ import { getTeamById } from "@/lib/data-access/teams";
 import { prisma } from "@/lib/prisma";
 import {
   TRADE_REQUEST_REASON_LABELS,
+  minAcceptableSalary,
   tradeRequestReasons,
   winPctForStandings,
 } from "@/lib/careers/player-demands";
 import { PlayerAvatar } from "@/components/team/PlayerAvatar";
-import {
-  releasePlayer,
-  extendContract,
-  offerAlternateContract,
-} from "@/app/actions/roster";
+import { ExtendContractForm } from "@/components/team/ExtendContractForm";
+import { releasePlayer, offerAlternateContract } from "@/app/actions/roster";
 import { MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import {
   ALT_CONTRACT_LABEL,
@@ -27,6 +25,7 @@ import {
   EXTENSION_MAX_YEARS_REMAINING,
   isEligibleForAlternateContract,
 } from "@/lib/careers/contract-type-rules";
+import { SALARY_RANGES } from "@/lib/careers/salary-rules";
 import { formatSalary, teamFullName } from "@/lib/utils";
 import type { PlayerRatings } from "@/lib/types";
 import { inverseRatingTone, ratingTone, toneClass, type ScaleTone } from "@/lib/color-scale";
@@ -95,6 +94,7 @@ export default async function PlayerDetailPage({
         teamWinPct: winPctForStandings(teamStandingsRow?.wins ?? 0, teamStandingsRow?.losses ?? 0),
         teamMarketAppeal: team.marketAppeal,
         teamFacilitiesLevel: teamState.facilitiesLevel,
+        isRookieScale: contract.isRookieScale,
       })
     : [];
 
@@ -102,6 +102,12 @@ export default async function PlayerDetailPage({
     isMyTeam && (contract.contractType !== "standard" || standardRosterSize > MIN_ROSTER_SIZE);
   const canExtend =
     isMyTeam && contract.contractType === "standard" && contract.yearsRemaining <= EXTENSION_MAX_YEARS_REMAINING;
+  const salaryRange = SALARY_RANGES[team.leagueId] ?? SALARY_RANGES.nba;
+  // Suggestion de départ pour l'offre du GM — plancher exigé par le joueur (0
+  // pour un rookie encore sous contrat rookie, qui n'a aucune exigence).
+  const suggestedSalary = contract.isRookieScale
+    ? contract.salary
+    : minAcceptableSalary(player.renown, player.overallRating, team.leagueId);
   const altType = ALT_CONTRACT_TYPE[team.leagueId];
   const canOfferAlternate =
     isMyTeam &&
@@ -187,6 +193,20 @@ export default async function PlayerDetailPage({
           {!contract.guaranteed && " · non garanti"}
         </p>
 
+        {canExtend && (
+          <div className="mt-4 rounded-lg border border-black/10 p-3 dark:border-white/10">
+            <p className="text-sm font-medium">Proposer une prolongation</p>
+            <ExtendContractForm
+              playerId={player.id}
+              minSalary={salaryRange.min}
+              maxSalary={salaryRange.max}
+              suggestedSalary={suggestedSalary}
+              suggestedYears={2}
+              isRookieScale={contract.isRookieScale}
+            />
+          </div>
+        )}
+
         {isMyTeam && (
           <div className="mt-4 flex flex-wrap gap-2">
             {canRelease && (
@@ -197,17 +217,6 @@ export default async function PlayerDetailPage({
                   className="rounded-full border border-red-500/30 px-4 py-1.5 text-sm font-medium text-red-500 hover:bg-red-500/10"
                 >
                   Couper
-                </button>
-              </form>
-            )}
-            {canExtend && (
-              <form action={extendContract}>
-                <input type="hidden" name="playerId" value={player.id} />
-                <button
-                  type="submit"
-                  className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
-                >
-                  Prolonger
                 </button>
               </form>
             )}
