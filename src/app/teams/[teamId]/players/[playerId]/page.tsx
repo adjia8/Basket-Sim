@@ -82,17 +82,12 @@ export default async function PlayerDetailPage({
   const reasons = isMyTeam
     ? tradeRequestReasons({
         renown: player.renown,
-        overallRating: player.overallRating,
-        salary: contract.salary,
-        leagueId: team.leagueId,
         teamWinPct: winPctForStandings(teamStandingsRow?.wins ?? 0, teamStandingsRow?.losses ?? 0),
         teamMarketAppeal: team.marketAppeal,
         teamFacilitiesLevel: teamState.facilitiesLevel,
-        isRookieScale: contract.isRookieScale,
       })
     : [];
   const tradeReasonLabels: Record<(typeof reasons)[number], string> = {
-    salary: t("domain.tradeReason.salary"),
     competitiveness: t("domain.tradeReason.competitiveness"),
     market: t("domain.tradeReason.market"),
     facilities: t("domain.tradeReason.facilities"),

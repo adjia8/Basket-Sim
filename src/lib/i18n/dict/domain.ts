@@ -3,7 +3,6 @@
 // consommé par plusieurs pages/composants (roster, fiche joueur, GM,
 // franchise, onboarding). Convention d'appel : t(`domain.<enum>.<valeur>`).
 export const keys = [
-  "domain.tradeReason.salary",
   "domain.tradeReason.competitiveness",
   "domain.tradeReason.market",
   "domain.tradeReason.facilities",
@@ -28,7 +27,6 @@ export const keys = [
 export type DomainKey = (typeof keys)[number];
 
 export const fr: Record<DomainKey, string> = {
-  "domain.tradeReason.salary": "Salaire jugé insuffisant pour son renommé",
   "domain.tradeReason.competitiveness": "Équipe pas assez compétitive à son goût",
   "domain.tradeReason.market": "Marché pas assez attractif à son goût",
   "domain.tradeReason.facilities": "Infrastructures d'entraînement jugées insuffisantes",
@@ -51,7 +49,6 @@ export const fr: Record<DomainKey, string> = {
 };
 
 export const en: Record<DomainKey, string> = {
-  "domain.tradeReason.salary": "Considers his salary too low for his renown",
   "domain.tradeReason.competitiveness": "Team not competitive enough for his taste",
   "domain.tradeReason.market": "Market not attractive enough for his taste",
   "domain.tradeReason.facilities": "Considers training facilities inadequate",

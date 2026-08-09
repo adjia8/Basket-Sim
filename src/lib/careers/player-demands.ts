@@ -2,7 +2,7 @@
 // d'accès base de données ici, tout est piloté par src/app/actions/roster.ts
 // et les pages qui affichent ces exigences avant de laisser cliquer.
 
-import { SALARY_RANGES, salaryForRating } from "./salary-rules";
+import { SALARY_RANGES, baseSalaryFloor } from "./salary-rules";
 
 // À partir de ce renommé, un joueur devient "star" : il exige en plus une
 // équipe compétitive et un marché attractif (en dessous, seul le salaire compte).
@@ -13,14 +13,18 @@ export const ATTRACTIVE_FACILITIES_THRESHOLD = 60;
 
 // Salaire plancher accepté par un joueur, dérivé de son renommé — nul jusqu'au
 // renommé "moyen" (50, comportement inchangé pour un joueur non renommé),
-// jusqu'à +60% de prime au renommé maximal.
+// jusqu'à +60% de prime au renommé maximal. Utilise le barème DÉTERMINISTE
+// (baseSalaryFloor, sans variance aléatoire) : cette fonction sert à évaluer
+// un état existant (refus de signer/prolonger), pas à générer un nouveau
+// contrat — un plancher qui change à chaque appel rendrait ces décisions
+// incohérentes d'un rendu à l'autre.
 export function minAcceptableSalary(
   renown: number,
   overallRating: number,
   leagueId: string
 ): number {
   const range = SALARY_RANGES[leagueId] ?? SALARY_RANGES.nba;
-  const baseline = salaryForRating(overallRating, range);
+  const baseline = baseSalaryFloor(overallRating, range);
   const premium = (Math.max(0, renown - 50) / 49) * 0.6;
   return Math.round(baseline * (1 + premium));
 }
@@ -62,34 +66,29 @@ export function teamMeetsPlayerDemands(params: {
   );
 }
 
-export type TradeRequestReason = "salary" | "competitiveness" | "market" | "facilities";
+export type TradeRequestReason = "competitiveness" | "market" | "facilities";
 
 // Libellés dans src/lib/i18n/dict/domain.ts (clé `domain.tradeReason.<valeur>`)
 // — pas de texte affichable dans ce fichier de règles pures.
 
 // Détaille CE QUI, précisément, pousse un joueur à vouloir être échangé —
-// mêmes seuils que minAcceptableSalary/teamMeetsPlayerDemands, mais renvoie
-// la liste des raisons plutôt qu'un simple booléen (affiché sur la fiche
-// joueur). Un joueur peut cumuler plusieurs raisons à la fois. Un rookie
-// encore sous son contrat rookie (isRookieScale) n'a aucune exigence
-// salariale (voir extendContract) : jamais de raison "salary" pour lui.
+// mêmes seuils que teamMeetsPlayerDemands, mais renvoie la liste des raisons
+// plutôt qu'un simple booléen (affiché sur la fiche joueur). Un joueur peut
+// cumuler plusieurs raisons à la fois.
+//
+// Volontairement AUCUNE raison liée au salaire ici : un échange ne change en
+// rien le contrat d'un joueur (il est repris tel quel par la nouvelle
+// équipe), donc "je veux être échangé pour être mieux payé" n'a pas de sens
+// — un joueur sous-payé refuse plutôt de signer/prolonger (voir
+// minAcceptableSalary, utilisé par extendContract/signFreeAgent), il ne
+// demande pas un échange pour ça.
 export function tradeRequestReasons(params: {
   renown: number;
-  overallRating: number;
-  salary: number;
-  leagueId: string;
   teamWinPct: number;
   teamMarketAppeal: number;
   teamFacilitiesLevel: number;
-  isRookieScale?: boolean;
 }): TradeRequestReason[] {
   const reasons: TradeRequestReason[] = [];
-  if (
-    !params.isRookieScale &&
-    params.salary < minAcceptableSalary(params.renown, params.overallRating, params.leagueId)
-  ) {
-    reasons.push("salary");
-  }
   if (params.renown >= STAR_RENOWN_THRESHOLD) {
     if (params.teamWinPct < COMPETITIVE_WIN_PCT_THRESHOLD) reasons.push("competitiveness");
     if (params.teamMarketAppeal < ATTRACTIVE_MARKET_THRESHOLD) reasons.push("market");

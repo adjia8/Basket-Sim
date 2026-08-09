@@ -25,3 +25,21 @@ export function renownDeltaForGame(
   const ratio = production / Math.max(expectedProduction(overallRating), 8);
   return Math.max(-1.5, Math.min(1.5, (ratio - 1) * 2));
 }
+
+// Un joueur éligible mais qui ne joue pas (hors rotation, banc profond —
+// jamais dans le box score) ne voit jamais son renommé ajusté par
+// renownDeltaForGame, qui ne s'applique qu'aux entrées du box score : sans
+// ce décompte, son renommé de départ (initialRenown, dérivé du seul overall)
+// resterait figé indéfiniment, même après des dizaines de matchs sans jouer
+// — un ancien "espoir" écarté de la rotation garderait un statut de star
+// pour toujours.
+//
+// Exprimé en PROBABILITÉ d'un pas entier (-1), pas en delta fractionnaire
+// fixe : renown est stocké en entier et re-arrondi à chaque appel
+// (Math.round(stocké + delta)) — un delta constant de -0.3 appliqué à un
+// entier redonnerait TOUJOURS le même entier (round(X - 0.3) === X, quel que
+// soit le nombre de fois où on l'applique), donc n'aurait littéralement
+// aucun effet. Un tirage qui vaut soit 0 soit -1 a une vraie espérance
+// négative (BENCHED_RENOWN_DECAY_CHANCE par match) tout en produisant à
+// chaque application un delta qui, lui, s'enregistre correctement.
+export const BENCHED_RENOWN_DECAY_CHANCE = 0.3;

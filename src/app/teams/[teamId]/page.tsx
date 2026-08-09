@@ -90,19 +90,14 @@ export default async function TeamRosterPage({
     const contract = contractByPlayerId.get(player.id);
     const salary = contract?.salary ?? 0;
     // Demande de trade visible uniquement pour mon propre effectif : un
-    // joueur mécontent (équipe pas assez compétitive/attractive pour son
-    // standing, ou sous-payé par rapport à son exigence) — purement
-    // informatif, n'affecte aucune mécanique.
+    // joueur "star" mécontent de la compétitivité/attractivité/infrastructures
+    // de l'équipe — purement informatif, n'affecte aucune mécanique.
     const reasons = isMyTeam
       ? tradeRequestReasons({
           renown: player.renown,
-          overallRating: player.overallRating,
-          salary,
-          leagueId: team.leagueId,
           teamWinPct,
           teamMarketAppeal: team.marketAppeal,
           teamFacilitiesLevel: teamState.facilitiesLevel,
-          isRookieScale: contract?.isRookieScale ?? false,
         })
       : [];
     const stats = seasonStats.get(player.id) ?? emptyStats;
@@ -245,7 +240,6 @@ export default async function TeamRosterPage({
               severe: t("domain.injurySeverity.severe"),
             },
             tradeReason: {
-              salary: t("domain.tradeReason.salary"),
               competitiveness: t("domain.tradeReason.competitiveness"),
               market: t("domain.tradeReason.market"),
               facilities: t("domain.tradeReason.facilities"),

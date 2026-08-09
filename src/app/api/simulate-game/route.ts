@@ -194,8 +194,14 @@ export async function POST(request: Request) {
     advanceRosterInjuries(membership.careerId, awayRoster, result.boxScore, awayTeamState.facilitiesLevel),
   ]);
 
-  // Ajuste le renommé de chaque joueur qui a joué selon sa performance.
-  await advancePlayerRenown(membership.careerId, result.boxScore, [...homeRoster, ...awayRoster]);
+  // Ajuste le renommé de chaque joueur éligible : performance s'il a joué,
+  // légère érosion sinon (voir data-access/renown.ts) — les blessés et les
+  // joueuses en développement bloquées (hors homeEligibleRoster/
+  // awayEligibleRoster) ne sont volontairement pas concernés.
+  await advancePlayerRenown(membership.careerId, result.boxScore, [
+    ...homeEligibleRoster,
+    ...awayEligibleRoster,
+  ]);
 
   // Programme d'entraînement : fait dériver le bonus temporaire de chaque
   // joueur vers le plafond de l'intensité choisie (ou vers 0 si aucun focus

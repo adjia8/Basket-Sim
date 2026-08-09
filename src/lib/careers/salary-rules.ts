@@ -18,13 +18,34 @@ const RATING_FLOOR = 60;
 const RATING_CEIL = 99;
 const CURVE_POWER = 3;
 
+// Valeur déterministe (sans variance aléatoire) — c'est celle-ci que
+// player-demands.ts doit utiliser pour tout ce qui représente une exigence
+// STABLE d'un joueur (plancher salarial, mécontentement) : un re-tirage à
+// chaque rendu ferait apparaître/disparaître le badge "veut être échangé" de
+// façon incohérente à chaque revalidation de page (ex: changement de
+// programme d'entraînement), sans qu'aucun état de jeu n'ait réellement
+// changé.
+function baseSalaryForRating(overallRating: number, range: { min: number; max: number }): number {
+  const clamped = Math.min(Math.max(overallRating, RATING_FLOOR), RATING_CEIL);
+  const t = (clamped - RATING_FLOOR) / (RATING_CEIL - RATING_FLOOR);
+  return range.min + Math.pow(t, CURVE_POWER) * (range.max - range.min);
+}
+
+// Variante avec variance aléatoire (+/- 15%) — réservée à la génération d'un
+// NOUVEAU contrat (signature, prolongation), où une part d'aléatoire dans le
+// montant proposé est réaliste (négociation, marché). Ne jamais l'utiliser
+// pour évaluer un état existant (voir baseSalaryForRating ci-dessus).
 export function salaryForRating(
   overallRating: number,
   range: { min: number; max: number }
 ): number {
-  const clamped = Math.min(Math.max(overallRating, RATING_FLOOR), RATING_CEIL);
-  const t = (clamped - RATING_FLOOR) / (RATING_CEIL - RATING_FLOOR);
-  const base = range.min + Math.pow(t, CURVE_POWER) * (range.max - range.min);
-  const variance = base * 0.15 * (Math.random() * 2 - 1); // +/- 15%
+  const base = baseSalaryForRating(overallRating, range);
+  const variance = base * 0.15 * (Math.random() * 2 - 1);
   return Math.round(Math.min(range.max, Math.max(range.min, base + variance)));
+}
+
+// Plancher stable (aucun aléatoire) utilisé par minAcceptableSalary — voir
+// baseSalaryForRating.
+export function baseSalaryFloor(overallRating: number, range: { min: number; max: number }): number {
+  return Math.round(Math.min(range.max, Math.max(range.min, baseSalaryForRating(overallRating, range))));
 }
