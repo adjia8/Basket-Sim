@@ -85,17 +85,22 @@ export function gmChemistryBonus(chemistryPoints: number): number {
 export type GmSeasonOutcome = "met" | "exceeded" | "warning" | "fired";
 
 // Écart entre objectif et résultat, ajusté d'une pénalité si finances
-// négatives en fin de saison (mauvaise gestion financière) : compte comme un
-// tier de résultat en moins. Un deuxième avertissement consécutif (déjà
-// 1+ avertissement à ce poste) entraîne un licenciement plutôt qu'un
-// nouvel avertissement.
+// négatives en fin de saison (mauvaise gestion financière) et de la
+// perception des dirigeants (issue des conférences de presse, voir
+// press-rules.ts) : une mauvaise relation (< 30) aggrave d'un tier
+// supplémentaire, une excellente relation (> 70) en absorbe un — chacune
+// compte comme un tier de résultat en plus/moins. Un deuxième avertissement
+// consécutif (déjà 1+ avertissement à ce poste) entraîne un licenciement
+// plutôt qu'un nouvel avertissement.
 export function evaluateGmSeason(
   expectation: ExpectationTier,
   result: ExpectationTier,
   financesNegative: boolean,
-  currentWarnings: number
+  currentWarnings: number,
+  frontOfficeApproval = 50
 ): { gap: number; outcome: GmSeasonOutcome } {
-  const gap = tierIndex(result) - tierIndex(expectation) - (financesNegative ? 1 : 0);
+  const approvalAdjustment = frontOfficeApproval < 30 ? -1 : frontOfficeApproval > 70 ? 1 : 0;
+  const gap = tierIndex(result) - tierIndex(expectation) - (financesNegative ? 1 : 0) + approvalAdjustment;
   if (gap >= 1) return { gap, outcome: "exceeded" };
   if (gap === 0) return { gap, outcome: "met" };
   if (gap === -1) {

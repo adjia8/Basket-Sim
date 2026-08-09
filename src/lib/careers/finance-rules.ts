@@ -16,13 +16,21 @@ export function initialFinances(leagueId: string, marketAppeal: number): number 
 }
 
 // Billetterie/maillots/snackerie : dépend du bilan de la saison qui vient de
-// se terminer ET de l'attractivité du marché (Team.marketAppeal) — un grand
-// marché vend plus même à bilan égal.
-export function seasonRevenue(leagueId: string, winPct: number, marketAppeal: number): number {
+// se terminer, de l'attractivité du marché (Team.marketAppeal) ET de
+// l'opinion publique (TeamState.publicOpinion, pilotée par les conférences
+// de presse — voir press-rules.ts) — une franchise appréciée remplit mieux
+// ses tribunes à bilan égal.
+export function seasonRevenue(
+  leagueId: string,
+  winPct: number,
+  marketAppeal: number,
+  publicOpinion = 50
+): number {
   const base = BASE_SEASON_REVENUE[leagueId] ?? BASE_SEASON_REVENUE.nba;
   const performanceMultiplier = 0.6 + winPct * 0.8; // 0.6x à 1.4x
   const marketMultiplier = 0.7 + (marketAppeal / 99) * 0.6; // 0.7x à 1.3x
-  return Math.round(base * performanceMultiplier * marketMultiplier);
+  const opinionMultiplier = 0.9 + (Math.max(0, Math.min(99, publicOpinion)) / 99) * 0.2; // 0.9x à 1.1x
+  return Math.round(base * performanceMultiplier * marketMultiplier * opinionMultiplier);
 }
 
 // Coût pour gagner UPGRADE_INCREMENT points à partir du niveau courant —

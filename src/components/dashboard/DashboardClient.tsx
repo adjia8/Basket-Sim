@@ -16,6 +16,7 @@ export function DashboardClient({
   playoffsInProgress,
   championTeamName,
   inviteCode,
+  hasPendingPressConference,
 }: {
   teamId: string;
   teams: Team[];
@@ -28,6 +29,7 @@ export function DashboardClient({
   playoffsInProgress: boolean;
   championTeamName?: string;
   inviteCode: string;
+  hasPendingPressConference: boolean;
 }) {
   const myTeam = teams.find((t) => t.id === teamId);
   if (!myTeam) return null;
@@ -61,6 +63,18 @@ export function DashboardClient({
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 px-4 py-8">
+      {hasPendingPressConference && (
+        <div className="flex items-center justify-between rounded-lg border border-black/10 bg-black/5 px-4 py-3 dark:border-white/10 dark:bg-white/10">
+          <p className="text-sm font-medium">Conférence de presse en attente.</p>
+          <Link
+            href="/press"
+            className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+          >
+            Répondre aux médias
+          </Link>
+        </div>
+      )}
+
       {seasonComplete && playoffsInProgress && (
         <div className="flex items-center justify-between rounded-lg border border-black/10 bg-black/5 px-4 py-3 dark:border-white/10 dark:bg-white/10">
           <p className="text-sm font-medium">Saison régulière terminée — playoffs en cours.</p>

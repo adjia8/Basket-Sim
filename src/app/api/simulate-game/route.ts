@@ -14,6 +14,7 @@ import { advanceRosterFatigue, getRestDays } from "@/lib/data-access/fatigue";
 import { advanceTeamChemistry, getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { advanceRosterTraining } from "@/lib/data-access/training";
 import { getGmBonusForTeam } from "@/lib/data-access/gm";
+import { maybeCreatePressConference } from "@/lib/data-access/press";
 import { winPctForStandings } from "@/lib/careers/player-demands";
 import {
   chemistryTrainingBonus,
@@ -21,6 +22,7 @@ import {
   type TrainingFocus,
   type TrainingIntensity,
 } from "@/lib/careers/training-rules";
+import { moraleBonus } from "@/lib/careers/press-rules";
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -127,8 +129,8 @@ export async function POST(request: Request) {
     awayTeam,
     awayRoster.filter(canPlay),
     {
-      homeChemistry: homeTeamState.chemistry + homeGm.chemistry,
-      awayChemistry: awayTeamState.chemistry + awayGm.chemistry,
+      homeChemistry: homeTeamState.chemistry + homeGm.chemistry + moraleBonus(homeTeamState.morale),
+      awayChemistry: awayTeamState.chemistry + awayGm.chemistry + moraleBonus(awayTeamState.morale),
       homeGmBonus: homeGm.strength,
       awayGmBonus: awayGm.strength,
     }
@@ -207,6 +209,17 @@ export async function POST(request: Request) {
       awayRoster,
       chemistryTrainingBonus(awayFocus, awayIntensity)
     ),
+  ]);
+
+  // Conférence de presse aléatoire (au plus 1/semaine réelle) — seulement
+  // pour les équipes gérées par un humain, jamais pour un match IA-vs-IA.
+  await Promise.all([
+    homeManager
+      ? maybeCreatePressConference(membership.careerId, updatedGame.homeTeamId, updatedGame.leagueId, gameDate)
+      : Promise.resolve(),
+    awayManager
+      ? maybeCreatePressConference(membership.careerId, updatedGame.awayTeamId, updatedGame.leagueId, gameDate)
+      : Promise.resolve(),
   ]);
 
   return NextResponse.json({ simulated: true, game: updated });

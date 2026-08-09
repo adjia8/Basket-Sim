@@ -176,7 +176,8 @@ export async function advanceSeason(): Promise<void> {
       gmProfile.currentExpectationTier as ExpectationTier,
       resultTier,
       teamState.finances < 0,
-      gmProfile.warningsAtCurrentTeam
+      gmProfile.warningsAtCurrentTeam,
+      gmProfile.frontOfficeApproval
     );
 
     await prisma.gmSeasonRecord.create({

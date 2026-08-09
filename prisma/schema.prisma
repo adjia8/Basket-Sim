@@ -37,6 +37,36 @@ model Career {
   playoffSeries    PlayoffSeries[]
   teamStates       TeamState[]
   playerTeamStints PlayerTeamStint[]
+  pressConferences PressConference[]
+}
+
+// Une conférence = 3-4 questions générées ensemble, répondues en un seul
+// envoi. Les options de réponse (avec leur ton) sont générées à la création
+// et stockées en JSON plutôt que normalisées — même esprit que
+// Game.boxScore, pas besoin d'une table à part pour un contenu jamais
+// requêté indépendamment de sa question.
+model PressConference {
+  id        String          @id @default(cuid())
+  careerId  String
+  career    Career          @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  teamId    String // pas de relation formelle à TeamState (identifiée par (careerId, teamId), pas par un id propre) — même pattern que Contract/DeadCap, qui référencent juste teamId en champ simple
+  gameDate  DateTime // date du match qui a déclenché la conférence
+  status    String          @default("pending") // "pending" | "answered"
+  createdAt DateTime        @default(now())
+  questions PressQuestion[]
+
+  @@index([careerId, teamId])
+}
+
+model PressQuestion {
+  id                String          @id @default(cuid())
+  pressConferenceId String
+  pressConference   PressConference @relation(fields: [pressConferenceId], references: [id], onDelete: Cascade)
+  order             Int
+  prompt            String
+  category          String // "results" | "roster" | "management" | "future"
+  optionsJson       String // JSON: { id: string; label: string; tone: AnswerTone }[]
+  chosenOptionId    String?
 }
 
 // Qui gère quelle équipe dans une Career (ligue) partagée. Un compte n'est
@@ -79,6 +109,7 @@ model GmProfile {
   warningsAtCurrentTeam  Int              @default(0)
   pendingReassignment    Boolean          @default(false) // vient d'être viré, doit choisir une nouvelle franchise
   pendingOfferTeamId     String? // offre de dépeçage en attente de réponse
+  frontOfficeApproval    Int              @default(50) // 0-99, piloté par les réponses en conférence de presse
   seasonRecords          GmSeasonRecord[]
 }
 
@@ -430,17 +461,20 @@ model DeadCap {
 // Créée paresseusement à la première lecture (défaut 50), même principe que
 // getCurrentDraftPick.
 model TeamState {
-  id                 String  @id @default(cuid())
-  careerId           String
-  career             Career  @relation(fields: [careerId], references: [id], onDelete: Cascade)
-  teamId             String
-  team               Team    @relation(fields: [teamId], references: [id])
-  chemistry          Int     @default(50) // 0-99
-  finances           Int     @default(0) // dollars, trésorerie de franchise — distincte du plafond salarial
-  facilitiesLevel    Int     @default(50) // 0-100
-  trainingStaffLevel Int     @default(50) // 0-100
-  trainingFocus      String? // "offensive" | "defensive" | "tactical" | "physical" | "chemistry" | "rest", null = aucun
-  trainingIntensity  String  @default("medium") // "low" | "medium" | "high"
+  id                      String    @id @default(cuid())
+  careerId                String
+  career                  Career    @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  teamId                  String
+  team                    Team      @relation(fields: [teamId], references: [id])
+  chemistry               Int       @default(50) // 0-99
+  finances                Int       @default(0) // dollars, trésorerie de franchise — distincte du plafond salarial
+  facilitiesLevel         Int       @default(50) // 0-100
+  trainingStaffLevel      Int       @default(50) // 0-100
+  trainingFocus           String? // "offensive" | "defensive" | "tactical" | "physical" | "chemistry" | "rest", null = aucun
+  trainingIntensity       String    @default("medium") // "low" | "medium" | "high"
+  morale                  Int       @default(50) // 0-99, piloté par les réponses en conférence de presse
+  publicOpinion           Int       @default(50) // 0-99, opinion fans/autres franchises, pilotée par les réponses en conférence de presse
+  lastPressConferenceDate DateTime?
 
   @@unique([careerId, teamId])
 }

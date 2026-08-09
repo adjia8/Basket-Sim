@@ -16,6 +16,7 @@ const NAV_LINKS = [
   { href: "/playoffs", label: "Playoffs" },
   { href: "/franchise", label: "Franchise" },
   { href: "/gm", label: "GM" },
+  { href: "/press", label: "Presse" },
   { href: "/season-recap", label: "Bilan" },
 ];
 

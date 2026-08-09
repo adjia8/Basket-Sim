@@ -87,7 +87,7 @@ export async function applySeasonFinancials(
   marketAppeal: number
 ): Promise<void> {
   const state = await getOrCreateTeamState(careerId, teamId, leagueId);
-  const revenue = seasonRevenue(leagueId, winPct, marketAppeal);
+  const revenue = seasonRevenue(leagueId, winPct, marketAppeal, state.publicOpinion);
 
   await prisma.teamState.update({
     where: { id: state.id },
