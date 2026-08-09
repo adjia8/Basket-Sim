@@ -8,20 +8,23 @@ import { getScheduleForCareer } from "@/lib/data-access/schedule";
 import { getStandings } from "@/lib/data-access/standings";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { getPendingPressConference } from "@/lib/data-access/press";
+import { preseasonSeasonLabel } from "@/lib/careers/schedule-rules";
 import { teamFullName } from "@/lib/utils";
 
 export default async function DashboardPage() {
   const membership = await getCurrentMembership();
 
-  const [teams, players, standings, games, payroll, league, pendingPressConference] = await Promise.all([
-    getTeamsByLeague(membership.leagueId),
-    getRosterForTeam(membership.careerId, membership.teamId),
-    getStandings(membership.careerId, membership.leagueId, membership.season),
-    getScheduleForCareer(membership.careerId, membership.season),
-    getPayrollForTeam(membership.careerId, membership.teamId),
-    getLeagueById(membership.leagueId),
-    getPendingPressConference(membership.careerId, membership.teamId),
-  ]);
+  const [teams, players, standings, games, preseasonGames, payroll, league, pendingPressConference] =
+    await Promise.all([
+      getTeamsByLeague(membership.leagueId),
+      getRosterForTeam(membership.careerId, membership.teamId),
+      getStandings(membership.careerId, membership.leagueId, membership.season),
+      getScheduleForCareer(membership.careerId, membership.season),
+      getScheduleForCareer(membership.careerId, preseasonSeasonLabel(membership.season)),
+      getPayrollForTeam(membership.careerId, membership.teamId),
+      getLeagueById(membership.leagueId),
+      getPendingPressConference(membership.careerId, membership.teamId),
+    ]);
 
   const seasonComplete = games.length > 0 && games.every((g) => g.status === "final");
   const playoffs = seasonComplete
@@ -38,6 +41,7 @@ export default async function DashboardPage() {
       players={players}
       standings={standings}
       games={games}
+      preseasonGames={preseasonGames}
       payroll={payroll}
       salaryCap={league?.salaryCap ?? 0}
       seasonComplete={seasonComplete}

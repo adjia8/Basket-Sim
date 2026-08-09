@@ -1,11 +1,9 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { simulationEngine } from "@/lib/simulation/mockEngine";
-import { toDomainPlayer, toDomainTeam } from "@/lib/data-access/mappers";
-import { REGULAR_SEASON_GAMES, SEASON_LENGTH_DAYS } from "./schedule-rules";
-import type { League, Player } from "@/lib/types";
+import { PRESEASON_ROUNDS, PRESEASON_SPAN_DAYS, REGULAR_SEASON_GAMES, SEASON_LENGTH_DAYS } from "./schedule-rules";
+import type { League } from "@/lib/types";
 
-function addDays(date: Date, days: number): Date {
+export function addDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
@@ -90,10 +88,12 @@ export interface GenerateScheduleOptions {
   // Étiquette de saison à appliquer aux Game générés (Career.season courant,
   // pas forcément league.season une fois qu'on a dépassé la 1ère saison).
   seasonLabel: string;
-  // true uniquement à la toute première génération (création de la Career) :
-  // pré-simule les matchs dont la date calculée est déjà passée. Pour un
-  // rollover de saison, tout doit démarrer "scheduled".
-  presimulatePast: boolean;
+  // Date du 1er match généré. Par défaut aujourd'hui - 8 jours (comportement
+  // historique du rollover de saison, laisse une poignée de matchs déjà
+  // "dus" à la date du jour sans que ça pose problème puisqu'ils restent
+  // "scheduled"). La création de Career la surcharge explicitement pour
+  // positionner la saison régulière après la pré-saison (voir actions/career.ts).
+  startDate?: Date;
 }
 
 export async function generateCareerSchedule(
@@ -102,24 +102,8 @@ export async function generateCareerSchedule(
   options: GenerateScheduleOptions
 ): Promise<void> {
   const teamRows = await prisma.team.findMany({ where: { leagueId: league.id } });
-  const teams = teamRows.map(toDomainTeam);
-  const teamIds = teams.map((t) => t.id);
+  const teamIds = teamRows.map((t) => t.id);
   const n = teamIds.length;
-
-  // Roster par équipe POUR CETTE CAREER (via Contract), seulement nécessaire
-  // si on doit effectivement pré-simuler des matchs.
-  const rosterByTeamId = new Map<string, Player[]>();
-  if (options.presimulatePast) {
-    const contractRows = await prisma.contract.findMany({
-      where: { careerId },
-      include: { player: true },
-    });
-    for (const contract of contractRows) {
-      const roster = rosterByTeamId.get(contract.teamId) ?? [];
-      roster.push(toDomainPlayer(contract.player));
-      rosterByTeamId.set(contract.teamId, roster);
-    }
-  }
 
   // Vrai nombre de matchs par équipe (82 NBA, 44 WNBA) : chaque adversaire est
   // joué `base` fois (round-robin répété), puis un graphe régulier ajoute une
@@ -140,11 +124,10 @@ export async function generateCareerSchedule(
     allPairs.push([teamIds[i], teamIds[j]]);
   }
 
-  const today = new Date();
   const pairs = seededShuffle(allPairs, `${careerId}-${options.seasonLabel}`);
   const roundOfPair = assignRounds(pairs);
   const totalRounds = Math.max(...roundOfPair) + 1;
-  const startDate = addDays(today, -8); // une poignée de matchs déjà joués
+  const startDate = options.startDate ?? addDays(new Date(), -8);
   const seasonDays = SEASON_LENGTH_DAYS[league.id] ?? SEASON_LENGTH_DAYS.nba;
 
   // Étale les tours sur toute la durée de la saison (plusieurs équipes jouent
@@ -158,27 +141,8 @@ export async function generateCareerSchedule(
   const rows = pairs.map(([teamA, teamB], index) => {
     const dayOffset = dayForRound(roundOfPair[index]);
     const gameDate = addDays(startDate, dayOffset);
-    const isPast = options.presimulatePast && gameDate < today;
     const homeTeamId = index % 2 === 0 ? teamA : teamB;
     const awayTeamId = index % 2 === 0 ? teamB : teamA;
-
-    let homeScore: number | null = null;
-    let awayScore: number | null = null;
-    let boxScore: string | null = null;
-
-    if (isPast) {
-      const homeTeam = teams.find((t) => t.id === homeTeamId)!;
-      const awayTeam = teams.find((t) => t.id === awayTeamId)!;
-      const result = simulationEngine.simulateGame(
-        homeTeam,
-        rosterByTeamId.get(homeTeamId) ?? [],
-        awayTeam,
-        rosterByTeamId.get(awayTeamId) ?? []
-      );
-      homeScore = result.homeScore;
-      awayScore = result.awayScore;
-      boxScore = JSON.stringify(result.boxScore);
-    }
 
     return {
       careerId,
@@ -187,12 +151,56 @@ export async function generateCareerSchedule(
       gameDate,
       homeTeamId,
       awayTeamId,
-      status: isPast ? "final" : "scheduled",
-      homeScore,
-      awayScore,
-      boxScore,
+      status: "scheduled",
     };
   });
+
+  await prisma.game.createMany({ data: rows });
+}
+
+// Calendrier de pré-saison : volontairement plus simple que la saison
+// régulière (pas besoin d'un round-robin équilibré pour des matchs
+// d'exhibition) — à chaque tour, mélange les équipes et les apparie deux par
+// deux ; une équipe seule sur un nombre impair d'équipes (ex: 13 en WNBA)
+// passe simplement ce tour (repos), comme dans un vrai calendrier de
+// pré-saison qui n'est jamais parfaitement symétrique non plus.
+export async function generateCareerPreseasonSchedule(
+  careerId: string,
+  league: League,
+  options: { seasonLabel: string; startDate: Date }
+): Promise<void> {
+  const teamRows = await prisma.team.findMany({ where: { leagueId: league.id } });
+  const teamIds = teamRows.map((t) => t.id);
+
+  const rows: {
+    careerId: string;
+    leagueId: string;
+    season: string;
+    gameDate: Date;
+    homeTeamId: string;
+    awayTeamId: string;
+    status: string;
+  }[] = [];
+
+  for (let round = 0; round < PRESEASON_ROUNDS; round++) {
+    const shuffled = seededShuffle(teamIds, `${careerId}-preseason-${round}`);
+    const gameDate = addDays(options.startDate, Math.floor((round * PRESEASON_SPAN_DAYS) / PRESEASON_ROUNDS));
+    for (let i = 0; i + 1 < shuffled.length; i += 2) {
+      // Alterne qui reçoit d'un tour à l'autre, pour qu'une équipe ne soit
+      // pas systématiquement à l'extérieur sur les tours pairs.
+      const homeTeamId = round % 2 === 0 ? shuffled[i] : shuffled[i + 1];
+      const awayTeamId = round % 2 === 0 ? shuffled[i + 1] : shuffled[i];
+      rows.push({
+        careerId,
+        leagueId: league.id,
+        season: options.seasonLabel,
+        gameDate,
+        homeTeamId,
+        awayTeamId,
+        status: "scheduled",
+      });
+    }
+  }
 
   await prisma.game.createMany({ data: rows });
 }

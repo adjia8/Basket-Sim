@@ -10,6 +10,7 @@ export function DashboardClient({
   players,
   standings,
   games,
+  preseasonGames,
   payroll,
   salaryCap,
   seasonComplete,
@@ -23,6 +24,7 @@ export function DashboardClient({
   players: Player[];
   standings: StandingsRow[];
   games: Game[];
+  preseasonGames: Game[];
   payroll: number;
   salaryCap: number;
   seasonComplete: boolean;
@@ -34,7 +36,12 @@ export function DashboardClient({
   const myTeam = teams.find((t) => t.id === teamId);
   if (!myTeam) return null;
 
-  const myTeamGames = games
+  // Fusionne pré-saison + saison régulière : la pré-saison est datée avant,
+  // donc le tri chronologique la fait naturellement apparaître en premier
+  // tant qu'elle n'est pas terminée — aucun traitement spécial nécessaire
+  // au-delà de l'étiquette visuelle (voir preseasonGameIds).
+  const preseasonGameIds = new Set(preseasonGames.map((g) => g.id));
+  const myTeamGames = [...preseasonGames, ...games]
     .filter((g) => g.homeTeamId === teamId || g.awayTeamId === teamId)
     .sort((a, b) => a.gameDate.localeCompare(b.gameDate));
 
@@ -133,7 +140,12 @@ export function DashboardClient({
       <section>
         <h2 className="mb-3 text-lg font-semibold">Prochain match</h2>
         {nextGame ? (
-          <GameLine game={nextGame} teams={teams} myTeamId={teamId} />
+          <GameLine
+            game={nextGame}
+            teams={teams}
+            myTeamId={teamId}
+            isPreseason={preseasonGameIds.has(nextGame.id)}
+          />
         ) : (
           <p className="text-sm text-black/50 dark:text-white/50">
             Aucun match programmé pour le moment.
@@ -146,7 +158,13 @@ export function DashboardClient({
         {recentGames.length > 0 ? (
           <div className="space-y-2">
             {recentGames.map((game) => (
-              <GameLine key={game.id} game={game} teams={teams} myTeamId={teamId} />
+              <GameLine
+                key={game.id}
+                game={game}
+                teams={teams}
+                myTeamId={teamId}
+                isPreseason={preseasonGameIds.has(game.id)}
+              />
             ))}
           </div>
         ) : (
@@ -231,10 +249,12 @@ function GameLine({
   game,
   teams,
   myTeamId,
+  isPreseason,
 }: {
   game: Game;
   teams: Team[];
   myTeamId: string;
+  isPreseason?: boolean;
 }) {
   const home = teams.find((t) => t.id === game.homeTeamId);
   const away = teams.find((t) => t.id === game.awayTeamId);
@@ -248,6 +268,11 @@ function GameLine({
     >
       <span>
         {isHome ? "vs" : "@"} {opponent ? teamFullName(opponent) : "?"}
+        {isPreseason && (
+          <span className="ml-2 rounded-full bg-black/5 px-2 py-0.5 text-xs font-normal text-black/50 dark:bg-white/10 dark:text-white/50">
+            Pré-saison
+          </span>
+        )}
       </span>
       <span className="flex items-center gap-3 text-black/50 dark:text-white/50">
         {game.status === "final" ? (

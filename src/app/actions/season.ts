@@ -269,10 +269,9 @@ export async function advanceSeason(): Promise<void> {
   const newFarSeason = futureSeasonsAfter(newSeason, FUTURE_PICK_WINDOW).at(-1)!;
   await createUnresolvedPicksForSeason(career.id, newFarSeason, draftOrderTeamIds);
 
-  // 5. Nouveau calendrier, tout "scheduled" (rien à pré-simuler).
+  // 5. Nouveau calendrier, tout "scheduled".
   await generateCareerSchedule(career.id, toDomainLeague(career.league), {
     seasonLabel: newSeason,
-    presimulatePast: false,
   });
 
   revalidatePath("/", "layout");
