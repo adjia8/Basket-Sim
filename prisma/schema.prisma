@@ -298,6 +298,7 @@ model Contract {
   contractType   String   @default("standard") // "standard" | "two_way" | "development" — voir contract-type-rules.ts
   isRookieScale  Boolean  @default(false) // contrat rookie non renégocié — voir extendContract dans actions/roster.ts
   developmentGamesActivated Int @default(0) // matchs activés sous CE contrat de développement (WNBA, limite 12) — voir DEVELOPMENT_CONTRACT_GAME_LIMIT dans contract-type-rules.ts
+  lastExtendedSeason String? // saison où extendContract a été utilisé — voir evaluatePendingPromises (promesse "renewal")
   createdAt      DateTime @default(now())
 
   @@unique([careerId, playerId])
@@ -357,6 +358,18 @@ model PlayerState {
   retiredSeason        String? // saison (label) de la retraite, null si actif
   trainingBoost        Int     @default(0) // 0-8, bonus temporaire courant sur les attributs de trainingBoostFocus
   trainingBoostFocus   String? // catégorie ciblée par le bonus courant, null si aucun
+
+  // Demande de trade + promesse du GM — voir src/lib/data-access/trade-requests.ts.
+  // wantsTrade est déclenché par un tirage probabiliste sous cooldown (jamais
+  // recalculé en direct), donc doit être persisté ici plutôt que dérivé à
+  // chaque rendu comme c'était le cas avant.
+  wantsTrade                Boolean   @default(false)
+  tradeRequestReasonsJson   String? // JSON des TradeRequestReason au moment du déclenchement
+  tradeRequestSinceSeason   String? // saison où la demande a été levée
+  lastTradeRequestCheckDate DateTime? // ancre de cooldown, même principe que TeamState.lastPressConferenceDate
+  activePromiseType         String? // "renewal" | "trade" | "facilities" | "competitiveness", null = aucune
+  activePromiseSeason       String? // saison à honorer (== saison où la promesse a été faite)
+  promiseOriginTeamId       String? // équipe qui a fait la promesse, figée à la création
 
   @@unique([careerId, playerId])
   @@index([careerId])
@@ -484,6 +497,7 @@ model TeamState {
   morale                  Int       @default(50) // 0-99, piloté par les réponses en conférence de presse
   publicOpinion           Int       @default(50) // 0-99, opinion fans/autres franchises, pilotée par les réponses en conférence de presse
   lastPressConferenceDate DateTime?
+  lastTradeRequestDate    DateTime? // anti-cluster : dernière fois qu'UNE joueuse de cette équipe a levé une demande de trade
 
   @@unique([careerId, teamId])
 }

@@ -90,7 +90,19 @@ export function FranchiseCarousel({
   const pointsRemaining = GM_POINT_POOL - pointsTotal;
 
   function setPoint(key: string, value: number) {
-    setPoints((prev) => ({ ...prev, [key]: Math.max(0, Math.min(GM_POINT_POOL, value)) }));
+    setPoints((prev) => {
+      // Le plafond de CE champ dépend de ce qui est déjà alloué ailleurs :
+      // un simple clamp [0, GM_POINT_POOL] par champ laissait le total
+      // dépasser le pool (ex. 20 partout), rendant "points restants"
+      // négatif — le bouton de soumission bloquait déjà ce cas, mais
+      // l'affichage intermédiaire ne devait jamais pouvoir descendre sous 0.
+      const othersTotal = Object.entries(prev).reduce(
+        (sum, [k, v]) => (k === key ? sum : sum + v),
+        0
+      );
+      const maxForField = Math.max(0, GM_POINT_POOL - othersTotal);
+      return { ...prev, [key]: Math.max(0, Math.min(maxForField, value)) };
+    });
   }
 
   if (!slide) {

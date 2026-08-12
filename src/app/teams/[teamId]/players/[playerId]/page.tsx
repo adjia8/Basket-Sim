@@ -4,14 +4,16 @@ import { getContractForPlayer } from "@/lib/data-access/contracts";
 import { getPlayerWithState } from "@/lib/data-access/players";
 import { getSeasonStatsForPlayers } from "@/lib/data-access/season-stats";
 import { getStintsForPlayer } from "@/lib/data-access/player-history";
-import { getStandings } from "@/lib/data-access/standings";
-import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getTeamById } from "@/lib/data-access/teams";
+import { getPlayerDemandState } from "@/lib/data-access/trade-requests";
+import { isTradeDeadlinePassed } from "@/lib/data-access/season-windows";
 import { prisma } from "@/lib/prisma";
-import { minAcceptableSalary, tradeRequestReasons, winPctForStandings } from "@/lib/careers/player-demands";
+import { minAcceptableSalary } from "@/lib/careers/player-demands";
+import { PROMISE_TYPES } from "@/lib/careers/promise-rules";
 import { PlayerAvatar } from "@/components/team/PlayerAvatar";
 import { ExtendContractForm } from "@/components/team/ExtendContractForm";
 import { PromoteContractForm } from "@/components/team/PromoteContractForm";
+import { MakePromiseForm } from "@/components/team/MakePromiseForm";
 import { releasePlayer, offerAlternateContract } from "@/app/actions/roster";
 import { MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import {
@@ -60,7 +62,7 @@ export default async function PlayerDetailPage({
 
   const isMyTeam = team.id === membership.teamId;
 
-  const [seasonStats, stints, standardRosterSize, altSlotsUsed, standings, teamState] = await Promise.all([
+  const [seasonStats, stints, standardRosterSize, altSlotsUsed, demandState, tradeDeadlinePassed] = await Promise.all([
     getSeasonStatsForPlayers(membership.careerId, membership.season, [playerId]),
     getStintsForPlayer(membership.careerId, playerId),
     prisma.contract.count({
@@ -69,24 +71,18 @@ export default async function PlayerDetailPage({
     prisma.contract.count({
       where: { careerId: membership.careerId, teamId, contractType: { not: "standard" } },
     }),
-    getStandings(membership.careerId, team.leagueId, membership.season),
-    getOrCreateTeamState(membership.careerId, teamId, team.leagueId),
+    isMyTeam ? getPlayerDemandState(membership.careerId, playerId) : Promise.resolve(null),
+    isTradeDeadlinePassed(membership.careerId, membership.season),
   ]);
   const stats = seasonStats.get(playerId) ?? {
     gamesPlayed: 0, points: 0, rebounds: 0, assists: 0, ppg: 0, rpg: 0, apg: 0,
   };
 
-  // Visible seulement pour mon équipe — même convention que le badge dans
-  // RosterTable (données purement informatives, sans effet sur le gameplay).
-  const teamStandingsRow = standings.find((row) => row.teamId === teamId);
-  const reasons = isMyTeam
-    ? tradeRequestReasons({
-        renown: player.renown,
-        teamWinPct: winPctForStandings(teamStandingsRow?.wins ?? 0, teamStandingsRow?.losses ?? 0),
-        teamMarketAppeal: team.marketAppeal,
-        teamFacilitiesLevel: teamState.facilitiesLevel,
-      })
-    : [];
+  // Visible seulement pour mon équipe — état persisté (voir
+  // trade-requests.ts), plus recalculé en direct à chaque rendu : purement
+  // informatif, n'affecte aucune mécanique par lui-même (seule la promesse
+  // en réponse a un effet, voir plus bas).
+  const reasons = demandState?.reasons ?? [];
   const tradeReasonLabels: Record<(typeof reasons)[number], string> = {
     competitiveness: t("domain.tradeReason.competitiveness"),
     market: t("domain.tradeReason.market"),
@@ -153,6 +149,36 @@ export default async function PlayerDetailPage({
               <li key={reason}>{tradeReasonLabels[reason]}</li>
             ))}
           </ul>
+
+          {isMyTeam && demandState?.wantsTrade && (
+            <div className="mt-3 border-t border-orange-500/20 pt-3">
+              {demandState.activePromiseType ? (
+                <p className="text-orange-600 dark:text-orange-400">
+                  {t("promise.pendingPrefix")}{" "}
+                  {t(`domain.promiseType.${demandState.activePromiseType}` as const)}
+                  {demandState.activePromiseSeason ? ` — ${demandState.activePromiseSeason}` : ""}
+                </p>
+              ) : (
+                <MakePromiseForm
+                  playerId={player.id}
+                  availableTypes={PROMISE_TYPES.filter(
+                    (type) => (type !== "renewal" || canExtend) && (type !== "trade" || !tradeDeadlinePassed)
+                  )}
+                  labels={{
+                    selectLabel: t("promise.selectLabel"),
+                    submitButton: t("promise.submitButton"),
+                    submitting: t("common.proposing"),
+                    typeLabels: {
+                      renewal: t("domain.promiseType.renewal"),
+                      trade: t("domain.promiseType.trade"),
+                      facilities: t("domain.promiseType.facilities"),
+                      competitiveness: t("domain.promiseType.competitiveness"),
+                    },
+                  }}
+                />
+              )}
+            </div>
+          )}
         </div>
       )}
 

@@ -23,6 +23,7 @@ import { applySeasonFinancials, getOrCreateTeamState } from "@/lib/data-access/t
 import { winPctForStandings } from "@/lib/careers/player-demands";
 import { getPlayoffResultTier } from "@/lib/data-access/playoffs";
 import { evaluateGmSeason, expectationForRoster, type ExpectationTier } from "@/lib/careers/gm-rules";
+import { evaluatePendingPromises } from "@/lib/data-access/trade-requests";
 
 const POACH_OFFER_CHANCE = 0.25;
 
@@ -228,6 +229,12 @@ export async function advanceSeason(): Promise<void> {
       },
     });
   }
+
+  // 2quater. Résolution des promesses en attente pour la saison qui se
+  // termine — DOIT tourner avec finishedStandings/teamStates capturés plus
+  // haut (teamStates = infrastructures AVANT la dégradation annuelle de
+  // l'étape 2bis) et AVANT l'écrasement de career.season juste en dessous.
+  await evaluatePendingPromises(career.id, career.season, finishedStandings, teamStates);
 
   // 3. Nouvelle saison (label déjà calculé plus haut, dans newSeason).
   await prisma.career.update({

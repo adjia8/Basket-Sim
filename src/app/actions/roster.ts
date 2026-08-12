@@ -80,6 +80,21 @@ export async function releasePlayer(formData: FormData): Promise<void> {
           }),
         ]
       : []),
+    // Une joueuse coupée n'est plus le problème de ce GM — sans ce reset, une
+    // promesse active resterait bloquée pour toujours si elle est re-signée
+    // plus tard (y compris par un autre GM humain en multijoueur).
+    prisma.playerState.updateMany({
+      where: { careerId: membership.careerId, playerId },
+      data: {
+        wantsTrade: false,
+        tradeRequestReasonsJson: null,
+        tradeRequestSinceSeason: null,
+        lastTradeRequestCheckDate: null,
+        activePromiseType: null,
+        activePromiseSeason: null,
+        promiseOriginTeamId: null,
+      },
+    }),
   ]);
 
   revalidateRosterPaths(membership.teamId);
@@ -294,7 +309,13 @@ export async function extendContract(
 
   await prisma.contract.update({
     where: { id: contract.id },
-    data: { salary, yearsRemaining: years, guaranteed: true, isRookieScale: false },
+    data: {
+      salary,
+      yearsRemaining: years,
+      guaranteed: true,
+      isRookieScale: false,
+      lastExtendedSeason: membership.career.season, // voir evaluatePendingPromises, promesse "renewal"
+    },
   });
 
   revalidateRosterPaths(membership.teamId);

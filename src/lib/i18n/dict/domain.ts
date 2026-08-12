@@ -22,6 +22,10 @@ export const keys = [
   "domain.expectationTier.conf_finals",
   "domain.expectationTier.nba_finals",
   "domain.expectationTier.champion",
+  "domain.promiseType.renewal",
+  "domain.promiseType.trade",
+  "domain.promiseType.facilities",
+  "domain.promiseType.competitiveness",
 ] as const;
 
 export type DomainKey = (typeof keys)[number];
@@ -46,6 +50,10 @@ export const fr: Record<DomainKey, string> = {
   "domain.expectationTier.conf_finals": "Finale de conférence",
   "domain.expectationTier.nba_finals": "Finale (NBA/WNBA)",
   "domain.expectationTier.champion": "Champion",
+  "domain.promiseType.renewal": "Prolongation de contrat en fin de saison",
+  "domain.promiseType.trade": "Échange en fin de saison",
+  "domain.promiseType.facilities": "Amélioration des infrastructures et du personnel",
+  "domain.promiseType.competitiveness": "Amélioration du bilan de l'équipe",
 };
 
 export const en: Record<DomainKey, string> = {
@@ -68,4 +76,8 @@ export const en: Record<DomainKey, string> = {
   "domain.expectationTier.conf_finals": "Conference finals",
   "domain.expectationTier.nba_finals": "Finals (NBA/WNBA)",
   "domain.expectationTier.champion": "Champion",
+  "domain.promiseType.renewal": "Contract renewal by end of season",
+  "domain.promiseType.trade": "Trade by end of season",
+  "domain.promiseType.facilities": "Facilities and staff improvement",
+  "domain.promiseType.competitiveness": "Team record improvement",
 };

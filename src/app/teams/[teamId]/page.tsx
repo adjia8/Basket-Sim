@@ -5,7 +5,6 @@ import { getLeagueById } from "@/lib/data-access/leagues";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getRosterForTeam } from "@/lib/data-access/players";
 import { getSeasonStatsForPlayers, type SeasonStats } from "@/lib/data-access/season-stats";
-import { getStandings } from "@/lib/data-access/standings";
 import { isTradeDeadlinePassed } from "@/lib/data-access/season-windows";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getTeamById } from "@/lib/data-access/teams";
@@ -15,7 +14,7 @@ import { TradeProposalForm, type TradePick } from "@/components/team/TradePropos
 import { TrainingPlanForm } from "@/components/team/TrainingPlanForm";
 import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
 import { MAX_ROSTER_SIZE, MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
-import { tradeRequestReasons, winPctForStandings } from "@/lib/careers/player-demands";
+import { getPlayerDemandStates, type PlayerDemandState } from "@/lib/data-access/trade-requests";
 import { getTranslator, type Translator } from "@/lib/i18n/translate";
 import { formatSalary, teamFullName } from "@/lib/utils";
 
@@ -60,7 +59,7 @@ export default async function TeamRosterPage({
   if (!team) notFound();
   const { t, locale } = await getTranslator();
 
-  const [roster, contracts, league, manager, totalPayroll, deadCap, picks, tradeDeadlinePassed, standings, teamState] =
+  const [roster, contracts, league, manager, totalPayroll, deadCap, picks, tradeDeadlinePassed, teamState] =
     await Promise.all([
       getRosterForTeam(membership.careerId, teamId),
       getContractsForTeam(membership.careerId, teamId),
@@ -70,13 +69,10 @@ export default async function TeamRosterPage({
       prisma.deadCap.findMany({ where: { careerId: membership.careerId, teamId } }),
       getPendingPicksForTeam(t, membership.careerId, teamId),
       isTradeDeadlinePassed(membership.careerId, membership.season),
-      getStandings(membership.careerId, team.leagueId, membership.season),
       getOrCreateTeamState(membership.careerId, teamId, team.leagueId),
     ]);
 
   const isMyTeam = team.id === membership.teamId;
-  const teamStandingsRow = standings.find((row) => row.teamId === teamId);
-  const teamWinPct = winPctForStandings(teamStandingsRow?.wins ?? 0, teamStandingsRow?.losses ?? 0);
 
   const seasonStats = await getSeasonStatsForPlayers(
     membership.careerId,
@@ -85,29 +81,26 @@ export default async function TeamRosterPage({
   );
   const emptyStats: SeasonStats = { gamesPlayed: 0, points: 0, rebounds: 0, assists: 0, ppg: 0, rpg: 0, apg: 0 };
 
+  // Demande de trade visible uniquement pour mon propre effectif — état
+  // persisté (voir trade-requests.ts), plus recalculé en direct à chaque
+  // rendu : purement informatif, n'affecte aucune mécanique.
+  const demandStates: Map<string, PlayerDemandState> = isMyTeam
+    ? await getPlayerDemandStates(membership.careerId, roster.map((p) => p.id))
+    : new Map();
+
   const contractByPlayerId = new Map(contracts.map((c) => [c.playerId, c]));
   const rosterWithContracts: RosterPlayer[] = roster.map((player) => {
     const contract = contractByPlayerId.get(player.id);
     const salary = contract?.salary ?? 0;
-    // Demande de trade visible uniquement pour mon propre effectif : un
-    // joueur "star" mécontent de la compétitivité/attractivité/infrastructures
-    // de l'équipe — purement informatif, n'affecte aucune mécanique.
-    const reasons = isMyTeam
-      ? tradeRequestReasons({
-          renown: player.renown,
-          teamWinPct,
-          teamMarketAppeal: team.marketAppeal,
-          teamFacilitiesLevel: teamState.facilitiesLevel,
-        })
-      : [];
+    const demandState = demandStates.get(player.id);
     const stats = seasonStats.get(player.id) ?? emptyStats;
     return {
       ...player,
       salary,
       yearsRemaining: contract?.yearsRemaining ?? 0,
       guaranteed: contract?.guaranteed ?? true,
-      wantsTrade: reasons.length > 0,
-      tradeReasons: reasons,
+      wantsTrade: demandState?.wantsTrade ?? false,
+      tradeReasons: demandState?.reasons ?? [],
       ppg: stats.ppg,
       rpg: stats.rpg,
       apg: stats.apg,

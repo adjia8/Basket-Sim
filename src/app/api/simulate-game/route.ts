@@ -16,6 +16,7 @@ import { advanceTeamChemistry, getOrCreateTeamState } from "@/lib/data-access/te
 import { advanceRosterTraining } from "@/lib/data-access/training";
 import { getGmBonusForTeam } from "@/lib/data-access/gm";
 import { maybeCreatePressConference } from "@/lib/data-access/press";
+import { maybeFlagTradeRequest } from "@/lib/data-access/trade-requests";
 import { winPctForStandings } from "@/lib/careers/player-demands";
 import { DEVELOPMENT_CONTRACT_GAME_LIMIT } from "@/lib/careers/contract-type-rules";
 import {
@@ -269,6 +270,17 @@ export async function POST(request: Request) {
       : Promise.resolve(),
     awayManager
       ? maybeCreatePressConference(membership.careerId, updatedGame.awayTeamId, updatedGame.leagueId, gameDate, locale)
+      : Promise.resolve(),
+  ]);
+
+  // Nouvelle demande de trade éventuelle (cooldown + tirage, voir
+  // maybeFlagTradeRequest) — même restriction aux équipes humaines.
+  await Promise.all([
+    homeManager
+      ? maybeFlagTradeRequest(membership.careerId, updatedGame.homeTeamId, updatedGame.leagueId, updatedGame.season, gameDate)
+      : Promise.resolve(),
+    awayManager
+      ? maybeFlagTradeRequest(membership.careerId, updatedGame.awayTeamId, updatedGame.leagueId, updatedGame.season, gameDate)
       : Promise.resolve(),
   ]);
 
