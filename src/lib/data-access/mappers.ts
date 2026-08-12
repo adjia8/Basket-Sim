@@ -79,6 +79,8 @@ export function toDomainPlayer(row: PrismaPlayer): Player {
     conditioning: 100,
     trainingBoost: 0,
     nationality: row.nationality,
+    realSalary: row.realSalary ?? undefined,
+    realYearsRemaining: row.realYearsRemaining ?? undefined,
   };
 }
 

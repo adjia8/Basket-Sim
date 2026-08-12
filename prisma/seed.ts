@@ -79,6 +79,9 @@ async function main() {
       clutch: player.ratings.clutch,
       stamina: player.ratings.stamina,
       injuryRisk: player.injuryRisk,
+      nationality: player.nationality,
+      realSalary: player.realSalary ?? null,
+      realYearsRemaining: player.realYearsRemaining ?? null,
     };
     await prisma.player.upsert({
       where: { id: player.id },

@@ -208,6 +208,13 @@ model Player {
   stamina        Int
   injuryRisk     Int               @default(30) // 0-99, risque de blessure basé sur l'historique réel connu
   nationality    String            @default("États-Unis")
+  // Salaire/durée de contrat réels connus (source publique — Spotrac, Her
+  // Hoop Stats, rapports officiels de plafond salarial) : si renseignés,
+  // priment sur la génération procédurale à la création de carrière (voir
+  // generateCareerContracts) — laissés null pour tout joueur sans donnée
+  // fiable, qui reçoit alors un contrat généré comme aujourd'hui.
+  realSalary         Int?
+  realYearsRemaining Int?
   contracts      Contract[]
   playerStates   PlayerState[]
   teamStints     PlayerTeamStint[]

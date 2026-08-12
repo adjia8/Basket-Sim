@@ -75,6 +75,11 @@ export default async function DashboardPage() {
         gamesUnit: t("roster.games"),
         viewFullRoster: t("common.viewFullRoster"),
         preseasonTag: t("dashboard.preseasonTag"),
+        deleteCareer: t("dashboard.deleteCareer"),
+        deleteCareerConfirm: t("dashboard.deleteCareerConfirm"),
+        deleteCareerConfirmButton: t("dashboard.deleteCareerConfirmButton"),
+        deleteCareerCancel: t("dashboard.deleteCareerCancel"),
+        deletingCareer: t("dashboard.deletingCareer"),
       }}
     />
   );

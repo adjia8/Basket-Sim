@@ -72,6 +72,11 @@ export interface Player {
   trainingBoost: number; // 0-8, bonus temporaire courant sur les attributs de trainingBoostFocus
   trainingBoostFocus?: "offensive" | "defensive" | "tactical" | "physical" | "chemistry" | "rest";
   nationality: string;
+  // Salaire/durée de contrat réels connus (source publique) — voir
+  // generateCareerContracts, qui les préfère à la génération procédurale
+  // quand présents.
+  realSalary?: number;
+  realYearsRemaining?: number;
 }
 
 // --- Calendrier / Match ---

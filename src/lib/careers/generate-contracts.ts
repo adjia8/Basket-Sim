@@ -24,6 +24,21 @@ export async function generateCareerContracts(
   players: Player[]
 ): Promise<void> {
   const rows = players.map((player) => {
+    // Salaire/durée réels connus (catalogue, source publique) : priment sur
+    // la génération procédurale — plus fidèle qu'une estimation basée sur le
+    // seul overall, et évite qu'un floor synthétique (minAcceptableSalary)
+    // vienne contredire une donnée déjà vérifiée.
+    if (player.realSalary != null && player.realYearsRemaining != null) {
+      return {
+        careerId,
+        playerId: player.id,
+        teamId: player.teamId,
+        salary: player.realSalary,
+        yearsRemaining: player.realYearsRemaining,
+        guaranteed: true,
+      };
+    }
+
     const terms = generateContractTerms(player.overallRating, leagueId);
     return {
       careerId,

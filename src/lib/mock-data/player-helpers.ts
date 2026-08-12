@@ -118,6 +118,11 @@ interface PlayerInput {
   // ment aux prospects fictifs générés — voir randomNationality) : défaut
   // "États-Unis" si non renseignée.
   nationality?: string;
+  // Salaire annuel réel connu (source publique) et années restantes sur ce
+  // contrat — quand les deux sont renseignés, generateCareerContracts les
+  // utilise tels quels au lieu de générer un contrat procédural.
+  realSalary?: number;
+  realYearsRemaining?: number;
 }
 
 export function mkPlayer(input: PlayerInput): Player {
@@ -133,5 +138,7 @@ export function mkPlayer(input: PlayerInput): Player {
     conditioning: 100,
     trainingBoost: 0,
     nationality: input.nationality ?? "États-Unis",
+    realSalary: input.realSalary,
+    realYearsRemaining: input.realYearsRemaining,
   };
 }

@@ -17,6 +17,11 @@ export const keys = [
   "dashboard.topPlayers",
   "dashboard.infirmary",
   "dashboard.preseasonTag",
+  "dashboard.deleteCareer",
+  "dashboard.deleteCareerConfirm",
+  "dashboard.deleteCareerConfirmButton",
+  "dashboard.deleteCareerCancel",
+  "dashboard.deletingCareer",
 ] as const;
 
 export type DashboardKey = (typeof keys)[number];
@@ -40,6 +45,12 @@ export const fr: Record<DashboardKey, string> = {
   "dashboard.topPlayers": "Meilleurs joueurs",
   "dashboard.infirmary": "Infirmerie",
   "dashboard.preseasonTag": "Pré-saison",
+  "dashboard.deleteCareer": "Supprimer la carrière",
+  "dashboard.deleteCareerConfirm":
+    "Es-tu sûr(e) ? Cette action est définitive : la carrière, son historique de matchs et tous ses contrats seront perdus.",
+  "dashboard.deleteCareerConfirmButton": "Confirmer la suppression",
+  "dashboard.deleteCareerCancel": "Annuler",
+  "dashboard.deletingCareer": "Suppression…",
 };
 
 export const en: Record<DashboardKey, string> = {
@@ -61,4 +72,10 @@ export const en: Record<DashboardKey, string> = {
   "dashboard.topPlayers": "Top players",
   "dashboard.infirmary": "Infirmary",
   "dashboard.preseasonTag": "Preseason",
+  "dashboard.deleteCareer": "Delete career",
+  "dashboard.deleteCareerConfirm":
+    "Are you sure? This is permanent: the career, its game history, and all its contracts will be lost.",
+  "dashboard.deleteCareerConfirmButton": "Confirm deletion",
+  "dashboard.deleteCareerCancel": "Cancel",
+  "dashboard.deletingCareer": "Deleting…",
 };

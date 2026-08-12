@@ -3,6 +3,7 @@ import { advanceSeason } from "@/app/actions/season";
 import type { Locale } from "@/lib/i18n/locale";
 import { formatGameDate, formatSalary, teamFullName } from "@/lib/utils";
 import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
+import { DeleteCareerButton } from "@/components/dashboard/DeleteCareerButton";
 import type { Game, Player, StandingsRow, Team } from "@/lib/types";
 
 // Composant client : tout le texte arrive déjà traduit en props depuis le
@@ -31,6 +32,11 @@ export interface DashboardLabels {
   gamesUnit: string;
   viewFullRoster: string;
   preseasonTag: string;
+  deleteCareer: string;
+  deleteCareerConfirm: string;
+  deleteCareerConfirmButton: string;
+  deleteCareerCancel: string;
+  deletingCareer: string;
 }
 
 export function DashboardClient({
@@ -253,6 +259,18 @@ export function DashboardClient({
       >
         {labels.viewFullRoster}
       </Link>
+
+      <div className="border-t border-black/10 pt-6 dark:border-white/10">
+        <DeleteCareerButton
+          labels={{
+            button: labels.deleteCareer,
+            confirmMessage: labels.deleteCareerConfirm,
+            confirmButton: labels.deleteCareerConfirmButton,
+            cancelButton: labels.deleteCareerCancel,
+            deleting: labels.deletingCareer,
+          }}
+        />
+      </div>
     </div>
   );
 }

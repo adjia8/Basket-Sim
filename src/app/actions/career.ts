@@ -238,3 +238,25 @@ export async function joinCareer(
   revalidatePath("/", "layout");
   redirect("/");
 }
+
+// Supprime l'implication de l'utilisateur dans sa carrière actuelle — ne
+// supprime la Career elle-même (et tout son historique de matchs/contrats
+// via cascade Prisma) que si plus personne n'y est rattaché : une Career
+// peut être partagée entre plusieurs managers humains (rejoint par code
+// d'invitation, voir JoinCareerForm), donc un simple "je pars" ne doit
+// jamais effacer la partie des autres.
+export async function deleteCareer(): Promise<void> {
+  const { userId } = await verifySession();
+  const membership = await prisma.membership.findUnique({ where: { userId } });
+  if (!membership) redirect("/onboarding");
+
+  await prisma.membership.delete({ where: { userId } });
+
+  const remaining = await prisma.membership.count({ where: { careerId: membership.careerId } });
+  if (remaining === 0) {
+    await prisma.career.delete({ where: { id: membership.careerId } });
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/onboarding");
+}
