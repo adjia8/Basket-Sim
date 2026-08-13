@@ -16,6 +16,7 @@ import * as seasonRecap from "./dict/seasonRecap";
 import * as press from "./dict/press";
 import * as leaguePages from "./dict/leaguePages";
 import * as promise from "./dict/promise";
+import * as rotation from "./dict/rotation";
 
 // Chaque module dict/<zone>.ts exporte { fr, en } avec les MÊMES clés (voir
 // common.ts pour le patron : un tableau `keys as const`, puis deux
@@ -42,6 +43,7 @@ const sources = [
   press,
   leaguePages,
   promise,
+  rotation,
 ];
 
 export const dictionaries = {
@@ -64,6 +66,7 @@ export const dictionaries = {
     ...press.fr,
     ...leaguePages.fr,
     ...promise.fr,
+    ...rotation.fr,
   },
   en: {
     ...common.en,
@@ -84,6 +87,7 @@ export const dictionaries = {
     ...press.en,
     ...leaguePages.en,
     ...promise.en,
+    ...rotation.en,
   },
 };
 

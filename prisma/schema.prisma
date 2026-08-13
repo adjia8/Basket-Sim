@@ -498,6 +498,7 @@ model TeamState {
   publicOpinion           Int       @default(50) // 0-99, opinion fans/autres franchises, pilotée par les réponses en conférence de presse
   lastPressConferenceDate DateTime?
   lastTradeRequestDate    DateTime? // anti-cluster : dernière fois qu'UNE joueuse de cette équipe a levé une demande de trade
+  rotationOrderJson       String? // JSON: string[] d'ids joueuses, ordre GM voulu (5 majeures + 6ème femme + banc) — null = tri automatique (voir rotationOf dans mockEngine.ts)
 
   @@unique([careerId, teamId])
 }

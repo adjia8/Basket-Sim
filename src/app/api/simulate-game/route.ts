@@ -18,6 +18,7 @@ import { getGmBonusForTeam } from "@/lib/data-access/gm";
 import { maybeCreatePressConference } from "@/lib/data-access/press";
 import { maybeFlagTradeRequest } from "@/lib/data-access/trade-requests";
 import { winPctForStandings } from "@/lib/careers/player-demands";
+import { parseRotationOrder } from "@/lib/careers/rotation-rules";
 import { DEVELOPMENT_CONTRACT_GAME_LIMIT } from "@/lib/careers/contract-type-rules";
 import {
   chemistryTrainingBonus,
@@ -159,6 +160,8 @@ export async function POST(request: Request) {
       awayChemistry: awayTeamState.chemistry + awayGm.chemistry + moraleBonus(awayTeamState.morale),
       homeGmBonus: homeGm.strength,
       awayGmBonus: awayGm.strength,
+      homeRotationOrder: parseRotationOrder(homeTeamState.rotationOrderJson),
+      awayRotationOrder: parseRotationOrder(awayTeamState.rotationOrderJson),
     }
   );
 

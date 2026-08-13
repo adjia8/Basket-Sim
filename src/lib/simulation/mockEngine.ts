@@ -12,7 +12,10 @@ import {
 import { TRAINING_FOCUS_ATTRIBUTES } from "@/lib/careers/training-rules";
 
 const HOME_ADVANTAGE = 2.5;
-const ROTATION_SIZE = 8; // joueurs qui touchent des minutes significatives
+// Exportée : l'UI de gestion de rotation (RotationOrderFormClient.tsx) en a
+// besoin pour savoir où s'arrête le "banc qui joue" et où commence le "hors
+// rotation" — une seule source de vérité, pas de valeur dupliquée côté UI.
+export const ROTATION_SIZE = 8; // joueurs qui touchent des minutes significatives
 const QUARTERS = 4;
 const QUARTER_MINUTES: Record<string, number> = { wnba: 10, nba: 12 };
 // La force d'équipe pesait 0.9 sur le score total dans l'ancien calcul "en un
@@ -79,8 +82,28 @@ function playerImpact(player: Player): number {
 // Rotation calculée à chaque quart-temps à partir du roster encore éligible
 // (ni blessé en amont, ni sorti sur fautes/exclusion pendant le match) — un
 // banc jusque-là hors rotation peut entrer en jeu si un titulaire sort.
-function rotationOf(activeRoster: Player[]): Player[] {
-  return [...activeRoster].sort((a, b) => playerImpact(b) - playerImpact(a)).slice(0, ROTATION_SIZE);
+//
+// rotationOrder (optionnel) = ordre de profondeur de banc choisi par le GM
+// (voir TeamState.rotationOrderJson) : quand présent, prime sur playerImpact
+// pour les joueuses qu'il liste, dans l'ordre donné ; les joueuses non
+// listées (nouvelles signatures pas encore classées) suivent, départagées
+// entre elles par playerImpact comme avant. Comme activeRoster est déjà
+// filtré des disqualifiées CE match, une titulaire sortie sur fautes est
+// automatiquement remplacée au quart-temps suivant par la joueuse suivante
+// de rotationOrder — aucune logique supplémentaire nécessaire pour ça.
+function rotationOf(activeRoster: Player[], rotationOrder?: string[]): Player[] {
+  if (!rotationOrder || rotationOrder.length === 0) {
+    return [...activeRoster].sort((a, b) => playerImpact(b) - playerImpact(a)).slice(0, ROTATION_SIZE);
+  }
+  const orderIndex = new Map(rotationOrder.map((id, i) => [id, i]));
+  return [...activeRoster]
+    .sort((a, b) => {
+      const ai = orderIndex.get(a.id) ?? Infinity;
+      const bi = orderIndex.get(b.id) ?? Infinity;
+      if (ai !== bi) return ai - bi;
+      return playerImpact(b) - playerImpact(a);
+    })
+    .slice(0, ROTATION_SIZE);
 }
 
 // gmBonus : bonus de force permanent apporté par le GM humain de l'équipe
@@ -89,8 +112,13 @@ function rotationOf(activeRoster: Player[]): Player[] {
 // "front-office" constant, pas une mécanique de rotation par joueur (donc
 // aucune dénormalisation sur Player nécessaire ici, contrairement au bonus
 // d'entraînement).
-function teamStrength(activeRoster: Player[], chemistry: number, gmBonus = 0): number {
-  const rotation = rotationOf(activeRoster);
+function teamStrength(
+  activeRoster: Player[],
+  chemistry: number,
+  gmBonus = 0,
+  rotationOrder?: string[]
+): number {
+  const rotation = rotationOf(activeRoster, rotationOrder);
   if (rotation.length === 0) return 0;
   const starters = rotation.slice(0, 5);
   const bench = rotation.slice(5);
@@ -102,8 +130,8 @@ function teamStrength(activeRoster: Player[], chemistry: number, gmBonus = 0): n
   return rawStrength * chemistryMultiplier + gmBonus;
 }
 
-function averageClutch(activeRoster: Player[]): number {
-  const rotation = rotationOf(activeRoster);
+function averageClutch(activeRoster: Player[], rotationOrder?: string[]): number {
+  const rotation = rotationOf(activeRoster, rotationOrder);
   return rotation.length ? average(rotation.map((p) => p.ratings.clutch)) : 50;
 }
 
@@ -112,8 +140,13 @@ function averageClutch(activeRoster: Player[]): number {
 // lancer franc réussi (seul moyen d'ajouter exactement 1 point) — pour que
 // le score final reste toujours égal à la somme du box score, jamais un
 // point fantôme attribué à personne.
-function creditClutchPoint(totals: Map<string, BoxScoreEntry>, teamId: string, activeRoster: Player[]): void {
-  const rotation = rotationOf(activeRoster);
+function creditClutchPoint(
+  totals: Map<string, BoxScoreEntry>,
+  teamId: string,
+  activeRoster: Player[],
+  rotationOrder?: string[]
+): void {
+  const rotation = rotationOf(activeRoster, rotationOrder);
   if (rotation.length === 0) return;
   const clutchPlayer = [...rotation].sort((a, b) => b.ratings.clutch - a.ratings.clutch)[0];
   const entry = totals.get(clutchPlayer.id) ?? emptyBoxEntry(clutchPlayer.id, teamId);
@@ -379,6 +412,8 @@ export class MockSimulationEngine implements SimulationEngine {
     const awayChemistry = options?.awayChemistry ?? 50;
     const homeGmBonus = options?.homeGmBonus ?? 0;
     const awayGmBonus = options?.awayGmBonus ?? 0;
+    const homeRotationOrder = options?.homeRotationOrder;
+    const awayRotationOrder = options?.awayRotationOrder;
     const quarterBase = basePointsForLeague(home.leagueId) / QUARTERS;
     const quarterHomeAdvantage = HOME_ADVANTAGE / QUARTERS;
 
@@ -393,11 +428,12 @@ export class MockSimulationEngine implements SimulationEngine {
     for (let q = 0; q < QUARTERS; q++) {
       const homeActive = homeRosterFull.filter((p) => !disqualified.has(p.id));
       const awayActive = awayRosterFull.filter((p) => !disqualified.has(p.id));
-      const homeRotation = rotationOf(homeActive);
-      const awayRotation = rotationOf(awayActive);
+      const homeRotation = rotationOf(homeActive, homeRotationOrder);
+      const awayRotation = rotationOf(awayActive, awayRotationOrder);
 
-      const homeStrength = teamStrength(homeActive, homeChemistry, homeGmBonus) + quarterHomeAdvantage;
-      const awayStrength = teamStrength(awayActive, awayChemistry, awayGmBonus);
+      const homeStrength =
+        teamStrength(homeActive, homeChemistry, homeGmBonus, homeRotationOrder) + quarterHomeAdvantage;
+      const awayStrength = teamStrength(awayActive, awayChemistry, awayGmBonus, awayRotationOrder);
 
       const homeQuarterScore = Math.max(
         15,
@@ -425,14 +461,14 @@ export class MockSimulationEngine implements SimulationEngine {
     if (Math.abs(homeScore - awayScore) <= 3) {
       const homeActive = homeRosterFull.filter((p) => !disqualified.has(p.id));
       const awayActive = awayRosterFull.filter((p) => !disqualified.has(p.id));
-      const homeClutch = averageClutch(homeActive);
-      const awayClutch = averageClutch(awayActive);
+      const homeClutch = averageClutch(homeActive, homeRotationOrder);
+      const awayClutch = averageClutch(awayActive, awayRotationOrder);
       if (homeClutch > awayClutch) {
         homeScore += 1;
-        creditClutchPoint(totals, home.id, homeActive);
+        creditClutchPoint(totals, home.id, homeActive, homeRotationOrder);
       } else if (awayClutch > homeClutch) {
         awayScore += 1;
-        creditClutchPoint(totals, away.id, awayActive);
+        creditClutchPoint(totals, away.id, awayActive, awayRotationOrder);
       }
     }
 

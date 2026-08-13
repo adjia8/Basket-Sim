@@ -16,6 +16,11 @@ export interface SimulationOptions {
   // ou sans GmProfile) — voir gm-rules.ts/getGmBonusForTeam.
   homeGmBonus?: number;
   awayGmBonus?: number;
+  // Ordre de profondeur de banc choisi par le GM (ids joueuses), voir
+  // TeamState.rotationOrderJson — absent = tri automatique par playerImpact
+  // (comportement inchangé, notamment pour une équipe gérée par l'IA).
+  homeRotationOrder?: string[];
+  awayRotationOrder?: string[];
 }
 
 export interface SimulationEngine {

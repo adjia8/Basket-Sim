@@ -12,9 +12,11 @@ import { prisma } from "@/lib/prisma";
 import { RosterTable, type RosterPlayer } from "@/components/team/RosterTable";
 import { TradeProposalForm, type TradePick } from "@/components/team/TradeProposalForm";
 import { TrainingPlanForm } from "@/components/team/TrainingPlanForm";
+import { RotationOrderForm } from "@/components/team/RotationOrderForm";
 import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
 import { MAX_ROSTER_SIZE, MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import { getPlayerDemandStates, type PlayerDemandState } from "@/lib/data-access/trade-requests";
+import { mergeRotationOrder, parseRotationOrder } from "@/lib/careers/rotation-rules";
 import { getTranslator, type Translator } from "@/lib/i18n/translate";
 import { formatSalary, teamFullName } from "@/lib/utils";
 
@@ -106,6 +108,10 @@ export default async function TeamRosterPage({
       apg: stats.apg,
     };
   });
+
+  const rotationOrder = isMyTeam
+    ? mergeRotationOrder(rosterWithContracts, parseRotationOrder(teamState.rotationOrderJson))
+    : [];
 
   const deadCapTotal = deadCap.reduce((sum, d) => sum + d.salary, 0);
   const salaryCap = league?.salaryCap ?? 0;
@@ -200,6 +206,12 @@ export default async function TeamRosterPage({
             focus={teamState.trainingFocus}
             intensity={teamState.trainingIntensity}
           />
+        </div>
+      )}
+
+      {isMyTeam && (
+        <div className="mt-6">
+          <RotationOrderForm initialOrder={rotationOrder} />
         </div>
       )}
 
