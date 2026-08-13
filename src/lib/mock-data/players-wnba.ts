@@ -209,3 +209,24 @@ export const playersWnba: Player[] = [
   mkPlayer({ id: "juste-jocyte", nationality: "Lituanie", teamId: "golden-state-valkyries", leagueId: "wnba", firstName: "Justė", lastName: "Jocytė", position: "SF", jerseyNumber: 4, heightCm: 188, age: 20, overallRating: 60, realSalary: 380_219, realYearsRemaining: 4 }),
   mkPlayer({ id: "miela-sowah", nationality: "Australie", teamId: "golden-state-valkyries", leagueId: "wnba", firstName: "Miela", lastName: "Sowah", position: "PG", jerseyNumber: 7, heightCm: 178, age: 26, overallRating: 45 }),
 ];
+
+// Joueuses gardées au catalogue avec un teamId (dernière équipe connue, pour
+// l'affichage/l'historique) mais qui NE reçoivent PAS de contrat à la
+// création d'une carrière — sans ça, absolument personne n'est agent libre
+// en tout début de partie (tout le catalogue WNBA correspond exactement aux
+// effectifs des 12 équipes), rendant la page agents libres vide jusqu'à ce
+// qu'un contrat expire ou qu'une équipe coupe une joueuse (donc au plus tôt
+// à l'intersaison suivante). Liste issue de l'audit des contrats réels : ces
+// 6 joueuses n'apparaissaient sur AUCUN effectif actuel de la source
+// consultée (Her Hoop Stats) — statut "droits suspendus" ou introuvable sur
+// un roster en vigueur — contrairement aux autres joueuses sans donnée de
+// salaire vérifiée (contrat de développement/écart de données ponctuel),
+// qui elles restent sous contrat procédural comme avant.
+export const INITIAL_FREE_AGENT_IDS: string[] = [
+  "marine-fauthoux",
+  "anneli-maley",
+  "jaylyn-sherrod",
+  "tonie-morgan",
+  "eliska-joklova",
+  "lou-lopez-senechal",
+];

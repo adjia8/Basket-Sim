@@ -17,6 +17,7 @@ import {
 import { toDomainLeague, toDomainPlayer } from "@/lib/data-access/mappers";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { GM_POINT_POOL, expectationForRoster } from "@/lib/careers/gm-rules";
+import { INITIAL_FREE_AGENT_IDS } from "@/lib/mock-data/players-wnba";
 
 export interface CreateCareerState {
   error?: string;
@@ -112,7 +113,17 @@ export async function createCareer(
   const leaguePlayers = await prisma.player.findMany({ where: { leagueId } });
   const domainPlayers = leaguePlayers.map(toDomainPlayer);
 
-  const teamCatalogRoster = domainPlayers.filter((p) => p.teamId === teamId);
+  // Catalogue plein (chaque joueuse WNBA correspond exactement à un effectif
+  // d'équipe) : sans exception, le vivier d'agents libres serait vide dès la
+  // création d'une carrière, jusqu'à ce qu'un contrat expire ou qu'une
+  // équipe coupe une joueuse (donc au plus tôt à l'intersaison suivante).
+  // INITIAL_FREE_AGENT_IDS liste les joueuses qui ne reçoivent pas de
+  // contrat au départ (voir sa doc dans players-wnba.ts) — exclues aussi du
+  // calcul de force d'effectif ci-dessous, cohérence oblige.
+  const initiallyFreeAgentIds = new Set(leagueId === "wnba" ? INITIAL_FREE_AGENT_IDS : []);
+  const playersUnderContract = domainPlayers.filter((p) => !initiallyFreeAgentIds.has(p.id));
+
+  const teamCatalogRoster = playersUnderContract.filter((p) => p.teamId === teamId);
   const teamAverageOverall = teamCatalogRoster.length
     ? teamCatalogRoster.reduce((sum, p) => sum + p.overallRating, 0) / teamCatalogRoster.length
     : 50;
@@ -133,7 +144,10 @@ export async function createCareer(
     },
   });
 
-  await generateCareerContracts(career.id, leagueId, domainPlayers);
+  // generateCareerPlayerStates reçoit TOUJOURS le catalogue complet (les
+  // agents libres doivent aussi vieillir dans la Career) — seuls les
+  // contrats sont filtrés (playersUnderContract, calculé plus haut).
+  await generateCareerContracts(career.id, leagueId, playersUnderContract);
   await generateCareerPlayerStates(career.id, domainPlayers);
 
   // La partie démarre dans l'entre-saison, juste après le draft : quelques
