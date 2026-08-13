@@ -24,9 +24,14 @@ export function rollsPersonalFoul(defenseInside: number, defenseOutside: number)
 }
 
 // Rares, indépendantes du profil du joueur (tempérament non modélisé dans
-// cette passe).
+// cette passe) — vérifiée comme rollsPersonalFoul, une fois par joueur de la
+// rotation et par quart-temps (~64 vérifications/match, 8 joueurs × 2
+// équipes × 4 quart-temps). 0.015 donnait une espérance proche de 1
+// technique par match et ~62% des matchs avec au moins une — bien plus
+// fréquent qu'en NBA/WNBA réelle. Calibré pour une espérance ~0.3/match
+// (environ 1 match sur 4 avec au moins une technique).
 export function rollsTechnicalFoul(): boolean {
-  return Math.random() < 0.015;
+  return Math.random() < 0.005;
 }
 
 export function rollsFlagrantFoul(): "none" | "flagrant1" | "flagrant2" {

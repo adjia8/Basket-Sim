@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
@@ -77,7 +78,11 @@ export default async function GmPage() {
       {offerTeam && (
         <div className="mt-6 rounded-xl border border-blue-500/30 bg-blue-500/5 p-4">
           <p className="font-medium">
-            {t("gm.poachOfferPrefix")} {teamFullName(offerTeam)} {t("gm.poachOfferSuffix")}
+            {t("gm.poachOfferPrefix")}{" "}
+            <Link href={`/teams/${offerTeam.id}`} className="hover:underline">
+              {teamFullName(offerTeam)}
+            </Link>{" "}
+            {t("gm.poachOfferSuffix")}
           </p>
           <div className="mt-3 flex gap-2">
             <form action={acceptPoachOffer}>
@@ -200,7 +205,11 @@ export default async function GmPage() {
                 {gm.seasonRecords.map((record) => (
                   <tr key={record.id} className="border-b border-black/5 dark:border-white/5">
                     <td className="py-2 pr-4">{record.season}</td>
-                    <td className="py-2 pr-4">{teamNameById.get(record.teamId) ?? record.teamId}</td>
+                    <td className="py-2 pr-4">
+                      <Link href={`/teams/${record.teamId}`} className="hover:underline">
+                        {teamNameById.get(record.teamId) ?? record.teamId}
+                      </Link>
+                    </td>
                     <td className="py-2 pr-4">
                       {record.wins}-{record.losses}
                     </td>

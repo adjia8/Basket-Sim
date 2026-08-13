@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getProspectsForCareer } from "@/lib/data-access/prospects";
 import { getLeagueById } from "@/lib/data-access/leagues";
@@ -56,12 +57,15 @@ export default async function DraftPage() {
     <div className="mx-auto max-w-5xl px-4 py-8">
       <h1 className="text-2xl font-bold">{t("draft.title")}</h1>
       <p className="mt-1 text-black/60 dark:text-white/60">
-        {t("draft.pickLine", {
-          number: currentPick.pickNumber,
-          round: currentPick.round,
-          team: pickTeam ? teamFullName(pickTeam) : "?",
-          salary: formatSalary(pickTerms.salary, locale),
-        })}{" "}
+        {t("draft.pickLinePrefix", { number: currentPick.pickNumber, round: currentPick.round })}{" "}
+        {pickTeam ? (
+          <Link href={`/teams/${pickTeam.id}`} className="hover:underline">
+            {teamFullName(pickTeam)}
+          </Link>
+        ) : (
+          "?"
+        )}{" "}
+        {t("draft.pickLineSuffix", { salary: formatSalary(pickTerms.salary, locale) })}{" "}
         {pickTerms.guaranteed ? t("draft.guaranteed") : t("draft.notGuaranteed")}
       </p>
 

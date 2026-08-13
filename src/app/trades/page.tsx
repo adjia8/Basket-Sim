@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import Link from "next/link";
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getTeamById } from "@/lib/data-access/teams";
@@ -47,12 +49,20 @@ export default async function TradesPage() {
     teamRows.filter((t): t is Team => Boolean(t)).map((t) => [t.id, t])
   );
 
+  // side "from" = l'équipe qui propose (offer.fromTeamId), "to" = l'équipe
+  // qui recevrait (offer.toTeamId) — sert à construire le lien vers la fiche
+  // de chaque joueur listé dans cette moitié de l'échange.
   function assetLabels(t: Translator, offer: (typeof allOffers)[number], side: "from" | "to") {
+    const teamId = side === "from" ? offer.fromTeamId : offer.toTeamId;
     const items = offer.items.filter((i) => i.side === side);
-    const playerLabels = items
+    const playerNodes = items
       .map((i) => (i.playerId ? playerById.get(i.playerId) : undefined))
       .filter((p): p is NonNullable<typeof p> => Boolean(p))
-      .map((p) => `${p.firstName} ${p.lastName}`);
+      .map((p) => (
+        <Link key={p.id} href={`/teams/${teamId}/players/${p.id}`} className="hover:underline">
+          {p.firstName} {p.lastName}
+        </Link>
+      ));
     const pickLabels = items
       .map((i) => (i.draftPickId ? pickById.get(i.draftPickId) : undefined))
       .filter((p): p is NonNullable<typeof p> => Boolean(p))
@@ -63,7 +73,13 @@ export default async function TradesPage() {
           : t("common.draftPick.roundOnly", { round: p.round, season: p.season }) +
             ` (${p.originalTeam.abbreviation})`
       );
-    return [...playerLabels, ...pickLabels].join(", ");
+    const nodes: ReactNode[] = [...playerNodes, ...pickLabels];
+    return nodes.map((node, i) => (
+      <span key={i}>
+        {node}
+        {i < nodes.length - 1 && ", "}
+      </span>
+    ));
   }
 
   return (
@@ -85,7 +101,15 @@ export default async function TradesPage() {
               return (
                 <div key={offer.id} className="rounded-lg border border-black/10 p-4 dark:border-white/10">
                   <p className="text-sm">
-                    <span className="font-medium">{fromTeam ? teamFullName(fromTeam) : "?"}</span>{" "}
+                    <span className="font-medium">
+                      {fromTeam ? (
+                        <Link href={`/teams/${fromTeam.id}`} className="hover:underline">
+                          {teamFullName(fromTeam)}
+                        </Link>
+                      ) : (
+                        "?"
+                      )}
+                    </span>{" "}
                     {t("tradeOffers.proposesVerb")} <strong>{assetLabels(t, offer, "from")}</strong>{" "}
                     {t("tradeOffers.forVerb")} <strong>{assetLabels(t, offer, "to")}</strong>
                   </p>
@@ -131,8 +155,15 @@ export default async function TradesPage() {
               return (
                 <div key={offer.id} className="rounded-lg border border-black/10 p-4 dark:border-white/10">
                   <p className="text-sm">
-                    {t("tradeOffers.sentTo", { team: toTeam ? teamFullName(toTeam) : "?" })}{" "}
-                    <strong>{assetLabels(t, offer, "from")}</strong> {t("tradeOffers.forVerb")}{" "}
+                    {t("tradeOffers.sentToPrefix")}{" "}
+                    {toTeam ? (
+                      <Link href={`/teams/${toTeam.id}`} className="hover:underline">
+                        {teamFullName(toTeam)}
+                      </Link>
+                    ) : (
+                      "?"
+                    )}
+                    : <strong>{assetLabels(t, offer, "from")}</strong> {t("tradeOffers.forVerb")}{" "}
                     <strong>{assetLabels(t, offer, "to")}</strong>
                   </p>
                   <form action={cancelTradeOffer} className="mt-3">

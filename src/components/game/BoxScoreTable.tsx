@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { BoxScoreEntry, Player } from "@/lib/types";
 
 interface EntryWithPlayer extends BoxScoreEntry {
@@ -132,9 +133,13 @@ function TeamBoxScore({
             {sorted.map((entry) => (
               <tr key={entry.playerId} className="border-b border-black/5 dark:border-white/5">
                 <td className="py-2 pr-4">
-                  {entry.player
-                    ? `${entry.player.firstName} ${entry.player.lastName}`
-                    : entry.playerId}
+                  {entry.player ? (
+                    <Link href={`/teams/${entry.teamId}/players/${entry.playerId}`} className="hover:underline">
+                      {entry.player.firstName} {entry.player.lastName}
+                    </Link>
+                  ) : (
+                    entry.playerId
+                  )}
                   {entry.technicalFouls > 0 && (
                     <span className="ml-2 rounded-full bg-yellow-500/10 px-2 py-0.5 text-xs font-normal text-yellow-600 dark:text-yellow-400">
                       {labels.technical(entry.technicalFouls)}

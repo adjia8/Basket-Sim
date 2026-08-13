@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { BoxScoreTable } from "@/components/game/BoxScoreTable";
 import { SimulateButton } from "@/components/game/SimulateButton";
 import { getCurrentMembership } from "@/lib/auth/dal";
@@ -63,7 +64,13 @@ export default async function GamePage({
         {formatGameDate(game.gameDate, locale)}
       </p>
       <h1 className="mt-1 text-2xl font-bold">
-        {teamFullName(awayTeam)} @ {teamFullName(homeTeam)}
+        <Link href={`/teams/${awayTeam.id}`} className="hover:underline">
+          {teamFullName(awayTeam)}
+        </Link>{" "}
+        @{" "}
+        <Link href={`/teams/${homeTeam.id}`} className="hover:underline">
+          {teamFullName(homeTeam)}
+        </Link>
       </h1>
 
       <div className="mt-6 flex items-center justify-center gap-8 rounded-xl border border-black/10 py-8 dark:border-white/10">
@@ -134,9 +141,16 @@ function readinessLine(
   team: Team,
   ready: boolean,
   manager: { email: string } | null
-): string {
-  if (!manager) return `${teamFullName(team)} : ${t("game.ai")}`;
-  return `${teamFullName(team)} : ${ready ? t("game.ready") : t("game.waiting")}`;
+) {
+  const status = !manager ? t("game.ai") : ready ? t("game.ready") : t("game.waiting");
+  return (
+    <>
+      <Link href={`/teams/${team.id}`} className="hover:underline">
+        {teamFullName(team)}
+      </Link>{" "}
+      : {status}
+    </>
+  );
 }
 
 function TeamScore({ team, score }: { team: Team; score?: number }) {
@@ -146,7 +160,9 @@ function TeamScore({ team, score }: { team: Team; score?: number }) {
         className="h-3 w-3 rounded-full"
         style={{ backgroundColor: team.primaryColor }}
       />
-      <span className="font-medium">{teamFullName(team)}</span>
+      <Link href={`/teams/${team.id}`} className="font-medium hover:underline">
+        {teamFullName(team)}
+      </Link>
       <span className="text-3xl font-bold">{score ?? "-"}</span>
     </div>
   );

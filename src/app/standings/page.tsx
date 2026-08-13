@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getConferencesByLeague } from "@/lib/data-access/leagues";
 import { getStandings } from "@/lib/data-access/standings";
@@ -51,7 +52,11 @@ export default async function StandingsPage() {
                     return (
                       <tr key={row.teamId} className="border-b border-black/5 dark:border-white/5">
                         <td className="py-2 pr-4">{index + 1}</td>
-                        <td className="py-2 pr-4 font-medium">{teamFullName(team)}</td>
+                        <td className="py-2 pr-4 font-medium">
+                          <Link href={`/teams/${team.id}`} className="hover:underline">
+                            {teamFullName(team)}
+                          </Link>
+                        </td>
                         <td className="py-2 pr-4">{row.wins}</td>
                         <td className="py-2 pr-4">{row.losses}</td>
                         <td className="py-2 pr-4">

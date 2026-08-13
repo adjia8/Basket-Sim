@@ -75,7 +75,10 @@ export default async function PlayoffsPage() {
         <h1 className="text-2xl font-bold">{t("playoffsPage.title")}</h1>
         {championTeam && (
           <p className="mt-2 text-sm font-medium">
-            {t("playoffsPage.championPrefix")} {teamFullName(championTeam)}
+            {t("playoffsPage.championPrefix")}{" "}
+            <Link href={`/teams/${championTeam.id}`} className="hover:underline">
+              {teamFullName(championTeam)}
+            </Link>
           </p>
         )}
       </div>
@@ -166,7 +169,10 @@ function SeriesLine({
           className="h-2.5 w-2.5 rounded-full"
           style={{ backgroundColor: team.primaryColor }}
         />
-        #{seed} {teamFullName(team)}
+        #{seed}{" "}
+        <Link href={`/teams/${team.id}`} className="hover:underline">
+          {teamFullName(team)}
+        </Link>
       </span>
       <span>{wins}</span>
     </div>

@@ -152,7 +152,11 @@ export function DashboardClient({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <TeamColorSwatch primaryColor={myTeam.primaryColor} secondaryColor={myTeam.secondaryColor} size="lg" />
-          <h1 className="text-2xl font-bold">{teamFullName(myTeam)}</h1>
+          <h1 className="text-2xl font-bold">
+            <Link href={`/teams/${myTeam.id}`} className="hover:underline">
+              {teamFullName(myTeam)}
+            </Link>
+          </h1>
         </div>
         <p className="text-sm text-black/50 dark:text-white/50">
           {labels.inviteCode}{" "}
@@ -222,7 +226,9 @@ export function DashboardClient({
               className="rounded-lg border border-black/10 p-4 dark:border-white/10"
             >
               <p className="font-medium">
-                {player.firstName} {player.lastName}
+                <Link href={`/teams/${teamId}/players/${player.id}`} className="hover:underline">
+                  {player.firstName} {player.lastName}
+                </Link>
               </p>
               <p className="text-sm text-black/50 dark:text-white/50">
                 {player.position} · {labels.overallLabel} {player.overallRating}
@@ -241,9 +247,9 @@ export function DashboardClient({
                 key={player.id}
                 className="flex items-center justify-between rounded-lg border border-black/10 px-4 py-3 text-sm dark:border-white/10"
               >
-                <span>
+                <Link href={`/teams/${teamId}/players/${player.id}`} className="hover:underline">
                   {player.firstName} {player.lastName}
-                </span>
+                </Link>
                 <span className="text-red-500">
                   {labels.unavailable} ({player.injuryGamesRemaining} {labels.gamesUnit})
                 </span>
@@ -316,10 +322,25 @@ function GameLine({
   const opponent = game.homeTeamId === myTeamId ? away : home;
   const isHome = game.homeTeamId === myTeamId;
 
+  // Victoire/défaite du point de vue de mon équipe — sert uniquement à
+  // colorer la ligne, aucun effet sur le classement/les stats (déjà pilotés
+  // ailleurs par getStandings).
+  const isFinal = game.status === "final" && game.homeScore != null && game.awayScore != null;
+  const myScore = isHome ? game.homeScore : game.awayScore;
+  const oppScore = isHome ? game.awayScore : game.homeScore;
+  const won = isFinal && myScore != null && oppScore != null && myScore > oppScore;
+  const lost = isFinal && myScore != null && oppScore != null && myScore < oppScore;
+
   return (
     <Link
       href={`/game/${game.id}`}
-      className="flex items-center justify-between rounded-lg border border-black/10 px-4 py-3 text-sm transition hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
+      className={`flex items-center justify-between rounded-lg border px-4 py-3 text-sm transition hover:bg-black/5 dark:hover:bg-white/5 ${
+        won
+          ? "border-green-500/30 bg-green-500/5"
+          : lost
+            ? "border-red-500/30 bg-red-500/5"
+            : "border-black/10 dark:border-white/10"
+      }`}
     >
       <span>
         {isHome ? "vs" : "@"} {opponent ? teamFullName(opponent) : "?"}
@@ -331,7 +352,15 @@ function GameLine({
       </span>
       <span className="flex items-center gap-3 text-black/50 dark:text-white/50">
         {game.status === "final" ? (
-          <span className="font-medium text-black dark:text-white">
+          <span
+            className={`font-medium ${
+              won
+                ? "text-green-600 dark:text-green-400"
+                : lost
+                  ? "text-red-500"
+                  : "text-black dark:text-white"
+            }`}
+          >
             {game.homeScore}-{game.awayScore}
           </span>
         ) : (

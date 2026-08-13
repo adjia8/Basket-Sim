@@ -269,6 +269,7 @@ export default async function TeamRosterPage({
         <TradeProposalForm
           myRoster={myRosterWithContracts}
           theirRoster={rosterWithContracts}
+          myTeamId={membership.teamId}
           myPicks={myPicks}
           theirPicks={picks}
           opponentTeamId={team.id}

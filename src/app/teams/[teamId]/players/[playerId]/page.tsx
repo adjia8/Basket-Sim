@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getContractForPlayer } from "@/lib/data-access/contracts";
 import { getPlayerWithState } from "@/lib/data-access/players";
@@ -50,15 +51,22 @@ export default async function PlayerDetailPage({
   params: Promise<{ teamId: string; playerId: string }>;
 }) {
   const membership = await getCurrentMembership();
-  const { teamId, playerId } = await params;
+  const { playerId } = await params;
   const { t, locale } = await getTranslator();
 
-  const [team, player, contract] = await Promise.all([
-    getTeamById(teamId),
+  const [player, contract] = await Promise.all([
     getPlayerWithState(membership.careerId, playerId),
     getContractForPlayer(membership.careerId, playerId),
   ]);
-  if (!team || !player || !contract || contract.teamId !== teamId) notFound();
+  if (!player || !contract) notFound();
+
+  // L'équipe actuelle du contrat fait foi, pas le teamId de l'URL — un lien
+  // vers cette page (box score, historique, ancien coéquipier...) peut avoir
+  // été construit avec l'équipe d'alors ; si la joueuse a été échangée
+  // depuis, on affiche quand même sa fiche à jour plutôt qu'un 404.
+  const teamId = contract.teamId;
+  const team = await getTeamById(teamId);
+  if (!team) notFound();
 
   const isMyTeam = team.id === membership.teamId;
 
@@ -135,7 +143,10 @@ export default async function PlayerDetailPage({
             #{player.jerseyNumber} {player.firstName} {player.lastName}
           </h1>
           <p className="text-sm text-black/50 dark:text-white/50">
-            {teamFullName(team)} · {player.position} · {player.heightCm} cm ·{" "}
+            <Link href={`/teams/${team.id}`} className="hover:underline">
+              {teamFullName(team)}
+            </Link>{" "}
+            · {player.position} · {player.heightCm} cm ·{" "}
             {t("player.ageLabel", { age: player.age })} · {player.nationality}
           </p>
         </div>
@@ -312,9 +323,9 @@ export default async function PlayerDetailPage({
           <ul className="space-y-1 text-sm">
             {stints.map((stint) => (
               <li key={stint.id} className="flex items-center justify-between">
-                <span>
+                <Link href={`/teams/${stint.teamId}`} className="hover:underline">
                   {stint.teamCity} {stint.teamName} ({stint.teamAbbreviation})
-                </span>
+                </Link>
                 <span className="text-black/50 dark:text-white/50">
                   {stint.season} · {stintReasonLabels[stint.reason] ?? stint.reason}
                 </span>

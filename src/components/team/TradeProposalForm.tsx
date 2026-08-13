@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { proposeTrade } from "@/app/actions/trade";
 import type { Locale } from "@/lib/i18n/locale";
 import { formatSalary } from "@/lib/utils";
@@ -37,6 +38,7 @@ export interface TradeProposalLabels {
 export function TradeProposalForm({
   myRoster,
   theirRoster,
+  myTeamId,
   myPicks,
   theirPicks,
   opponentTeamId,
@@ -45,6 +47,7 @@ export function TradeProposalForm({
 }: {
   myRoster: RosterPlayer[];
   theirRoster: RosterPlayer[];
+  myTeamId: string;
   myPicks: TradePick[];
   theirPicks: TradePick[];
   opponentTeamId: string;
@@ -62,7 +65,13 @@ export function TradeProposalForm({
 
         <div className="grid gap-6 sm:grid-cols-2">
           <div className="space-y-6">
-            <PlayerCheckboxList title={labels.myPlayersToOffer} name="myPlayerIds" roster={myRoster} locale={locale} />
+            <PlayerCheckboxList
+              title={labels.myPlayersToOffer}
+              name="myPlayerIds"
+              roster={myRoster}
+              teamId={myTeamId}
+              locale={locale}
+            />
             <PickCheckboxList title={labels.myPicksToOffer} name="myPickIds" picks={myPicks} />
           </div>
           <div className="space-y-6">
@@ -70,6 +79,7 @@ export function TradeProposalForm({
               title={labels.theirPlayersToReceive}
               name="theirPlayerIds"
               roster={theirRoster}
+              teamId={opponentTeamId}
               locale={locale}
             />
             <PickCheckboxList title={labels.theirPicksToReceive} name="theirPickIds" picks={theirPicks} />
@@ -101,11 +111,13 @@ function PlayerCheckboxList({
   title,
   name,
   roster,
+  teamId,
   locale,
 }: {
   title: string;
   name: "myPlayerIds" | "theirPlayerIds";
   roster: RosterPlayer[];
+  teamId: string;
   locale: Locale;
 }) {
   return (
@@ -119,7 +131,13 @@ function PlayerCheckboxList({
             <label className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-black/5 dark:hover:bg-white/5">
               <input type="checkbox" name={name} value={player.id} />
               <span className="flex-1">
-                {player.firstName} {player.lastName}{" "}
+                <Link
+                  href={`/teams/${teamId}/players/${player.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="hover:underline"
+                >
+                  {player.firstName} {player.lastName}
+                </Link>{" "}
                 <span className="text-black/40 dark:text-white/40">
                   ({player.position}, {player.overallRating})
                 </span>
