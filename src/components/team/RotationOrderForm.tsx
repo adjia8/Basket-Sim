@@ -12,11 +12,14 @@ export async function RotationOrderForm({ initialOrder }: { initialOrder: Rotati
         initialOrder={initialOrder}
         labels={{
           description: t("rotation.description"),
+          activeHeading: t("rotation.activeHeading"),
+          reserveHeading: t("rotation.reserveHeading"),
           roleStarter: t("rotation.role.starter"),
           roleSixthWoman: t("rotation.role.sixthWoman"),
           roleBench: t("rotation.role.bench"),
-          roleOutOfRotation: t("rotation.role.outOfRotation"),
           dragHandle: t("rotation.dragHandle"),
+          addToRotation: t("rotation.addToRotation"),
+          removeFromRotation: t("rotation.removeFromRotation"),
           save: t("rotation.save"),
           saving: t("rotation.saving"),
         }}

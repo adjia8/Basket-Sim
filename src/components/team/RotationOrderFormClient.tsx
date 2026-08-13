@@ -7,11 +7,14 @@ import type { RotationOrderPlayer } from "@/lib/careers/rotation-rules";
 
 export interface RotationOrderLabels {
   description: string;
+  activeHeading: string;
+  reserveHeading: string;
   roleStarter: string;
   roleSixthWoman: string;
   roleBench: string;
-  roleOutOfRotation: string;
   dragHandle: string;
+  addToRotation: string;
+  removeFromRotation: string;
   save: string;
   saving: string;
 }
@@ -19,8 +22,7 @@ export interface RotationOrderLabels {
 function roleLabel(index: number, labels: RotationOrderLabels): string {
   if (index < 5) return labels.roleStarter;
   if (index === 5) return labels.roleSixthWoman;
-  if (index < ROTATION_SIZE) return labels.roleBench;
-  return labels.roleOutOfRotation;
+  return labels.roleBench;
 }
 
 export function RotationOrderFormClient({
@@ -54,11 +56,41 @@ export function RotationOrderFormClient({
     });
   }
 
+  // Retirer envoie la joueuse en toute fin de liste (dernière priorité de
+  // banc) ; ajouter l'insère juste avant la limite ROTATION_SIZE, ce qui
+  // repousse mécaniquement la dernière joueuse de la rotation active vers
+  // le haut du groupe "hors rotation" — même modèle que le moteur (le rôle
+  // n'est jamais qu'une question de position dans un seul tableau).
+  function removeFromRotation(id: string) {
+    setOrder((prev) => {
+      const from = prev.findIndex((p) => p.id === id);
+      if (from === -1) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.push(moved);
+      return next;
+    });
+  }
+
+  function addToRotation(id: string) {
+    setOrder((prev) => {
+      const from = prev.findIndex((p) => p.id === id);
+      if (from === -1) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(Math.min(ROTATION_SIZE - 1, next.length), 0, moved);
+      return next;
+    });
+  }
+
   // Ligne dont le milieu est le plus proche du pointeur — glisser-déposer
   // "au survol", pas un calcul de zone de dépôt précis : suffisant pour
   // réordonner une petite liste (12-14 joueuses au plus) et beaucoup plus
   // robuste que le drag-and-drop HTML5 natif sur mobile (Pointer Events
   // couvre souris/tactile/stylet avec le même code, l'API native non).
+  // Fonctionne aussi bien pour réordonner à l'intérieur d'un groupe que
+  // pour faire passer une joueuse d'un groupe à l'autre (les deux listes
+  // ne sont que deux vues du même tableau `order`, coupées à ROTATION_SIZE).
   function nearestIndex(y: number): number {
     let closest = 0;
     let closestDist = Infinity;
@@ -103,51 +135,84 @@ export function RotationOrderFormClient({
     }
   }
 
+  function renderRow(player: RotationOrderPlayer, index: number, inRotation: boolean) {
+    return (
+      <li
+        key={player.id}
+        ref={(el) => {
+          if (el) itemRefs.current.set(player.id, el);
+          else itemRefs.current.delete(player.id);
+        }}
+        className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm transition ${
+          draggingId === player.id
+            ? "border-black/30 bg-black/5 shadow-sm dark:border-white/30 dark:bg-white/10"
+            : "border-black/5 dark:border-white/5"
+        }`}
+      >
+        <button
+          type="button"
+          aria-label={labels.dragHandle}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            startDrag(player.id);
+          }}
+          onKeyDown={(e) => handleHandleKeyDown(e, player.id, index)}
+          className="touch-none cursor-grab select-none rounded px-1.5 py-1 text-base leading-none text-black/40 hover:bg-black/5 active:cursor-grabbing dark:text-white/40 dark:hover:bg-white/10"
+        >
+          ⠿
+        </button>
+        <span className="w-6 text-center text-black/40 dark:text-white/40">{index + 1}</span>
+        <span className="flex-1">
+          #{player.jerseyNumber} {player.firstName} {player.lastName}{" "}
+          <span className="text-black/40 dark:text-white/40">
+            ({player.position}, {player.overallRating})
+          </span>
+        </span>
+        {inRotation && (
+          <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs font-medium text-black/60 dark:bg-white/10 dark:text-white/60">
+            {roleLabel(index, labels)}
+          </span>
+        )}
+        <button
+          type="button"
+          aria-label={inRotation ? labels.removeFromRotation : labels.addToRotation}
+          onClick={() => (inRotation ? removeFromRotation(player.id) : addToRotation(player.id))}
+          className={`flex h-6 w-6 items-center justify-center rounded-full text-sm font-bold transition ${
+            inRotation
+              ? "bg-red-500/10 text-red-600 hover:bg-red-500/20 dark:text-red-400"
+              : "bg-green-500/10 text-green-600 hover:bg-green-500/20 dark:text-green-400"
+          }`}
+        >
+          {inRotation ? "−" : "+"}
+        </button>
+      </li>
+    );
+  }
+
+  const activePlayers = order.slice(0, ROTATION_SIZE);
+  const reservePlayers = order.slice(ROTATION_SIZE);
+
   return (
     <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
       <p className="text-xs text-black/50 dark:text-white/50">{labels.description}</p>
 
-      <ul className="mt-3 space-y-1">
-        {order.map((player, index) => (
-          <li
-            key={player.id}
-            ref={(el) => {
-              if (el) itemRefs.current.set(player.id, el);
-              else itemRefs.current.delete(player.id);
-            }}
-            className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm transition ${
-              draggingId === player.id
-                ? "border-black/30 bg-black/5 shadow-sm dark:border-white/30 dark:bg-white/10"
-                : "border-black/5 dark:border-white/5"
-            }`}
-          >
-            <button
-              type="button"
-              aria-label={labels.dragHandle}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                startDrag(player.id);
-              }}
-              onKeyDown={(e) => handleHandleKeyDown(e, player.id, index)}
-              className="touch-none cursor-grab select-none rounded px-1.5 py-1 text-base leading-none text-black/40 hover:bg-black/5 active:cursor-grabbing dark:text-white/40 dark:hover:bg-white/10"
-            >
-              ⠿
-            </button>
-            <span className="w-6 text-center text-black/40 dark:text-white/40">{index + 1}</span>
-            <span className="flex-1">
-              #{player.jerseyNumber} {player.firstName} {player.lastName}{" "}
-              <span className="text-black/40 dark:text-white/40">
-                ({player.position}, {player.overallRating})
-              </span>
-            </span>
-            <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs font-medium text-black/60 dark:bg-white/10 dark:text-white/60">
-              {roleLabel(index, labels)}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+        {labels.activeHeading}
+      </h3>
+      <ul className="mt-2 space-y-1">{activePlayers.map((player, index) => renderRow(player, index, true))}</ul>
 
-      <form action={action} className="mt-3">
+      {reservePlayers.length > 0 && (
+        <>
+          <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+            {labels.reserveHeading}
+          </h3>
+          <ul className="mt-2 space-y-1">
+            {reservePlayers.map((player, index) => renderRow(player, index + ROTATION_SIZE, false))}
+          </ul>
+        </>
+      )}
+
+      <form action={action} className="mt-4">
         <input type="hidden" name="order" value={JSON.stringify(order.map((p) => p.id))} />
         <button
           type="submit"
