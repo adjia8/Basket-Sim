@@ -93,6 +93,20 @@ export interface BoxScoreEntry {
   flagrantFouls: number;
   // undefined = a joué tout le match ; sinon la raison de sa sortie prématurée.
   disqualifiedReason?: "fouled_out" | "ejected";
+  // Tirs — dérivés a posteriori des points déjà attribués (voir mockEngine.ts),
+  // jamais l'inverse : ne change jamais le score final, seulement comment il
+  // est expliqué. fieldGoalsMade/Attempted incluent les tirs à 3 points
+  // (convention standard d'une feuille de stats).
+  fieldGoalsMade: number;
+  fieldGoalsAttempted: number;
+  threePointersMade: number;
+  threePointersAttempted: number;
+  freeThrowsMade: number;
+  freeThrowsAttempted: number;
+  steals: number;
+  blocks: number;
+  turnovers: number;
+  minutesPlayed: number;
 }
 
 export interface Game {
