@@ -10,6 +10,7 @@ import {
   PRESS_CONFERENCE_CHANCE,
   PRESS_CONFERENCE_COOLDOWN_DAYS,
   type AnswerTone,
+  type PressGameContext,
   type PressOption,
 } from "@/lib/careers/press-rules";
 
@@ -65,7 +66,8 @@ export async function maybeCreatePressConference(
   teamId: string,
   leagueId: string,
   gameDate: Date,
-  locale: Locale
+  locale: Locale,
+  gameContext: PressGameContext
 ): Promise<void> {
   const state = await getOrCreateTeamState(careerId, teamId, leagueId);
 
@@ -81,7 +83,7 @@ export async function maybeCreatePressConference(
   if (Math.random() >= PRESS_CONFERENCE_CHANCE) return;
 
   const count = Math.random() < 0.5 ? 3 : 4;
-  const generated = generateQuestions(count, locale);
+  const generated = generateQuestions(count, locale, gameContext);
 
   await prisma.$transaction([
     prisma.pressConference.create({

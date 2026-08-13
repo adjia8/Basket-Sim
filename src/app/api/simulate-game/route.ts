@@ -26,8 +26,27 @@ import {
   type TrainingFocus,
   type TrainingIntensity,
 } from "@/lib/careers/training-rules";
-import { moraleBonus } from "@/lib/careers/press-rules";
+import { moraleBonus, type PressGameContext } from "@/lib/careers/press-rules";
 import { getTranslator } from "@/lib/i18n/translate";
+import { teamFullName } from "@/lib/utils";
+import type { BoxScoreEntry, Player } from "@/lib/types";
+
+// Meilleure marqueuse d'une équipe sur CE match — sert à personnaliser une
+// question de conférence de presse ("X a terminé avec Y points..."),
+// undefined si personne n'a marqué (jamais le cas en pratique, mais évite un
+// crash si un jour l'entrée de box score manque).
+function topScorer(
+  boxScore: BoxScoreEntry[],
+  teamId: string,
+  roster: Player[]
+): { name: string; points: number } | undefined {
+  const entries = boxScore.filter((e) => e.teamId === teamId && e.points > 0);
+  if (entries.length === 0) return undefined;
+  const best = entries.reduce((a, b) => (b.points > a.points ? b : a));
+  const player = roster.find((p) => p.id === best.playerId);
+  if (!player) return undefined;
+  return { name: `${player.firstName} ${player.lastName}`, points: best.points };
+}
 
 export async function POST(request: Request) {
   const { t, locale } = await getTranslator();
@@ -267,12 +286,61 @@ export async function POST(request: Request) {
 
   // Conférence de presse aléatoire (au plus 1/semaine réelle) — seulement
   // pour les équipes gérées par un humain, jamais pour un match IA-vs-IA.
+  // Contexte du match qu'on vient de jouer, injecté dans les questions et les
+  // réponses proposées (voir press-rules.ts) — standings/scores déjà en
+  // mémoire ci-dessus, aucune requête supplémentaire nécessaire.
+  const homeRankIndex = standings.findIndex((s) => s.teamId === updatedGame.homeTeamId);
+  const awayRankIndex = standings.findIndex((s) => s.teamId === updatedGame.awayTeamId);
+  const homeTopScorer = topScorer(result.boxScore, updatedGame.homeTeamId, homeRoster);
+  const awayTopScorer = topScorer(result.boxScore, updatedGame.awayTeamId, awayRoster);
+  const homeGameContext: PressGameContext = {
+    teamName: teamFullName(homeTeam),
+    opponentName: teamFullName(awayTeam),
+    won: result.homeScore > result.awayScore,
+    teamScore: result.homeScore,
+    opponentScore: result.awayScore,
+    wins: homeStandingsRow?.wins ?? 0,
+    losses: homeStandingsRow?.losses ?? 0,
+    streak: homeStandingsRow?.streak ?? "-",
+    rank: homeRankIndex >= 0 ? homeRankIndex + 1 : standings.length,
+    leagueSize: standings.length,
+    topPerformerName: homeTopScorer?.name,
+    topPerformerPoints: homeTopScorer?.points,
+  };
+  const awayGameContext: PressGameContext = {
+    teamName: teamFullName(awayTeam),
+    opponentName: teamFullName(homeTeam),
+    won: result.awayScore > result.homeScore,
+    teamScore: result.awayScore,
+    opponentScore: result.homeScore,
+    wins: awayStandingsRow?.wins ?? 0,
+    losses: awayStandingsRow?.losses ?? 0,
+    streak: awayStandingsRow?.streak ?? "-",
+    rank: awayRankIndex >= 0 ? awayRankIndex + 1 : standings.length,
+    leagueSize: standings.length,
+    topPerformerName: awayTopScorer?.name,
+    topPerformerPoints: awayTopScorer?.points,
+  };
   await Promise.all([
     homeManager
-      ? maybeCreatePressConference(membership.careerId, updatedGame.homeTeamId, updatedGame.leagueId, gameDate, locale)
+      ? maybeCreatePressConference(
+          membership.careerId,
+          updatedGame.homeTeamId,
+          updatedGame.leagueId,
+          gameDate,
+          locale,
+          homeGameContext
+        )
       : Promise.resolve(),
     awayManager
-      ? maybeCreatePressConference(membership.careerId, updatedGame.awayTeamId, updatedGame.leagueId, gameDate, locale)
+      ? maybeCreatePressConference(
+          membership.careerId,
+          updatedGame.awayTeamId,
+          updatedGame.leagueId,
+          gameDate,
+          locale,
+          awayGameContext
+        )
       : Promise.resolve(),
   ]);
 

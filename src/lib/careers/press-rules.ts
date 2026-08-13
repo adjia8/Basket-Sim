@@ -27,87 +27,149 @@ export interface GeneratedQuestion {
   options: PressOption[];
 }
 
-// Toujours les 4 mêmes tons, quelle que soit la question — simplifie
-// l'interface (un seul jeu d'options à afficher) et laisse le prompt porter
-// toute la variété.
-const TONE_LABELS: Record<Locale, Record<AnswerTone, string>> = {
-  fr: {
-    diplomatic: "Réponse mesurée, sans vague",
-    confident: "Réponse offensive, pleine de confiance",
-    critical: "Réponse critique envers l'effectif/l'arbitrage",
-    humble: "Réponse humble, reconnaît les difficultés",
-  },
-  en: {
-    diplomatic: "A measured, cautious answer",
-    confident: "A bold, confident answer",
-    critical: "A critical answer toward the roster/officiating",
-    humble: "A humble answer, acknowledging the struggles",
-  },
-};
-const TONES: AnswerTone[] = ["diplomatic", "confident", "critical", "humble"];
+// Contexte du dernier match joué, injecté dans les questions/réponses pour
+// qu'elles parlent du vrai résultat plutôt que de rester génériques (voir
+// simulate-game/route.ts pour comment il est construit : tout est déjà en
+// mémoire à cet endroit, aucune requête supplémentaire).
+export interface PressGameContext {
+  teamName: string;
+  opponentName: string;
+  won: boolean;
+  teamScore: number;
+  opponentScore: number;
+  wins: number;
+  losses: number;
+  streak: string; // "W3" / "L2" / "-", voir computeStreak dans standings.ts
+  rank: number; // 1-based
+  leagueSize: number;
+  topPerformerName?: string;
+  topPerformerPoints?: number;
+}
 
-const QUESTION_BANK: Record<Locale, Record<QuestionCategory, string[]>> = {
-  fr: {
-    results: [
-      "Comment expliquez-vous les résultats de l'équipe ces derniers matchs ?",
-      "Le groupe a-t-il le niveau pour viser les objectifs fixés cette saison ?",
-      "Certains observateurs jugent la dynamique inquiétante — qu'en pensez-vous ?",
-      "Quel est le principal point à corriger après ce dernier match ?",
-      "Le calendrier à venir s'annonce difficile : comment l'abordez-vous ?",
-    ],
-    roster: [
-      "Êtes-vous satisfait de l'implication de votre effectif en ce moment ?",
-      "Certains joueurs semblent frustrés de leur temps de jeu — un commentaire ?",
-      "Le vestiaire traverse-t-il des tensions selon vous ?",
-      "Peut-on s'attendre à des changements dans la rotation prochainement ?",
-      "Comment jugez-vous l'alchimie sur le terrain cette saison ?",
-    ],
-    management: [
-      "La direction vous soutient-elle pleinement dans vos choix ?",
-      "Votre poste est-il remis en question en interne selon vous ?",
-      "Les investissements dans les infrastructures sont-ils suffisants ?",
-      "Comment décririez-vous votre relation avec les dirigeants du club ?",
-      "Sentez-vous une pression particulière de la part de la franchise ?",
-    ],
-    future: [
-      "Quels sont vos objectifs pour la suite de la saison ?",
-      "Envisagez-vous des mouvements sur le marché des transferts ?",
-      "Où voyez-vous cette équipe dans les prochaines saisons ?",
-      "Les supporters peuvent-ils garder espoir cette année ?",
-      "Quel message souhaitez-vous adresser aux fans après cette période ?",
-    ],
-  },
-  en: {
-    results: [
-      "How do you explain the team's results over the last few games?",
-      "Does this group have what it takes to reach this season's goals?",
-      "Some observers see the recent momentum as worrying — your thoughts?",
-      "What's the main thing to fix after that last game?",
-      "The upcoming schedule looks tough — how are you approaching it?",
-    ],
-    roster: [
-      "Are you satisfied with your roster's effort level right now?",
-      "Some players seem frustrated with their playing time — any comment?",
-      "Is there tension in the locker room, in your view?",
-      "Should we expect changes to the rotation soon?",
-      "How would you rate the on-court chemistry this season?",
-    ],
-    management: [
-      "Does the front office fully support your decisions?",
-      "Is your job under scrutiny internally, in your opinion?",
-      "Are the investments in facilities sufficient?",
-      "How would you describe your relationship with the club's leadership?",
-      "Do you feel particular pressure from the franchise?",
-    ],
-    future: [
-      "What are your goals for the rest of the season?",
-      "Are you considering any moves on the trade market?",
-      "Where do you see this team in the coming seasons?",
-      "Can the fans stay hopeful this year?",
-      "What message would you like to send to the fans right now?",
-    ],
-  },
+function describeStreak(streak: string, locale: Locale): string {
+  const kind = streak[0];
+  const count = Number(streak.slice(1));
+  if (!kind || !Number.isFinite(count) || count <= 0) {
+    return locale === "fr" ? "ce début de saison" : "this start to the season";
+  }
+  if (locale === "fr") {
+    return kind === "W" ? `${count} victoire${count > 1 ? "s" : ""} de suite` : `${count} défaite${count > 1 ? "s" : ""} de suite`;
+  }
+  return kind === "W" ? `${count} straight win${count > 1 ? "s" : ""}` : `${count} straight loss${count > 1 ? "es" : ""}`;
+}
+
+type QuestionTemplate = (ctx: PressGameContext, locale: Locale) => string;
+
+const QUESTION_BANK: Record<QuestionCategory, QuestionTemplate[]> = {
+  results: [
+    (ctx, locale) =>
+      locale === "fr"
+        ? `Vous venez de ${ctx.won ? "battre" : "vous incliner face à"} ${ctx.opponentName} ${ctx.teamScore}-${ctx.opponentScore} : comment expliquez-vous ce résultat ?`
+        : `You just ${ctx.won ? "beat" : "lost to"} ${ctx.opponentName} ${ctx.teamScore}-${ctx.opponentScore}: how do you explain that result?`,
+    (ctx, locale) =>
+      locale === "fr"
+        ? `Avec un bilan de ${ctx.wins}-${ctx.losses}, le groupe a-t-il le niveau pour viser les objectifs fixés cette saison ?`
+        : `With a ${ctx.wins}-${ctx.losses} record, does this group have what it takes to reach this season's goals?`,
+    (ctx, locale) =>
+      locale === "fr"
+        ? `Cette série de ${describeStreak(ctx.streak, locale)} inquiète certains observateurs — qu'en pensez-vous ?`
+        : `This stretch of ${describeStreak(ctx.streak, locale)} worries some observers — your thoughts?`,
+    (ctx, locale) =>
+      locale === "fr"
+        ? `Quel est le principal point à corriger après cette rencontre contre ${ctx.opponentName} ?`
+        : `What's the main thing to fix after that game against ${ctx.opponentName}?`,
+    (ctx, locale) =>
+      locale === "fr"
+        ? `Le calendrier à venir s'annonce difficile après ce ${ctx.won ? "succès" : "revers"} : comment l'abordez-vous ?`
+        : `The upcoming schedule looks tough after that ${ctx.won ? "win" : "loss"} — how are you approaching it?`,
+  ],
+  roster: [
+    (ctx, locale) =>
+      ctx.topPerformerName
+        ? locale === "fr"
+          ? `${ctx.topPerformerName} a terminé avec ${ctx.topPerformerPoints} points face à ${ctx.opponentName} — êtes-vous satisfait de l'implication du reste de l'effectif ?`
+          : `${ctx.topPerformerName} finished with ${ctx.topPerformerPoints} points against ${ctx.opponentName} — are you satisfied with the rest of the roster's effort?`
+        : locale === "fr"
+          ? `Êtes-vous satisfait de l'implication de votre effectif en ce moment ?`
+          : `Are you satisfied with your roster's effort level right now?`,
+    (_ctx, locale) =>
+      locale === "fr"
+        ? "Certains joueurs semblent frustrés de leur temps de jeu — un commentaire ?"
+        : "Some players seem frustrated with their playing time — any comment?",
+    (ctx, locale) =>
+      locale === "fr"
+        ? `Le vestiaire traverse-t-il des tensions, après ce passage à ${ctx.wins}-${ctx.losses} ?`
+        : `Is there tension in the locker room, after this stretch to ${ctx.wins}-${ctx.losses}?`,
+    (_ctx, locale) =>
+      locale === "fr"
+        ? "Peut-on s'attendre à des changements dans la rotation prochainement ?"
+        : "Should we expect changes to the rotation soon?",
+    (ctx, locale) =>
+      locale === "fr"
+        ? `Comment jugez-vous l'alchimie sur le terrain, avec ${ctx.teamName} désormais ${ctx.rank}e sur ${ctx.leagueSize} ?`
+        : `How would you rate the on-court chemistry, with ${ctx.teamName} now ${ctx.rank}${ordinalSuffix(ctx.rank, locale)} out of ${ctx.leagueSize}?`,
+  ],
+  management: [
+    (ctx, locale) =>
+      locale === "fr"
+        ? `La direction vous soutient-elle pleinement, alors que ${ctx.teamName} pointe à la ${ctx.rank}e place sur ${ctx.leagueSize} ?`
+        : `Does the front office fully support you, with ${ctx.teamName} sitting ${ctx.rank}${ordinalSuffix(ctx.rank, locale)} out of ${ctx.leagueSize}?`,
+    (ctx, locale) =>
+      locale === "fr"
+        ? `Votre poste est-il remis en question en interne après ce ${ctx.won ? "succès" : "revers"} face à ${ctx.opponentName} ?`
+        : `Is your job under scrutiny internally after that ${ctx.won ? "win" : "loss"} against ${ctx.opponentName}?`,
+    (_ctx, locale) =>
+      locale === "fr"
+        ? "Les investissements dans les infrastructures sont-ils suffisants ?"
+        : "Are the investments in facilities sufficient?",
+    (_ctx, locale) =>
+      locale === "fr"
+        ? "Comment décririez-vous votre relation avec les dirigeants du club ?"
+        : "How would you describe your relationship with the club's leadership?",
+    (ctx, locale) =>
+      locale === "fr"
+        ? `Sentez-vous une pression particulière de la franchise avec ce bilan de ${ctx.wins}-${ctx.losses} ?`
+        : `Do you feel particular pressure from the franchise with a ${ctx.wins}-${ctx.losses} record?`,
+  ],
+  future: [
+    (ctx, locale) =>
+      locale === "fr"
+        ? `Quels sont vos objectifs pour la suite de la saison, avec ${ctx.teamName} à la ${ctx.rank}e place ?`
+        : `What are your goals for the rest of the season, with ${ctx.teamName} in ${ctx.rank}${ordinalSuffix(ctx.rank, locale)} place?`,
+    (ctx, locale) =>
+      locale === "fr"
+        ? `Envisagez-vous des mouvements sur le marché des transferts après ce ${ctx.won ? "succès" : "revers"} ?`
+        : `Are you considering any moves on the trade market after that ${ctx.won ? "win" : "loss"}?`,
+    (_ctx, locale) =>
+      locale === "fr"
+        ? "Où voyez-vous cette équipe dans les prochaines saisons ?"
+        : "Where do you see this team in the coming seasons?",
+    (ctx, locale) =>
+      locale === "fr"
+        ? `Les supporters peuvent-ils garder espoir avec ce bilan de ${ctx.wins}-${ctx.losses} ?`
+        : `Can the fans stay hopeful with a ${ctx.wins}-${ctx.losses} record?`,
+    (ctx, locale) =>
+      locale === "fr"
+        ? `Quel message souhaitez-vous adresser aux fans après ce match contre ${ctx.opponentName} ?`
+        : `What message would you like to send to the fans after that game against ${ctx.opponentName}?`,
+  ],
 };
+
+function ordinalSuffix(rank: number, locale: Locale): string {
+  if (locale === "fr") return rank === 1 ? "re" : "e";
+  const mod100 = rank % 100;
+  if (mod100 >= 11 && mod100 <= 13) return "th";
+  switch (rank % 10) {
+    case 1:
+      return "st";
+    case 2:
+      return "nd";
+    case 3:
+      return "rd";
+    default:
+      return "th";
+  }
+}
 
 function shuffledCategories(): QuestionCategory[] {
   const categories: QuestionCategory[] = ["results", "roster", "management", "future"];
@@ -118,20 +180,63 @@ function shuffledCategories(): QuestionCategory[] {
   return categories;
 }
 
-function buildOptions(locale: Locale): PressOption[] {
-  return TONES.map((tone) => ({ id: tone, label: TONE_LABELS[locale][tone], tone }));
+// Réponses proposées : toujours les 4 mêmes postures (tons), mais formulées
+// comme une citation qui reprend le résultat réel — plus la même phrase
+// recyclée sur toutes les conférences, quel que soit ce qui vient de se
+// passer sur le terrain.
+function buildOptions(locale: Locale, ctx: PressGameContext): PressOption[] {
+  const tones: AnswerTone[] = ["diplomatic", "confident", "critical", "humble"];
+  return tones.map((tone) => ({ id: tone, label: toneAnswerLabel(tone, ctx, locale), tone }));
+}
+
+function toneAnswerLabel(tone: AnswerTone, ctx: PressGameContext, locale: Locale): string {
+  if (locale === "fr") {
+    switch (tone) {
+      case "diplomatic":
+        return ctx.won
+          ? `« On reste concentrées sur le travail, cette victoire ${ctx.teamScore}-${ctx.opponentScore} contre ${ctx.opponentName} ne change rien à notre approche. »`
+          : `« On reste concentrées sur le travail, cette défaite contre ${ctx.opponentName} ne change rien à notre approche. »`;
+      case "confident":
+        return ctx.won
+          ? `« On savait qu'on pouvait battre ${ctx.opponentName} — ce n'est qu'un début, on vise mieux que la ${ctx.rank}e place. »`
+          : `« Cette défaite contre ${ctx.opponentName} ne représente pas notre vrai niveau, on va le prouver très vite. »`;
+      case "critical":
+        return `« Il y a eu des détails, des choix d'arbitrage aussi, qui nous ont coûté cher face à ${ctx.opponentName} — on doit en reparler en interne. »`;
+      case "humble":
+        return ctx.won
+          ? `« On a eu de la réussite ce soir contre ${ctx.opponentName}, il reste beaucoup de travail. »`
+          : `« ${ctx.opponentName} était meilleure que nous ce soir, on doit apprendre de cette défaite. »`;
+    }
+  }
+  switch (tone) {
+    case "diplomatic":
+      return ctx.won
+        ? `"We stay focused on the work — this ${ctx.teamScore}-${ctx.opponentScore} win over ${ctx.opponentName} doesn't change our approach."`
+        : `"We stay focused on the work — this loss to ${ctx.opponentName} doesn't change our approach."`;
+    case "confident":
+      return ctx.won
+        ? `"We knew we could beat ${ctx.opponentName} — this is just the start, we're aiming higher than ${ctx.rank}${ordinalSuffix(ctx.rank, locale)} place."`
+        : `"That loss to ${ctx.opponentName} doesn't reflect our real level, and we'll prove it soon."`;
+    case "critical":
+      return `"There were some details, and some officiating calls too, that cost us against ${ctx.opponentName} — we need to talk about that internally."`;
+    case "humble":
+      return ctx.won
+        ? `"We caught some breaks tonight against ${ctx.opponentName}, there's still plenty of work to do."`
+        : `"${ctx.opponentName} was the better team tonight — we need to learn from this loss."`;
+  }
 }
 
 // Tire `count` questions (3 ou 4) réparties sur des catégories différentes
-// quand c'est possible, chacune avec les 4 tons de réponse disponibles.
-export function generateQuestions(count: number, locale: Locale): GeneratedQuestion[] {
+// quand c'est possible, chacune avec les 4 tons de réponse disponibles,
+// toutes injectées avec le contexte du dernier match joué.
+export function generateQuestions(count: number, locale: Locale, ctx: PressGameContext): GeneratedQuestion[] {
   const categories = shuffledCategories();
   const questions: GeneratedQuestion[] = [];
   for (let i = 0; i < count; i++) {
     const category = categories[i % categories.length];
-    const bank = QUESTION_BANK[locale][category];
-    const prompt = bank[Math.floor(Math.random() * bank.length)];
-    questions.push({ prompt, category, options: buildOptions(locale) });
+    const bank = QUESTION_BANK[category];
+    const template = bank[Math.floor(Math.random() * bank.length)];
+    questions.push({ prompt: template(ctx, locale), category, options: buildOptions(locale, ctx) });
   }
   return questions;
 }
