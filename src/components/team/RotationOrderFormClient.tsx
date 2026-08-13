@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { setRotationOrder, type RotationOrderFormState } from "@/app/actions/rotation";
 import { ROTATION_SIZE } from "@/lib/simulation/mockEngine";
 import type { RotationOrderPlayer } from "@/lib/careers/rotation-rules";
@@ -11,8 +11,7 @@ export interface RotationOrderLabels {
   roleSixthWoman: string;
   roleBench: string;
   roleOutOfRotation: string;
-  moveUp: string;
-  moveDown: string;
+  dragHandle: string;
   save: string;
   saving: string;
 }
@@ -32,19 +31,76 @@ export function RotationOrderFormClient({
   labels: RotationOrderLabels;
 }) {
   const [order, setOrder] = useState(initialOrder);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const orderRef = useRef(order);
+  const itemRefs = useRef(new Map<string, HTMLLIElement>());
   const [state, action, pending] = useActionState<RotationOrderFormState | undefined, FormData>(
     setRotationOrder,
     undefined
   );
 
-  function move(index: number, direction: -1 | 1): void {
-    const target = index + direction;
-    if (target < 0 || target >= order.length) return;
+  useEffect(() => {
+    orderRef.current = order;
+  }, [order]);
+
+  function moveTo(id: string, targetIndex: number) {
     setOrder((prev) => {
+      const from = prev.findIndex((p) => p.id === id);
+      if (from === -1 || from === targetIndex) return prev;
       const next = [...prev];
-      [next[index], next[target]] = [next[target], next[index]];
+      const [moved] = next.splice(from, 1);
+      next.splice(targetIndex, 0, moved);
       return next;
     });
+  }
+
+  // Ligne dont le milieu est le plus proche du pointeur — glisser-déposer
+  // "au survol", pas un calcul de zone de dépôt précis : suffisant pour
+  // réordonner une petite liste (12-14 joueuses au plus) et beaucoup plus
+  // robuste que le drag-and-drop HTML5 natif sur mobile (Pointer Events
+  // couvre souris/tactile/stylet avec le même code, l'API native non).
+  function nearestIndex(y: number): number {
+    let closest = 0;
+    let closestDist = Infinity;
+    orderRef.current.forEach((player, index) => {
+      const el = itemRefs.current.get(player.id);
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      const dist = Math.abs(mid - y);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = index;
+      }
+    });
+    return closest;
+  }
+
+  function startDrag(id: string) {
+    setDraggingId(id);
+
+    function handlePointerMove(e: PointerEvent) {
+      moveTo(id, nearestIndex(e.clientY));
+    }
+    function stopDrag() {
+      setDraggingId(null);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopDrag);
+      window.removeEventListener("pointercancel", stopDrag);
+    }
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopDrag);
+    window.addEventListener("pointercancel", stopDrag);
+  }
+
+  function handleHandleKeyDown(e: React.KeyboardEvent, id: string, index: number) {
+    if (e.key === "ArrowUp" && index > 0) {
+      e.preventDefault();
+      moveTo(id, index - 1);
+    } else if (e.key === "ArrowDown" && index < order.length - 1) {
+      e.preventDefault();
+      moveTo(id, index + 1);
+    }
   }
 
   return (
@@ -55,8 +111,28 @@ export function RotationOrderFormClient({
         {order.map((player, index) => (
           <li
             key={player.id}
-            className="flex items-center gap-3 rounded-lg border border-black/5 px-3 py-2 text-sm dark:border-white/5"
+            ref={(el) => {
+              if (el) itemRefs.current.set(player.id, el);
+              else itemRefs.current.delete(player.id);
+            }}
+            className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm transition ${
+              draggingId === player.id
+                ? "border-black/30 bg-black/5 shadow-sm dark:border-white/30 dark:bg-white/10"
+                : "border-black/5 dark:border-white/5"
+            }`}
           >
+            <button
+              type="button"
+              aria-label={labels.dragHandle}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                startDrag(player.id);
+              }}
+              onKeyDown={(e) => handleHandleKeyDown(e, player.id, index)}
+              className="touch-none cursor-grab select-none rounded px-1.5 py-1 text-base leading-none text-black/40 hover:bg-black/5 active:cursor-grabbing dark:text-white/40 dark:hover:bg-white/10"
+            >
+              ⠿
+            </button>
             <span className="w-6 text-center text-black/40 dark:text-white/40">{index + 1}</span>
             <span className="flex-1">
               #{player.jerseyNumber} {player.firstName} {player.lastName}{" "}
@@ -67,26 +143,6 @@ export function RotationOrderFormClient({
             <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs font-medium text-black/60 dark:bg-white/10 dark:text-white/60">
               {roleLabel(index, labels)}
             </span>
-            <div className="flex gap-1">
-              <button
-                type="button"
-                aria-label={labels.moveUp}
-                disabled={index === 0}
-                onClick={() => move(index, -1)}
-                className="rounded-full border border-black/10 px-2 py-1 text-xs hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-30 dark:border-white/10 dark:hover:bg-white/10"
-              >
-                ▲
-              </button>
-              <button
-                type="button"
-                aria-label={labels.moveDown}
-                disabled={index === order.length - 1}
-                onClick={() => move(index, 1)}
-                className="rounded-full border border-black/10 px-2 py-1 text-xs hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-30 dark:border-white/10 dark:hover:bg-white/10"
-              >
-                ▼
-              </button>
-            </div>
           </li>
         ))}
       </ul>

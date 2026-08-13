@@ -15,7 +15,7 @@ const HOME_ADVANTAGE = 2.5;
 // Exportée : l'UI de gestion de rotation (RotationOrderFormClient.tsx) en a
 // besoin pour savoir où s'arrête le "banc qui joue" et où commence le "hors
 // rotation" — une seule source de vérité, pas de valeur dupliquée côté UI.
-export const ROTATION_SIZE = 8; // joueurs qui touchent des minutes significatives
+export const ROTATION_SIZE = 10; // joueurs qui touchent des minutes significatives
 const QUARTERS = 4;
 const QUARTER_MINUTES: Record<string, number> = { wnba: 10, nba: 12 };
 // La force d'équipe pesait 0.9 sur le score total dans l'ancien calcul "en un

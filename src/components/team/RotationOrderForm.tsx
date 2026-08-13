@@ -16,8 +16,7 @@ export async function RotationOrderForm({ initialOrder }: { initialOrder: Rotati
           roleSixthWoman: t("rotation.role.sixthWoman"),
           roleBench: t("rotation.role.bench"),
           roleOutOfRotation: t("rotation.role.outOfRotation"),
-          moveUp: t("rotation.moveUp"),
-          moveDown: t("rotation.moveDown"),
+          dragHandle: t("rotation.dragHandle"),
           save: t("rotation.save"),
           saving: t("rotation.saving"),
         }}
