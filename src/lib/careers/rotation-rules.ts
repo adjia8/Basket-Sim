@@ -11,6 +11,7 @@ export interface RotationOrderPlayer {
   jerseyNumber: number;
   position: string;
   overallRating: number;
+  fatigue: number; // 0-99, voir Player.fatigue — affiché en anneau dans l'UI
 }
 
 // TeamState.rotationOrderJson est une chaîne libre (peut être absente,

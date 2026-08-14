@@ -46,3 +46,16 @@ export function financeTone(finances: number, healthyThreshold: number): ScaleTo
 export function toneClass(tone: ScaleTone): string {
   return TONE_CLASSES[tone];
 }
+
+// Même palette que TONE_CLASSES mais en classes `stroke-*` — pour les
+// jauges en anneau SVG (voir FatigueRing.tsx), où la couleur porte sur le
+// trait du cercle plutôt que sur du texte.
+export const TONE_STROKE_CLASSES: Record<ScaleTone, string> = {
+  good: "stroke-green-600 dark:stroke-green-400",
+  average: "stroke-orange-500 dark:stroke-orange-400",
+  bad: "stroke-red-600 dark:stroke-red-400",
+};
+
+export function toneStrokeClass(tone: ScaleTone): string {
+  return TONE_STROKE_CLASSES[tone];
+}

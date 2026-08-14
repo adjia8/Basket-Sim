@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { setRotationOrder, type RotationOrderFormState } from "@/app/actions/rotation";
 import { ROTATION_SIZE } from "@/lib/simulation/mockEngine";
 import type { RotationOrderPlayer } from "@/lib/careers/rotation-rules";
+import { FatigueRing } from "./FatigueRing";
 
 export interface RotationOrderLabels {
   description: string;
@@ -168,6 +169,7 @@ export function RotationOrderFormClient({
             ({player.position}, {player.overallRating})
           </span>
         </span>
+        <FatigueRing value={player.fatigue} />
         {inRotation && (
           <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs font-medium text-black/60 dark:bg-white/10 dark:text-white/60">
             {roleLabel(index, labels)}
