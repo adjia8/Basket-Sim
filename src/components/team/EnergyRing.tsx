@@ -1,15 +1,18 @@
-import { inverseRatingTone, toneStrokeClass } from "@/lib/color-scale";
+import { ratingTone, toneStrokeClass } from "@/lib/color-scale";
 
-// Jauge de fatigue en anneau (0-99, voir Player.fatigue) — haut = mauvais,
-// même échelle inversée que le reste de l'UI (voir inverseRatingTone).
-export function FatigueRing({ value, size = 40 }: { value: number; size?: number }) {
-  const clamped = Math.max(0, Math.min(100, value));
+// Jauge d'énergie en anneau — inverse de Player.fatigue (0-99, haut =
+// épuisée) : l'anneau se remplit et devient vert quand la joueuse est
+// fraîche, se vide et devient rouge à mesure qu'elle s'épuise (jauge
+// d'essence/batterie, pas un "cadran de dégâts accumulés").
+export function EnergyRing({ fatigue, size = 40 }: { fatigue: number; size?: number }) {
+  const clampedFatigue = Math.max(0, Math.min(100, fatigue));
+  const energy = 100 - clampedFatigue;
   const strokeWidth = 4;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference * (1 - clamped / 100);
+  const offset = circumference * (1 - energy / 100);
   const center = size / 2;
-  const tone = inverseRatingTone(clamped);
+  const tone = ratingTone(energy);
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
@@ -42,7 +45,7 @@ export function FatigueRing({ value, size = 40 }: { value: number; size?: number
         fontWeight="600"
         className="fill-current"
       >
-        {Math.round(clamped)}%
+        {Math.round(energy)}%
       </text>
     </svg>
   );
