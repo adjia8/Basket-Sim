@@ -5,6 +5,7 @@
 // fichier dict/<page>.ts.
 export const keys = [
   "common.nav.dashboard",
+  "common.nav.myTeam",
   "common.nav.teams",
   "common.nav.schedule",
   "common.nav.standings",
@@ -40,6 +41,7 @@ export type CommonKey = (typeof keys)[number];
 
 export const fr: Record<CommonKey, string> = {
   "common.nav.dashboard": "Dashboard",
+  "common.nav.myTeam": "Mon équipe",
   "common.nav.teams": "Équipes",
   "common.nav.schedule": "Calendrier",
   "common.nav.standings": "Classement",
@@ -73,6 +75,7 @@ export const fr: Record<CommonKey, string> = {
 
 export const en: Record<CommonKey, string> = {
   "common.nav.dashboard": "Dashboard",
+  "common.nav.myTeam": "My Team",
   "common.nav.teams": "Teams",
   "common.nav.schedule": "Schedule",
   "common.nav.standings": "Standings",

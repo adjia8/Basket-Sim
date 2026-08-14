@@ -18,6 +18,7 @@ export async function NavBar() {
   // pas aligner 12 onglets à plat dans la barre.
   const NAV_LINKS = [
     { href: "/", label: t("common.nav.dashboard") },
+    ...(membership ? [{ href: `/teams/${membership.teamId}`, label: t("common.nav.myTeam") }] : []),
     { href: "/teams", label: t("common.nav.teams") },
     { href: "/schedule", label: t("common.nav.schedule") },
   ];
