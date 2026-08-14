@@ -39,6 +39,16 @@ export function SimulateButton({
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
+        // 409 = le match est déjà terminé côté serveur (déclenché par
+        // l'autre manager, un autre onglet, ou un clic précédent dont la
+        // réponse s'est perdue en route sous latence Neon) — la vraie
+        // source de vérité est la DB, pas ce que cet onglet croit encore
+        // afficher : on rafraîchit plutôt que de bloquer sur une erreur qui
+        // ne reflète qu'un état client périmé.
+        if (res.status === 409) {
+          router.refresh();
+          return;
+        }
         throw new Error(data?.error ?? labels.simulationFailed);
       }
       if (data?.simulated) {
