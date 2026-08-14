@@ -88,49 +88,55 @@ export default async function GamePage({
   const canAct = mySide !== null || (!homeManager && !awayManager);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <p className="text-sm text-black/50 dark:text-white/50">
-        {formatGameDate(game.gameDate, locale)}
-      </p>
-      <h1 className="mt-1 text-2xl font-bold">
-        <Link href={`/teams/${awayTeam.id}`} className="hover:underline">
-          {teamFullName(awayTeam)}
-        </Link>{" "}
-        @{" "}
-        <Link href={`/teams/${homeTeam.id}`} className="hover:underline">
-          {teamFullName(homeTeam)}
-        </Link>
-      </h1>
+    <div className="mx-auto max-w-5xl px-4 py-8">
+      <div className="mx-auto max-w-3xl">
+        <p className="text-sm text-black/50 dark:text-white/50">
+          {formatGameDate(game.gameDate, locale)}
+        </p>
+        <h1 className="mt-1 text-2xl font-bold">
+          <Link href={`/teams/${awayTeam.id}`} className="hover:underline">
+            {teamFullName(awayTeam)}
+          </Link>{" "}
+          @{" "}
+          <Link href={`/teams/${homeTeam.id}`} className="hover:underline">
+            {teamFullName(homeTeam)}
+          </Link>
+        </h1>
 
-      <div className="mt-6 flex items-center justify-center gap-8 rounded-xl border border-black/10 py-8 dark:border-white/10">
-        <TeamScore team={awayTeam} score={game.awayScore} />
-        <span className="text-black/30 dark:text-white/30">–</span>
-        <TeamScore team={homeTeam} score={game.homeScore} />
+        <div className="mt-6 flex items-center justify-center gap-8 rounded-xl border border-black/10 py-8 dark:border-white/10">
+          <TeamScore team={awayTeam} score={game.awayScore} />
+          <span className="text-black/30 dark:text-white/30">–</span>
+          <TeamScore team={homeTeam} score={game.homeScore} />
+        </div>
+
+        {game.status === "scheduled" && (
+          <div className="mt-6 flex flex-col items-center gap-2">
+            {canAct ? (
+              <SimulateButton
+                gameId={game.id}
+                initialWaitingFor={initialWaitingFor}
+                labels={{
+                  simulate: t("game.simulate"),
+                  simulating: t("game.simulating"),
+                  waitingForPrefix: t("game.waitingForPrefix"),
+                  simulationFailed: t("game.simulationFailed"),
+                  unknownError: t("game.unknownError"),
+                  otherManagerFallback: t("game.otherManagerFallback"),
+                }}
+              />
+            ) : (
+              <p className="text-sm text-black/50 dark:text-white/50">
+                {readinessLine(t, awayTeam, game.awayReady, awayManager)} ·{" "}
+                {readinessLine(t, homeTeam, game.homeReady, homeManager)}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {game.status === "scheduled" ? (
-        <div className="mt-6 flex flex-col items-center gap-4">
-          {canAct ? (
-            <SimulateButton
-              gameId={game.id}
-              initialWaitingFor={initialWaitingFor}
-              labels={{
-                simulate: t("game.simulate"),
-                simulating: t("game.simulating"),
-                waitingForPrefix: t("game.waitingForPrefix"),
-                simulationFailed: t("game.simulationFailed"),
-                unknownError: t("game.unknownError"),
-                otherManagerFallback: t("game.otherManagerFallback"),
-              }}
-            />
-          ) : (
-            <p className="text-sm text-black/50 dark:text-white/50">
-              {readinessLine(t, awayTeam, game.awayReady, awayManager)} ·{" "}
-              {readinessLine(t, homeTeam, game.homeReady, homeManager)}
-            </p>
-          )}
-
-          <div className="mt-4 grid w-full gap-4">
+        <div>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <GameRosterPreview
               team={awayTeam}
               roster={awayRoster}
