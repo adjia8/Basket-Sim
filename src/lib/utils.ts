@@ -15,6 +15,25 @@ export function teamFullName(team: Team): string {
   return `${team.city} ${team.name}`;
 }
 
+// Suffixe ordinal pour un classement ("3e" / "3rd") — partagé entre l'aperçu
+// de match et les questions de conférence de presse (press-rules.ts), qui
+// affichent tous deux un rang de classement.
+export function ordinalSuffix(rank: number, locale: Locale): string {
+  if (locale === "fr") return rank === 1 ? "re" : "e";
+  const mod100 = rank % 100;
+  if (mod100 >= 11 && mod100 <= 13) return "th";
+  switch (rank % 10) {
+    case 1:
+      return "st";
+    case 2:
+      return "nd";
+    case 3:
+      return "rd";
+    default:
+      return "th";
+  }
+}
+
 export function formatSalary(amount: number, locale: Locale): string {
   // minimumFractionDigits égal à maximumFractionDigits : sans ça, l'affichage ou
   // non du ".0" en notation compacte n'est pas garanti identique entre le rendu

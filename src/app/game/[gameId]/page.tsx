@@ -1,14 +1,17 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { BoxScoreTable } from "@/components/game/BoxScoreTable";
+import { GameRosterPreview } from "@/components/game/GameRosterPreview";
 import { SimulateButton } from "@/components/game/SimulateButton";
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
-import { getPlayerById } from "@/lib/data-access/players";
+import { getPlayerById, getRosterForTeam } from "@/lib/data-access/players";
 import { getGameById } from "@/lib/data-access/schedule";
+import { getSeasonStatsForPlayers } from "@/lib/data-access/season-stats";
+import { getStandings } from "@/lib/data-access/standings";
 import { getTeamById } from "@/lib/data-access/teams";
 import { getTranslator, type Translator } from "@/lib/i18n/translate";
-import { formatGameDate, teamFullName } from "@/lib/utils";
+import { formatGameDate, ordinalSuffix, teamFullName } from "@/lib/utils";
 import type { Team } from "@/lib/types";
 
 export default async function GamePage({
@@ -38,6 +41,32 @@ export default async function GamePage({
         }))
       )
     : [];
+
+  // Aperçu des effectifs (roster + moyennes + bilan/classement) affiché
+  // avant simulation seulement — une fois le match joué, le box score réel
+  // remplace cet aperçu, aucune raison de payer ces requêtes en plus.
+  let awayRoster: Awaited<ReturnType<typeof getRosterForTeam>> = [];
+  let homeRoster: Awaited<ReturnType<typeof getRosterForTeam>> = [];
+  let seasonStats: Awaited<ReturnType<typeof getSeasonStatsForPlayers>> = new Map();
+  let standings: Awaited<ReturnType<typeof getStandings>> = [];
+  let awayRank = 0;
+  let homeRank = 0;
+  if (game.status === "scheduled") {
+    [awayRoster, homeRoster, standings] = await Promise.all([
+      getRosterForTeam(membership.careerId, game.awayTeamId),
+      getRosterForTeam(membership.careerId, game.homeTeamId),
+      getStandings(membership.careerId, game.leagueId, game.season),
+    ]);
+    seasonStats = await getSeasonStatsForPlayers(
+      membership.careerId,
+      game.season,
+      [...awayRoster, ...homeRoster].map((p) => p.id)
+    );
+    awayRank = standings.findIndex((s) => s.teamId === game.awayTeamId) + 1 || standings.length;
+    homeRank = standings.findIndex((s) => s.teamId === game.homeTeamId) + 1 || standings.length;
+  }
+  const awayStandingsRow = standings.find((s) => s.teamId === game.awayTeamId);
+  const homeStandingsRow = standings.find((s) => s.teamId === game.homeTeamId);
 
   const mySide: "home" | "away" | null =
     game.homeTeamId === membership.teamId
@@ -80,7 +109,7 @@ export default async function GamePage({
       </div>
 
       {game.status === "scheduled" ? (
-        <div className="mt-6 flex flex-col items-center gap-2">
+        <div className="mt-6 flex flex-col items-center gap-4">
           {canAct ? (
             <SimulateButton
               gameId={game.id}
@@ -100,6 +129,39 @@ export default async function GamePage({
               {readinessLine(t, homeTeam, game.homeReady, homeManager)}
             </p>
           )}
+
+          <div className="mt-4 grid w-full gap-4">
+            <GameRosterPreview
+              team={awayTeam}
+              roster={awayRoster}
+              seasonStats={seasonStats}
+              labels={{
+                record: `${awayStandingsRow?.wins ?? 0}-${awayStandingsRow?.losses ?? 0}`,
+                rank: `${awayRank}${ordinalSuffix(awayRank, locale)}/${standings.length}`,
+                player: t("roster.column.player"),
+                position: t("roster.column.position"),
+                overall: t("roster.column.overall"),
+                ppg: t("roster.column.ppg"),
+                rpg: t("roster.column.rpg"),
+                apg: t("roster.column.apg"),
+              }}
+            />
+            <GameRosterPreview
+              team={homeTeam}
+              roster={homeRoster}
+              seasonStats={seasonStats}
+              labels={{
+                record: `${homeStandingsRow?.wins ?? 0}-${homeStandingsRow?.losses ?? 0}`,
+                rank: `${homeRank}${ordinalSuffix(homeRank, locale)}/${standings.length}`,
+                player: t("roster.column.player"),
+                position: t("roster.column.position"),
+                overall: t("roster.column.overall"),
+                ppg: t("roster.column.ppg"),
+                rpg: t("roster.column.rpg"),
+                apg: t("roster.column.apg"),
+              }}
+            />
+          </div>
         </div>
       ) : (
         <div className="mt-10">

@@ -11,6 +11,7 @@
 // requête qui l'a déclenchée plutôt que dans celle du manager qui la lira.
 
 import type { Locale } from "@/lib/i18n/locale";
+import { ordinalSuffix } from "@/lib/utils";
 
 export type AnswerTone = "diplomatic" | "confident" | "critical" | "humble";
 export type QuestionCategory = "results" | "roster" | "management" | "future";
@@ -154,22 +155,6 @@ const QUESTION_BANK: Record<QuestionCategory, QuestionTemplate[]> = {
         : `What message would you like to send to the fans after that game against ${ctx.opponentName}?`,
   ],
 };
-
-function ordinalSuffix(rank: number, locale: Locale): string {
-  if (locale === "fr") return rank === 1 ? "re" : "e";
-  const mod100 = rank % 100;
-  if (mod100 >= 11 && mod100 <= 13) return "th";
-  switch (rank % 10) {
-    case 1:
-      return "st";
-    case 2:
-      return "nd";
-    case 3:
-      return "rd";
-    default:
-      return "th";
-  }
-}
 
 function shuffledCategories(): QuestionCategory[] {
   const categories: QuestionCategory[] = ["results", "roster", "management", "future"];
