@@ -4,6 +4,7 @@ import { getOptionalCurrentMembership } from "@/lib/auth/dal";
 import { getTeamById } from "@/lib/data-access/teams";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageToggle } from "./LanguageToggle";
+import { NavDropdown } from "./NavDropdown";
 import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
 import { getTranslator } from "@/lib/i18n/translate";
 
@@ -12,19 +13,40 @@ export async function NavBar() {
   const team = membership ? await getTeamById(membership.teamId) : null;
   const { t, locale } = await getTranslator();
 
+  // Liens autonomes : les pages les plus consultées, en accès direct.
+  // Le reste est regroupé par thème (ligue / transactions / club) pour ne
+  // pas aligner 12 onglets à plat dans la barre.
   const NAV_LINKS = [
     { href: "/", label: t("common.nav.dashboard") },
     { href: "/teams", label: t("common.nav.teams") },
     { href: "/schedule", label: t("common.nav.schedule") },
-    { href: "/standings", label: t("common.nav.standings") },
-    { href: "/free-agents", label: t("common.nav.freeAgents") },
-    { href: "/draft", label: t("common.nav.draft") },
-    { href: "/trades", label: t("common.nav.trades") },
-    { href: "/playoffs", label: t("common.nav.playoffs") },
-    { href: "/franchise", label: t("common.nav.franchise") },
-    { href: "/gm", label: t("common.nav.gm") },
-    { href: "/press", label: t("common.nav.press") },
-    { href: "/season-recap", label: t("common.nav.recap") },
+  ];
+
+  const NAV_GROUPS = [
+    {
+      label: t("common.nav.groupLeague"),
+      items: [
+        { href: "/standings", label: t("common.nav.standings") },
+        { href: "/playoffs", label: t("common.nav.playoffs") },
+        { href: "/season-recap", label: t("common.nav.recap") },
+      ],
+    },
+    {
+      label: t("common.nav.groupTransactions"),
+      items: [
+        { href: "/free-agents", label: t("common.nav.freeAgents") },
+        { href: "/draft", label: t("common.nav.draft") },
+        { href: "/trades", label: t("common.nav.trades") },
+      ],
+    },
+    {
+      label: t("common.nav.groupClub"),
+      items: [
+        { href: "/franchise", label: t("common.nav.franchise") },
+        { href: "/gm", label: t("common.nav.gm") },
+        { href: "/press", label: t("common.nav.press") },
+      ],
+    },
   ];
 
   return (
@@ -47,6 +69,9 @@ export async function NavBar() {
               >
                 {link.label}
               </Link>
+            ))}
+            {NAV_GROUPS.map((group) => (
+              <NavDropdown key={group.label} label={group.label} items={group.items} />
             ))}
           </nav>
         )}
