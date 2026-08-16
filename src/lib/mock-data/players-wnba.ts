@@ -216,24 +216,19 @@ export const playersWnba: Player[] = [
 // en tout début de partie (tout le catalogue WNBA correspond exactement aux
 // effectifs des 12 équipes), rendant la page agents libres vide jusqu'à ce
 // qu'un contrat expire ou qu'une équipe coupe une joueuse (donc au plus tôt
-// à l'intersaison suivante). Liste issue de l'audit des contrats réels : ces
-// 5 joueuses n'apparaissaient sur AUCUN effectif actuel de la source
-// consultée (Her Hoop Stats) — statut "droits suspendus" ou introuvable sur
-// un roster en vigueur — contrairement aux autres joueuses sans donnée de
-// salaire vérifiée (contrat de développement/écart de données ponctuel),
-// qui elles restent sous contrat procédural comme avant. "marine-fauthoux"
-// a été retirée de cette liste (voir INITIAL_DEVELOPMENT_CONTRACT_IDS
-// ci-dessous) : un second passage (rosters d'ouverture 2026, ESPN) l'a
-// retrouvée sous contrat de développement chez New York Liberty — elle
-// n'était donc pas réellement agent libre, juste mal classée faute de
-// donnée au premier passage.
-export const INITIAL_FREE_AGENT_IDS: string[] = [
-  "anneli-maley",
-  "jaylyn-sherrod",
-  "tonie-morgan",
-  "eliska-joklova",
-  "lou-lopez-senechal",
-];
+// à l'intersaison suivante). Liste issue de l'audit des contrats réels —
+// statut "droits suspendus" ou introuvable sur un roster en vigueur au
+// moment de la vérification — contrairement aux autres joueuses sans donnée
+// de salaire vérifiée (contrat de développement/écart de données ponctuel),
+// qui elles restent sous contrat procédural comme avant. Un second passage,
+// rosters CBS Sports/ESPN 2026, a retrouvé QUATRE des six joueuses
+// initialement listées ici bel et bien sur un effectif réel (retirées de
+// cette liste, voir INITIAL_DEVELOPMENT_CONTRACT_IDS pour marine-fauthoux) :
+// elles n'étaient pas réellement agents libres, juste mal classées faute de
+// donnée au premier passage. Seule "lou-lopez-senechal" reste confirmée
+// absente de tout roster WNBA actuel (Dallas Wings, sa dernière équipe
+// connue, ne la liste plus).
+export const INITIAL_FREE_AGENT_IDS: string[] = ["lou-lopez-senechal"];
 
 // Joueuses confirmées sous contrat de développement (WNBA, 2 places par
 // équipe max — voir ALT_CONTRACT_SLOTS_PER_TEAM) sur les rosters d'ouverture
