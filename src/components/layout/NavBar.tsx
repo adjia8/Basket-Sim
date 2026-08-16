@@ -2,6 +2,8 @@ import Link from "next/link";
 import { logout } from "@/app/actions/auth";
 import { getOptionalCurrentMembership } from "@/lib/auth/dal";
 import { getTeamById } from "@/lib/data-access/teams";
+import { getPendingPressConference } from "@/lib/data-access/press";
+import { prisma } from "@/lib/prisma";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageToggle } from "./LanguageToggle";
 import { NavDropdown } from "./NavDropdown";
@@ -12,6 +14,26 @@ export async function NavBar() {
   const membership = await getOptionalCurrentMembership();
   const team = membership ? await getTeamById(membership.teamId) : null;
   const { t, locale } = await getTranslator();
+
+  // Signaux "attention requise" — les items concernés (Presse/GM sous
+  // "Club", Échanges sous "Transactions") sont maintenant cachés derrière
+  // un clic sur le menu déroulant : un point rouge restaure la visibilité
+  // "en un coup d'œil" qu'avait la nav à plat.
+  const [pendingPress, pendingTradeCount, gmProfile] = membership
+    ? await Promise.all([
+        getPendingPressConference(membership.careerId, membership.teamId),
+        prisma.tradeOffer.count({
+          where: { careerId: membership.careerId, toTeamId: membership.teamId, status: "pending" },
+        }),
+        prisma.gmProfile.findUnique({
+          where: { membershipId: membership.id },
+          select: { pendingOfferTeamId: true },
+        }),
+      ])
+    : [null, 0, null];
+  const hasPendingPress = pendingPress !== null;
+  const hasPendingTrade = pendingTradeCount > 0;
+  const hasPendingPoach = Boolean(gmProfile?.pendingOfferTeamId);
 
   // Liens autonomes : les pages les plus consultées, en accès direct.
   // Le reste est regroupé par thème (ligue / transactions / club) pour ne
@@ -37,15 +59,15 @@ export async function NavBar() {
       items: [
         { href: "/free-agents", label: t("common.nav.freeAgents") },
         { href: "/draft", label: t("common.nav.draft") },
-        { href: "/trades", label: t("common.nav.trades") },
+        { href: "/trades", label: t("common.nav.trades"), alert: hasPendingTrade },
       ],
     },
     {
       label: t("common.nav.groupClub"),
       items: [
         { href: "/franchise", label: t("common.nav.franchise") },
-        { href: "/gm", label: t("common.nav.gm") },
-        { href: "/press", label: t("common.nav.press") },
+        { href: "/gm", label: t("common.nav.gm"), alert: hasPendingPoach },
+        { href: "/press", label: t("common.nav.press"), alert: hasPendingPress },
       ],
     },
   ];

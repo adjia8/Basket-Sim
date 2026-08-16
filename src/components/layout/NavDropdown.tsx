@@ -3,17 +3,26 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
+function AlertDot() {
+  return <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" aria-hidden />;
+}
+
 // Composant client : ne gère que l'ouverture/fermeture, les libellés
-// arrivent déjà traduits depuis NavBar.tsx (Server Component).
+// arrivent déjà traduits depuis NavBar.tsx (Server Component). `alert` sur
+// un item signale qu'une action attend (conférence de presse en attente,
+// offre de trade reçue, offre de braconnage GM) — vu que ces pages sont
+// maintenant cachées derrière un clic, sans ce point rouge elles seraient
+// plus faciles à oublier qu'avec l'ancienne nav à plat.
 export function NavDropdown({
   label,
   items,
 }: {
   label: string;
-  items: { href: string; label: string }[];
+  items: { href: string; label: string; alert?: boolean }[];
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const hasAlert = items.some((item) => item.alert);
 
   useEffect(() => {
     if (!open) return;
@@ -37,9 +46,10 @@ export function NavDropdown({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex items-center gap-1 text-black/70 transition hover:text-black dark:text-white/70 dark:hover:text-white"
+        className="flex items-center gap-1.5 text-black/70 transition hover:text-black dark:text-white/70 dark:hover:text-white"
       >
         {label}
+        {hasAlert && <AlertDot />}
         <span className={`text-[10px] transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
       </button>
       {open && (
@@ -49,9 +59,10 @@ export function NavDropdown({
               key={item.href}
               href={item.href}
               onClick={() => setOpen(false)}
-              className="block px-3 py-1.5 text-sm text-black/70 hover:bg-black/5 hover:text-black dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-black/70 hover:bg-black/5 hover:text-black dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white"
             >
               {item.label}
+              {item.alert && <AlertDot />}
             </Link>
           ))}
         </div>
