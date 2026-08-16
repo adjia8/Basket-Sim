@@ -141,9 +141,11 @@ export default async function GamePage({
               team={awayTeam}
               roster={awayRoster}
               seasonStats={seasonStats}
+              gamesPlayed={(awayStandingsRow?.wins ?? 0) + (awayStandingsRow?.losses ?? 0)}
               labels={{
                 record: `${awayStandingsRow?.wins ?? 0}-${awayStandingsRow?.losses ?? 0}`,
                 rank: `${awayRank}${ordinalSuffix(awayRank, locale)}/${standings.length}`,
+                noGamesPlayedYet: t("game.noGamesPlayedYet"),
                 player: t("roster.column.player"),
                 position: t("roster.column.position"),
                 overall: t("roster.column.overall"),
@@ -156,9 +158,11 @@ export default async function GamePage({
               team={homeTeam}
               roster={homeRoster}
               seasonStats={seasonStats}
+              gamesPlayed={(homeStandingsRow?.wins ?? 0) + (homeStandingsRow?.losses ?? 0)}
               labels={{
                 record: `${homeStandingsRow?.wins ?? 0}-${homeStandingsRow?.losses ?? 0}`,
                 rank: `${homeRank}${ordinalSuffix(homeRank, locale)}/${standings.length}`,
+                noGamesPlayedYet: t("game.noGamesPlayedYet"),
                 player: t("roster.column.player"),
                 position: t("roster.column.position"),
                 overall: t("roster.column.overall"),

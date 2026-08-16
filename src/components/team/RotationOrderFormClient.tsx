@@ -170,10 +170,16 @@ export function RotationOrderFormClient({
           </span>
         </span>
         <EnergyRing fatigue={player.fatigue} />
-        {inRotation && (
-          <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs font-medium text-black/60 dark:bg-white/10 dark:text-white/60">
+        {inRotation ? (
+          <span className="w-24 shrink-0 rounded-full bg-black/5 px-2 py-0.5 text-center text-xs font-medium text-black/60 dark:bg-white/10 dark:text-white/60">
             {roleLabel(index, labels)}
           </span>
+        ) : (
+          // Largeur fixe identique au badge de rôle (même si vide) — sans
+          // ça, l'anneau d'énergie se décale ligne par ligne selon que le
+          // texte du badge voisin ("Titulaire"/"6ème femme"/"Banc", ou rien
+          // du tout hors rotation) est plus ou moins large.
+          <span className="w-24 shrink-0" aria-hidden />
         )}
         <button
           type="button"

@@ -10,6 +10,7 @@ import { teamFullName } from "@/lib/utils";
 export interface GameRosterPreviewLabels {
   record: string; // "9-3", déjà composé par l'appelant
   rank: string; // "2e/12", déjà composé par l'appelant
+  noGamesPlayedYet: string;
   player: string;
   position: string;
   overall: string;
@@ -22,11 +23,13 @@ export function GameRosterPreview({
   team,
   roster,
   seasonStats,
+  gamesPlayed,
   labels,
 }: {
   team: Team;
   roster: Player[];
   seasonStats: Map<string, SeasonStats>;
+  gamesPlayed: number;
   labels: GameRosterPreviewLabels;
 }) {
   const sorted = [...roster].sort((a, b) => b.overallRating - a.overallRating);
@@ -41,6 +44,12 @@ export function GameRosterPreview({
           {labels.record} · {labels.rank}
         </span>
       </div>
+
+      {/* Sans ça, une colonne de "-" ressemble à des stats cassées plutôt
+          qu'à une équipe qui n'a simplement encore joué aucun match. */}
+      {gamesPlayed === 0 && (
+        <p className="mt-1 text-xs text-black/40 dark:text-white/40">{labels.noGamesPlayedYet}</p>
+      )}
 
       <div className="mt-3 overflow-x-auto">
         <table className="w-full text-left text-sm">
