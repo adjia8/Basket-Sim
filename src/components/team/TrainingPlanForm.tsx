@@ -28,6 +28,7 @@ export async function TrainingPlanForm({ focus, intensity }: { focus: string | n
         description: t("training.description"),
         focusLabel: t("training.focusLabel"),
         intensityLabel: t("training.intensityLabel"),
+        fatigueImpactPrefix: t("training.fatigueImpactPrefix"),
         apply: t("training.apply"),
         applying: t("training.applying"),
         focusOptions,
