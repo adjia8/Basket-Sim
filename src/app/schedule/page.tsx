@@ -4,6 +4,8 @@ import { getScheduleForCareer, getScheduleForTeam } from "@/lib/data-access/sche
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { preseasonSeasonLabel } from "@/lib/careers/schedule-rules";
 import { getTranslator } from "@/lib/i18n/translate";
+import { prisma } from "@/lib/prisma";
+import { SimulateAllAiButton } from "@/components/schedule/SimulateAllAiButton";
 import type { Locale } from "@/lib/i18n/locale";
 import { formatGameDate, teamFullName } from "@/lib/utils";
 import type { Game, Team } from "@/lib/types";
@@ -30,16 +32,44 @@ export default async function SchedulePage({
 
   const teamById = new Map(teams.map((t) => [t.id, t]));
 
+  // Aucun match IA-vs-IA ne se simule tout seul — voir simulate-bulk.ts pour
+  // le contexte complet (ça bloque même la fin de saison).
+  const humanTeamIds = (
+    await prisma.membership.findMany({ where: { careerId: membership.careerId }, select: { teamId: true } })
+  ).map((m) => m.teamId);
+  const pendingAiGamesCount = await prisma.game.count({
+    where: {
+      careerId: membership.careerId,
+      status: { not: "final" },
+      homeTeamId: { notIn: humanTeamIds },
+      awayTeamId: { notIn: humanTeamIds },
+    },
+  });
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">{t("schedule.title")}</h1>
-        <Link
-          href={showAll ? "/schedule" : "/schedule?all=1"}
-          className="rounded-full bg-black/5 px-3 py-1 text-sm dark:bg-white/10"
-        >
-          {showAll ? t("schedule.myTeam") : t("schedule.wholeLeague")}
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          {pendingAiGamesCount > 0 && (
+            <SimulateAllAiButton
+              initialCount={pendingAiGamesCount}
+              labels={{
+                button: t("schedule.simulateAllAi"),
+                runningPrefix: t("schedule.simulateAllAiRunningPrefix"),
+                remainingSuffix: t("schedule.simulateAllAiRemainingSuffix"),
+                done: t("schedule.simulateAllAiDone"),
+                error: t("schedule.simulateAllAiError"),
+              }}
+            />
+          )}
+          <Link
+            href={showAll ? "/schedule" : "/schedule?all=1"}
+            className="rounded-full bg-black/5 px-3 py-1 text-sm dark:bg-white/10"
+          >
+            {showAll ? t("schedule.myTeam") : t("schedule.wholeLeague")}
+          </Link>
+        </div>
       </div>
 
       {preseasonGames.length > 0 && (

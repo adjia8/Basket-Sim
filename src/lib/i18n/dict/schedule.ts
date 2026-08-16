@@ -5,6 +5,11 @@ export const keys = [
   "schedule.preseasonHeading",
   "schedule.regularSeasonHeading",
   "schedule.upcoming",
+  "schedule.simulateAllAi",
+  "schedule.simulateAllAiRunningPrefix",
+  "schedule.simulateAllAiRemainingSuffix",
+  "schedule.simulateAllAiDone",
+  "schedule.simulateAllAiError",
 ] as const;
 
 export type ScheduleKey = (typeof keys)[number];
@@ -16,6 +21,11 @@ export const fr: Record<ScheduleKey, string> = {
   "schedule.preseasonHeading": "Pré-saison",
   "schedule.regularSeasonHeading": "Saison régulière",
   "schedule.upcoming": "À venir",
+  "schedule.simulateAllAi": "Simuler tous les matchs IA restants",
+  "schedule.simulateAllAiRunningPrefix": "Simulation en cours — matchs simulés :",
+  "schedule.simulateAllAiRemainingSuffix": "restants",
+  "schedule.simulateAllAiDone": "Tous les matchs IA-vs-IA ont été simulés.",
+  "schedule.simulateAllAiError": "La simulation en masse a échoué — réessaie.",
 };
 
 export const en: Record<ScheduleKey, string> = {
@@ -25,4 +35,9 @@ export const en: Record<ScheduleKey, string> = {
   "schedule.preseasonHeading": "Preseason",
   "schedule.regularSeasonHeading": "Regular season",
   "schedule.upcoming": "Upcoming",
+  "schedule.simulateAllAi": "Simulate all remaining AI games",
+  "schedule.simulateAllAiRunningPrefix": "Simulating — games simulated:",
+  "schedule.simulateAllAiRemainingSuffix": "remaining",
+  "schedule.simulateAllAiDone": "All AI-vs-AI games have been simulated.",
+  "schedule.simulateAllAiError": "Bulk simulation failed — try again.",
 };
