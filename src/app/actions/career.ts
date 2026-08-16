@@ -18,6 +18,7 @@ import { toDomainLeague, toDomainPlayer } from "@/lib/data-access/mappers";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { GM_POINT_POOL, expectationForRoster } from "@/lib/careers/gm-rules";
 import { INITIAL_FREE_AGENT_IDS } from "@/lib/mock-data/players-wnba";
+import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 
 export interface CreateCareerState {
   error?: string;
@@ -121,6 +122,29 @@ export async function createCareer(
   // contrat au départ (voir sa doc dans players-wnba.ts) — exclues aussi du
   // calcul de force d'effectif ci-dessous, cohérence oblige.
   const initiallyFreeAgentIds = new Set(leagueId === "wnba" ? INITIAL_FREE_AGENT_IDS : []);
+
+  // Certaines franchises du catalogue (roster réel complet, camp
+  // d'entraînement inclus) dépassent MAX_ROSTER_SIZE — sans ce filtrage,
+  // l'équipe démarrerait la Career déjà hors plafond, ce qui bloque en
+  // silence tout échange ou toute signature d'agent libre pour cette équipe
+  // dès le premier jour (aucune transaction "neutre" en effectif ne peut
+  // jamais faire redescendre un total déjà trop haut sous la barre). Les
+  // joueuses en surnombre (les moins bien notées) rejoignent le vivier
+  // d'agents libres plutôt que de recevoir un contrat.
+  const maxRosterSize = MAX_ROSTER_SIZE[leagueId] ?? MAX_ROSTER_SIZE.nba;
+  const rosterByTeam = new Map<string, typeof domainPlayers>();
+  for (const player of domainPlayers) {
+    if (initiallyFreeAgentIds.has(player.id)) continue;
+    const list = rosterByTeam.get(player.teamId) ?? [];
+    list.push(player);
+    rosterByTeam.set(player.teamId, list);
+  }
+  for (const roster of rosterByTeam.values()) {
+    if (roster.length <= maxRosterSize) continue;
+    const overflow = [...roster].sort((a, b) => b.overallRating - a.overallRating).slice(maxRosterSize);
+    for (const player of overflow) initiallyFreeAgentIds.add(player.id);
+  }
+
   const playersUnderContract = domainPlayers.filter((p) => !initiallyFreeAgentIds.has(p.id));
 
   const teamCatalogRoster = playersUnderContract.filter((p) => p.teamId === teamId);

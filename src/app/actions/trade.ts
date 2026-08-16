@@ -112,12 +112,16 @@ export async function proposeTrade(
   const maxRosterSize = MAX_ROSTER_SIZE[membership.career.leagueId] ?? MAX_ROSTER_SIZE.nba;
   const myNewSize = myRosterSize - myPlayerIds.length + theirPlayerIds.length;
   const theirNewSize = theirRosterSize - theirPlayerIds.length + myPlayerIds.length;
-  if (
-    myNewSize < minRosterSize ||
-    myNewSize > maxRosterSize ||
-    theirNewSize < minRosterSize ||
-    theirNewSize > maxRosterSize
-  ) {
+  // Le plafond ne bloque que si l'échange AUGMENTE un effectif déjà (ou
+  // désormais) trop haut — une équipe qui démarre au-dessus du plafond
+  // (catalogue de départ trop fourni pour cette franchise, voir
+  // actions/career.ts) doit rester capable de faire des échanges à effectif
+  // constant ou décroissant, sinon elle serait bloquée à vie. Le plancher,
+  // lui, reste une limite dure dans tous les cas (jamais descendre sous le
+  // minimum jouable, peu importe le point de départ).
+  const myExceedsMax = myNewSize > maxRosterSize && myNewSize > myRosterSize;
+  const theirExceedsMax = theirNewSize > maxRosterSize && theirNewSize > theirRosterSize;
+  if (myNewSize < minRosterSize || myExceedsMax || theirNewSize < minRosterSize || theirExceedsMax) {
     return {
       error: t("tradeAction.rosterSizeOutOfRange", { min: minRosterSize, max: maxRosterSize }),
     };
@@ -298,6 +302,12 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
   const fromNewPayroll = fromCurrentPayroll - fromSalaryOut + toSalaryOut;
   const toNewPayroll = toCurrentPayroll - toSalaryOut + fromSalaryOut;
 
+  // Même relaxation qu'à la proposition (voir proposeTrade) : le plafond ne
+  // bloque que si l'échange AUGMENTE un effectif déjà trop haut, pas
+  // simplement parce qu'il l'était déjà avant l'échange.
+  const fromExceedsMax = newFromSize > maxRosterSize && newFromSize > fromRosterSize;
+  const toExceedsMax = newToSize > maxRosterSize && newToSize > toRosterSize;
+
   const stillValid =
     !deadlinePassed &&
     fromPlayersValid &&
@@ -305,9 +315,9 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
     fromPicksValid &&
     toPicksValid &&
     newFromSize >= minRosterSize &&
-    newFromSize <= maxRosterSize &&
+    !fromExceedsMax &&
     newToSize >= minRosterSize &&
-    newToSize <= maxRosterSize &&
+    !toExceedsMax &&
     fromNewPayroll <= salaryCap &&
     toNewPayroll <= salaryCap;
 
