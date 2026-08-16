@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Player } from "@/lib/types";
+import type { ContractType, Player } from "@/lib/types";
 import type { Locale } from "@/lib/i18n/locale";
 import { formatSalary } from "@/lib/utils";
 import { setPlayingThroughInjury } from "@/app/actions/roster";
@@ -17,6 +17,7 @@ export type RosterPlayer = Player & {
   salary: number;
   yearsRemaining: number;
   guaranteed: boolean;
+  contractType: ContractType;
   wantsTrade: boolean;
   tradeReasons: TradeRequestReason[];
   ppg: number;
@@ -50,6 +51,7 @@ export interface RosterTableLabels {
   notGuaranteed: string;
   severity: Record<NonNullable<Player["injurySeverity"]>, string>;
   tradeReason: Record<TradeRequestReason, string>;
+  contractType: Record<Exclude<ContractType, "standard">, string>;
 }
 
 function valueFor(player: RosterPlayer, key: SortKey): number {
@@ -136,6 +138,11 @@ export function RosterTable({
                 >
                   #{player.jerseyNumber} {player.firstName} {player.lastName}
                 </Link>
+                {player.contractType !== "standard" && (
+                  <span className="ml-2 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-normal text-blue-600 dark:text-blue-400">
+                    {labels.contractType[player.contractType]}
+                  </span>
+                )}
                 {player.injured && (
                   <span className="ml-2 rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-normal text-red-500">
                     {labels.unavailable}{" "}

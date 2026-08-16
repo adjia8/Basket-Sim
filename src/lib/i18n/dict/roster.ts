@@ -16,6 +16,8 @@ export const keys = [
   "roster.playThroughInjury",
   "roster.wantsTrade",
   "roster.notGuaranteed",
+  "roster.contractType.development",
+  "roster.contractType.two_way",
 ] as const;
 
 export type RosterKey = (typeof keys)[number];
@@ -38,6 +40,8 @@ export const fr: Record<RosterKey, string> = {
   "roster.playThroughInjury": "Jouer malgré la blessure",
   "roster.wantsTrade": "🚩 Veut être échangé",
   "roster.notGuaranteed": "(non garanti)",
+  "roster.contractType.development": "Développement",
+  "roster.contractType.two_way": "Two-way",
 };
 
 export const en: Record<RosterKey, string> = {
@@ -58,4 +62,6 @@ export const en: Record<RosterKey, string> = {
   "roster.playThroughInjury": "Play through injury",
   "roster.wantsTrade": "🚩 Wants a trade",
   "roster.notGuaranteed": "(not guaranteed)",
+  "roster.contractType.development": "Development",
+  "roster.contractType.two_way": "Two-way",
 };

@@ -101,6 +101,7 @@ export default async function TeamRosterPage({
       salary,
       yearsRemaining: contract?.yearsRemaining ?? 0,
       guaranteed: contract?.guaranteed ?? true,
+      contractType: contract?.contractType ?? "standard",
       wantsTrade: demandState?.wantsTrade ?? false,
       tradeReasons: demandState?.reasons ?? [],
       ppg: stats.ppg,
@@ -149,6 +150,7 @@ export default async function TeamRosterPage({
         salary: contract?.salary ?? 0,
         yearsRemaining: contract?.yearsRemaining ?? 0,
         guaranteed: contract?.guaranteed ?? true,
+        contractType: contract?.contractType ?? "standard",
         wantsTrade: false, // non pertinent dans le contexte du formulaire d'échange
         tradeReasons: [],
         ppg: stats.ppg,
@@ -248,6 +250,10 @@ export default async function TeamRosterPage({
               competitiveness: t("domain.tradeReason.competitiveness"),
               market: t("domain.tradeReason.market"),
               facilities: t("domain.tradeReason.facilities"),
+            },
+            contractType: {
+              development: t("roster.contractType.development"),
+              two_way: t("roster.contractType.two_way"),
             },
           }}
         />
