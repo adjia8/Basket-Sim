@@ -134,6 +134,12 @@ export async function advanceSeason(): Promise<void> {
           ? {
               retiredSeason: newSeason,
               hallOfFame: isHallOfFameWorthy(peakOverallRating, peakRenown),
+              // Dernière équipe active au moment de la retraite — capturée ici
+              // car le Contract est supprimé juste après (voir plus bas) :
+              // c'est le seul moment où cette info est encore disponible sans
+              // requête supplémentaire (voir franchise-history.ts pour son
+              // usage, la page Franchise affichant les légendes du club).
+              hallOfFameTeamId: teamId ?? null,
             }
           : {}),
       },

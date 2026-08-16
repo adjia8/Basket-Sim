@@ -355,6 +355,7 @@ model PlayerState {
   peakOverallRating    Int     @default(0) // plus haut overallRating jamais atteint en carrière
   peakRenown           Int     @default(50) // plus haut renommé jamais atteint en carrière
   hallOfFame           Boolean @default(false) // fixé à la retraite si les seuils HOF sont atteints
+  hallOfFameTeamId     String? // dernière équipe active au moment de la retraite (voir advanceSeason) — null si pas encore retraitée, ou retraitée avant l'ajout de ce champ
   retiredSeason        String? // saison (label) de la retraite, null si actif
   trainingBoost        Int     @default(0) // 0-8, bonus temporaire courant sur les attributs de trainingBoostFocus
   trainingBoostFocus   String? // catégorie ciblée par le bonus courant, null si aucun
@@ -499,6 +500,7 @@ model TeamState {
   lastPressConferenceDate DateTime?
   lastTradeRequestDate    DateTime? // anti-cluster : dernière fois qu'UNE joueuse de cette équipe a levé une demande de trade
   rotationOrderJson       String? // JSON: string[] d'ids joueuses, ordre GM voulu (5 majeures + 6ème femme + banc) — null = tri automatique (voir rotationOf dans mockEngine.ts)
+  attendance               Int       @default(50) // 0-99, dérive vers une cible pilotée par le bilan de l'équipe — voir attendance-rules.ts
 
   @@unique([careerId, teamId])
 }

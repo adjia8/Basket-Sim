@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { TeamState } from "@prisma/client";
 import type { Player } from "@/lib/types";
 import { chemistryTarget, nextChemistry } from "@/lib/careers/chemistry-rules";
+import { attendanceTarget, nextAttendance } from "@/lib/careers/attendance-rules";
 import {
   ANNUAL_DEGRADATION,
   clampFacilityLevel,
@@ -73,6 +74,26 @@ export async function advanceTeamChemistry(
   await prisma.teamState.update({
     where: { id: state.id },
     data: { chemistry },
+  });
+}
+
+// Appelé juste après la résolution d'un match, pour chaque équipe (humaine
+// ou IA, comme la chimie) : fait dériver l'affluence vers sa cible, dominée
+// par le bilan de l'équipe (voir attendance-rules.ts).
+export async function advanceAttendance(
+  careerId: string,
+  teamId: string,
+  leagueId: string,
+  winPct: number,
+  marketAppeal: number
+): Promise<void> {
+  const state = await getOrCreateTeamState(careerId, teamId, leagueId);
+  const target = attendanceTarget(winPct, marketAppeal, state.facilitiesLevel);
+  const attendance = nextAttendance(state.attendance, target);
+
+  await prisma.teamState.update({
+    where: { id: state.id },
+    data: { attendance },
   });
 }
 

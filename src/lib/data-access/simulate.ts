@@ -10,7 +10,7 @@ import { recordPlayoffGameResult } from "@/lib/data-access/playoffs";
 import { advanceRosterInjuries } from "@/lib/data-access/injuries";
 import { advancePlayerRenown } from "@/lib/data-access/renown";
 import { advanceRosterFatigue, getRestDays } from "@/lib/data-access/fatigue";
-import { advanceTeamChemistry, getOrCreateTeamState } from "@/lib/data-access/team-state";
+import { advanceAttendance, advanceTeamChemistry, getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { advanceRosterTraining } from "@/lib/data-access/training";
 import { getGmBonusForTeam } from "@/lib/data-access/gm";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
@@ -194,15 +194,20 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
 
   // Chimie d'équipe : dérive vers sa cible (bilan à jour + QI basket moyen du
   // roster), plus le bonus si un focus "cohésion d'équipe" est actif.
+  // Affluence : même principe, dérive vers une cible dominée par le bilan
+  // (voir attendance-rules.ts) — pour les deux équipes, humaines ou IA,
+  // comme la chimie.
   const standings = await getStandings(careerId, game.leagueId, game.season);
   const homeStandingsRow = standings.find((s) => s.teamId === game.homeTeamId);
   const awayStandingsRow = standings.find((s) => s.teamId === game.awayTeamId);
+  const homeWinPct = winPctForStandings(homeStandingsRow?.wins ?? 0, homeStandingsRow?.losses ?? 0);
+  const awayWinPct = winPctForStandings(awayStandingsRow?.wins ?? 0, awayStandingsRow?.losses ?? 0);
   await Promise.all([
     advanceTeamChemistry(
       careerId,
       game.homeTeamId,
       game.leagueId,
-      winPctForStandings(homeStandingsRow?.wins ?? 0, homeStandingsRow?.losses ?? 0),
+      homeWinPct,
       homeRoster,
       chemistryTrainingBonus(homeFocus, homeIntensity)
     ),
@@ -210,10 +215,12 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
       careerId,
       game.awayTeamId,
       game.leagueId,
-      winPctForStandings(awayStandingsRow?.wins ?? 0, awayStandingsRow?.losses ?? 0),
+      awayWinPct,
       awayRoster,
       chemistryTrainingBonus(awayFocus, awayIntensity)
     ),
+    advanceAttendance(careerId, game.homeTeamId, game.leagueId, homeWinPct, homeTeam.marketAppeal),
+    advanceAttendance(careerId, game.awayTeamId, game.leagueId, awayWinPct, awayTeam.marketAppeal),
   ]);
 
   // Conférence de presse aléatoire (au plus 1/semaine réelle) — seulement
