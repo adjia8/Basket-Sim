@@ -217,16 +217,41 @@ export const playersWnba: Player[] = [
 // effectifs des 12 équipes), rendant la page agents libres vide jusqu'à ce
 // qu'un contrat expire ou qu'une équipe coupe une joueuse (donc au plus tôt
 // à l'intersaison suivante). Liste issue de l'audit des contrats réels : ces
-// 6 joueuses n'apparaissaient sur AUCUN effectif actuel de la source
+// 5 joueuses n'apparaissaient sur AUCUN effectif actuel de la source
 // consultée (Her Hoop Stats) — statut "droits suspendus" ou introuvable sur
 // un roster en vigueur — contrairement aux autres joueuses sans donnée de
 // salaire vérifiée (contrat de développement/écart de données ponctuel),
-// qui elles restent sous contrat procédural comme avant.
+// qui elles restent sous contrat procédural comme avant. "marine-fauthoux"
+// a été retirée de cette liste (voir INITIAL_DEVELOPMENT_CONTRACT_IDS
+// ci-dessous) : un second passage (rosters d'ouverture 2026, ESPN) l'a
+// retrouvée sous contrat de développement chez New York Liberty — elle
+// n'était donc pas réellement agent libre, juste mal classée faute de
+// donnée au premier passage.
 export const INITIAL_FREE_AGENT_IDS: string[] = [
-  "marine-fauthoux",
   "anneli-maley",
   "jaylyn-sherrod",
   "tonie-morgan",
   "eliska-joklova",
   "lou-lopez-senechal",
+];
+
+// Joueuses confirmées sous contrat de développement (WNBA, 2 places par
+// équipe max — voir ALT_CONTRACT_SLOTS_PER_TEAM) sur les rosters d'ouverture
+// 2026 réels (ESPN, recoupé avec Swish Appeal pour Washington) — reçoivent
+// un contrat "development" plutôt que "standard" à la création d'une
+// carrière, cohérence oblige avec MAX_ROSTER_SIZE (elles ne comptent pas
+// dans les 12 places standard). Toute franchise encore au-dessus de 12
+// joueuses standard après application de cette liste retombe sur
+// l'heuristique de repli dans actions/career.ts (joueuses les moins bien
+// notées converties en développement, dans la limite des places restantes).
+export const INITIAL_DEVELOPMENT_CONTRACT_IDS: string[] = [
+  "marine-fauthoux", // New York Liberty
+  "ashlon-jackson", // Connecticut Sun
+  "maddy-westbeld", // Chicago Sky
+  "aicha-coulibaly", // Chicago Sky
+  "alicia-florez", // Washington Mystics
+  "darianna-littlepage-buggs", // Washington Mystics
+  "marta-suarez", // Phoenix Mercury
+  "shay-ciezki", // Phoenix Mercury
+  "miela-sowah", // Golden State Valkyries
 ];

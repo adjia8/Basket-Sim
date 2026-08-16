@@ -17,8 +17,9 @@ import {
 import { toDomainLeague, toDomainPlayer } from "@/lib/data-access/mappers";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { GM_POINT_POOL, expectationForRoster } from "@/lib/careers/gm-rules";
-import { INITIAL_FREE_AGENT_IDS } from "@/lib/mock-data/players-wnba";
+import { INITIAL_FREE_AGENT_IDS, INITIAL_DEVELOPMENT_CONTRACT_IDS } from "@/lib/mock-data/players-wnba";
 import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import { ALT_CONTRACT_SLOTS_PER_TEAM } from "@/lib/careers/contract-type-rules";
 
 export interface CreateCareerState {
   error?: string;
@@ -122,15 +123,20 @@ export async function createCareer(
   // contrat au départ (voir sa doc dans players-wnba.ts) — exclues aussi du
   // calcul de force d'effectif ci-dessous, cohérence oblige.
   const initiallyFreeAgentIds = new Set(leagueId === "wnba" ? INITIAL_FREE_AGENT_IDS : []);
+  const developmentPlayerIds = new Set(leagueId === "wnba" ? INITIAL_DEVELOPMENT_CONTRACT_IDS : []);
 
   // Certaines franchises du catalogue (roster réel complet, camp
-  // d'entraînement inclus) dépassent MAX_ROSTER_SIZE — sans ce filtrage,
-  // l'équipe démarrerait la Career déjà hors plafond, ce qui bloque en
-  // silence tout échange ou toute signature d'agent libre pour cette équipe
-  // dès le premier jour (aucune transaction "neutre" en effectif ne peut
-  // jamais faire redescendre un total déjà trop haut sous la barre). Les
-  // joueuses en surnombre (les moins bien notées) rejoignent le vivier
-  // d'agents libres plutôt que de recevoir un contrat.
+  // d'entraînement inclus) dépassent MAX_ROSTER_SIZE une fois les contrats
+  // de développement confirmés (voir INITIAL_DEVELOPMENT_CONTRACT_IDS)
+  // retirés du compte standard — sans ce filtrage, l'équipe démarrerait la
+  // Career déjà hors plafond, ce qui bloque en silence tout échange ou toute
+  // signature d'agent libre dès le premier jour (aucune transaction
+  // "neutre" en effectif ne peut jamais faire redescendre un total déjà
+  // trop haut sous la barre). Repli en cascade, comme en vraie WNBA (12
+  // standard + jusqu'à 2 développement par équipe) : les joueuses en
+  // surnombre les moins bien notées comblent d'abord les places de
+  // développement restantes ; seul un reliquat au-delà des 2 places
+  // rejoint le vivier d'agents libres.
   const maxRosterSize = MAX_ROSTER_SIZE[leagueId] ?? MAX_ROSTER_SIZE.nba;
   const rosterByTeam = new Map<string, typeof domainPlayers>();
   for (const player of domainPlayers) {
@@ -140,9 +146,17 @@ export async function createCareer(
     rosterByTeam.set(player.teamId, list);
   }
   for (const roster of rosterByTeam.values()) {
-    if (roster.length <= maxRosterSize) continue;
-    const overflow = [...roster].sort((a, b) => b.overallRating - a.overallRating).slice(maxRosterSize);
-    for (const player of overflow) initiallyFreeAgentIds.add(player.id);
+    const standardRoster = roster.filter((p) => !developmentPlayerIds.has(p.id));
+    if (standardRoster.length <= maxRosterSize) continue;
+
+    const devSlotsUsed = roster.length - standardRoster.length;
+    const devSlotsAvailable = Math.max(0, ALT_CONTRACT_SLOTS_PER_TEAM - devSlotsUsed);
+    const overflow = [...standardRoster]
+      .sort((a, b) => a.overallRating - b.overallRating) // pire d'abord
+      .slice(0, standardRoster.length - maxRosterSize);
+
+    overflow.slice(0, devSlotsAvailable).forEach((p) => developmentPlayerIds.add(p.id));
+    overflow.slice(devSlotsAvailable).forEach((p) => initiallyFreeAgentIds.add(p.id));
   }
 
   const playersUnderContract = domainPlayers.filter((p) => !initiallyFreeAgentIds.has(p.id));
@@ -171,7 +185,7 @@ export async function createCareer(
   // generateCareerPlayerStates reçoit TOUJOURS le catalogue complet (les
   // agents libres doivent aussi vieillir dans la Career) — seuls les
   // contrats sont filtrés (playersUnderContract, calculé plus haut).
-  await generateCareerContracts(career.id, leagueId, playersUnderContract);
+  await generateCareerContracts(career.id, leagueId, playersUnderContract, developmentPlayerIds);
   await generateCareerPlayerStates(career.id, domainPlayers);
 
   // La partie démarre dans l'entre-saison, juste après le draft : quelques
