@@ -144,6 +144,13 @@ export const playersWnba: Player[] = [
   mkPlayer({ id: "betnijah-laney-hamilton", teamId: "washington-mystics", leagueId: "wnba", firstName: "Betnijah", lastName: "Laney-Hamilton", position: "SF", jerseyNumber: 5, heightCm: 183, age: 32, overallRating: 82, realSalary: 400_000, realYearsRemaining: 1 }),
   mkPlayer({ id: "lucy-olsen", teamId: "washington-mystics", leagueId: "wnba", firstName: "Lucy", lastName: "Olsen", position: "PG", jerseyNumber: 33, heightCm: 178, age: 23, overallRating: 74, realSalary: 277_500, realYearsRemaining: 3 }),
   mkPlayer({ id: "cassandre-prosper", nationality: "Canada", teamId: "washington-mystics", leagueId: "wnba", firstName: "Cassandre", lastName: "Prosper", position: "SF", jerseyNumber: 18, heightCm: 191, age: 21, overallRating: 61, realSalary: 270_000, realYearsRemaining: 4 }),
+  // Manquait au catalogue (retrouvée orpheline en base, référencée par une
+  // Career déjà en cours — voir l'audit CBS Sports des 13 effectifs) alors
+  // qu'elle est bien sur le roster actuel des Mystics : ré-ajoutée avec les
+  // mêmes valeurs que sa ligne existante pour ne rien changer sous les pieds
+  // d'une partie en cours (seul le numéro de maillot est corrigé, 3 au lieu
+  // de 12 — 12 était déjà pris par Darianna Littlepage-Buggs).
+  mkPlayer({ id: "rori-harmon", teamId: "washington-mystics", leagueId: "wnba", firstName: "Rori", lastName: "Harmon", position: "PG", jerseyNumber: 3, heightCm: 168, age: 23, overallRating: 65 }),
   mkPlayer({ id: "alicia-florez", nationality: "Espagne", teamId: "washington-mystics", leagueId: "wnba", firstName: "Alicia", lastName: "Flórez", position: "PG", jerseyNumber: 2, heightCm: 175, age: 22, overallRating: 60, realSalary: 210_732, realYearsRemaining: 2 }),
   mkPlayer({ id: "darianna-littlepage-buggs", teamId: "washington-mystics", leagueId: "wnba", firstName: "Darianna", lastName: "Littlepage-Buggs", position: "SF", jerseyNumber: 12, heightCm: 185, age: 22, overallRating: 54 }),
 
@@ -225,10 +232,19 @@ export const playersWnba: Player[] = [
 // initialement listées ici bel et bien sur un effectif réel (retirées de
 // cette liste, voir INITIAL_DEVELOPMENT_CONTRACT_IDS pour marine-fauthoux) :
 // elles n'étaient pas réellement agents libres, juste mal classées faute de
-// donnée au premier passage. Seule "lou-lopez-senechal" reste confirmée
-// absente de tout roster WNBA actuel (Dallas Wings, sa dernière équipe
-// connue, ne la liste plus).
-export const INITIAL_FREE_AGENT_IDS: string[] = ["lou-lopez-senechal"];
+// donnée au premier passage. "lou-lopez-senechal" restait confirmée absente
+// de tout roster WNBA actuel (Dallas Wings, sa dernière équipe connue, ne la
+// liste plus) — un troisième passage (vérification systématique des 13
+// effectifs contre CBS Sports) a trouvé le même statut pour trois autres
+// joueuses du catalogue : "costanza-verona" et "kiana-williams" (leur
+// dernière équipe connue ne les liste plus), "rayah-marshall" (idem,
+// Connecticut Sun).
+export const INITIAL_FREE_AGENT_IDS: string[] = [
+  "lou-lopez-senechal",
+  "costanza-verona",
+  "kiana-williams",
+  "rayah-marshall",
+];
 
 // Joueuses confirmées sous contrat de développement (WNBA, 2 places par
 // équipe max — voir ALT_CONTRACT_SLOTS_PER_TEAM) sur les rosters d'ouverture
