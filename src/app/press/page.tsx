@@ -1,4 +1,5 @@
 import { getCurrentMembership } from "@/lib/auth/dal";
+import { prisma } from "@/lib/prisma";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getPendingPressConference, getPressHistory } from "@/lib/data-access/press";
 import { submitPressAnswers } from "@/app/actions/press";
@@ -17,8 +18,9 @@ export default async function PressPage() {
   const membership = await getCurrentMembership();
   const { t } = await getTranslator();
 
-  const [teamState, pending, history] = await Promise.all([
+  const [teamState, gmProfile, pending, history] = await Promise.all([
     getOrCreateTeamState(membership.careerId, membership.teamId, membership.leagueId),
+    prisma.gmProfile.findUnique({ where: { membershipId: membership.id }, select: { frontOfficeApproval: true } }),
     getPendingPressConference(membership.careerId, membership.teamId),
     getPressHistory(membership.careerId, membership.teamId),
   ]);
@@ -42,6 +44,16 @@ export default async function PressPage() {
             {teamState.publicOpinion} / 99
           </p>
         </div>
+        {gmProfile && (
+          <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
+            <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
+              {t("pressPage.frontOfficeApproval")}
+            </p>
+            <p className={`mt-1 text-xl font-semibold ${toneClass(neutralTone(gmProfile.frontOfficeApproval))}`}>
+              {gmProfile.frontOfficeApproval} / 99
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">

@@ -10,7 +10,7 @@ import type { ExpectationTier } from "@/lib/careers/gm-rules";
 import { healthyFinancesThreshold } from "@/lib/careers/finance-rules";
 import { getTranslator, type Translator } from "@/lib/i18n/translate";
 import { formatSalary, teamFullName } from "@/lib/utils";
-import { financeTone, ratingTone, toneClass, type ScaleTone } from "@/lib/color-scale";
+import { financeTone, ratingTone, neutralTone, toneClass, type ScaleTone } from "@/lib/color-scale";
 
 const OUTCOME_TONES: Record<string, ScaleTone> = {
   met: "good",
@@ -145,6 +145,14 @@ export default async function GmPage() {
           <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">{t("gm.trainingStaff")}</p>
           <p className={`mt-1 text-xl font-semibold ${toneClass(ratingTone(teamState.trainingStaffLevel))}`}>
             {teamState.trainingStaffLevel} / 99
+          </p>
+        </div>
+        <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
+          <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
+            {t("gm.frontOfficeApproval")}
+          </p>
+          <p className={`mt-1 text-xl font-semibold ${toneClass(neutralTone(gm.frontOfficeApproval))}`}>
+            {gm.frontOfficeApproval} / 99
           </p>
         </div>
       </div>

@@ -166,49 +166,106 @@ function shuffledCategories(): QuestionCategory[] {
 }
 
 // Réponses proposées : toujours les 4 mêmes postures (tons), mais formulées
-// comme une citation qui reprend le résultat réel — plus la même phrase
-// recyclée sur toutes les conférences, quel que soit ce qui vient de se
-// passer sur le terrain.
-function buildOptions(locale: Locale, ctx: PressGameContext): PressOption[] {
-  const tones: AnswerTone[] = ["diplomatic", "confident", "critical", "humble"];
-  return tones.map((tone) => ({ id: tone, label: toneAnswerLabel(tone, ctx, locale), tone }));
-}
+// comme une citation qui reprend le SUJET de la question posée (résultat,
+// effectif, direction, avenir) — avant, les 4 options étaient calculées à
+// partir du seul contexte de match, identiques quelle que soit la question,
+// ce qui les faisait paraître recyclées sur toute la conférence.
+type ToneAnswerBank = Record<AnswerTone, (ctx: PressGameContext, locale: Locale) => string>;
 
-function toneAnswerLabel(tone: AnswerTone, ctx: PressGameContext, locale: Locale): string {
-  if (locale === "fr") {
-    switch (tone) {
-      case "diplomatic":
-        return ctx.won
+const ANSWER_BANK: Record<QuestionCategory, ToneAnswerBank> = {
+  results: {
+    diplomatic: (ctx, locale) =>
+      locale === "fr"
+        ? ctx.won
           ? `« On reste concentrées sur le travail, cette victoire ${ctx.teamScore}-${ctx.opponentScore} contre ${ctx.opponentName} ne change rien à notre approche. »`
-          : `« On reste concentrées sur le travail, cette défaite contre ${ctx.opponentName} ne change rien à notre approche. »`;
-      case "confident":
-        return ctx.won
+          : `« On reste concentrées sur le travail, cette défaite contre ${ctx.opponentName} ne change rien à notre approche. »`
+        : ctx.won
+          ? `"We stay focused on the work — this ${ctx.teamScore}-${ctx.opponentScore} win over ${ctx.opponentName} doesn't change our approach."`
+          : `"We stay focused on the work — this loss to ${ctx.opponentName} doesn't change our approach."`,
+    confident: (ctx, locale) =>
+      locale === "fr"
+        ? ctx.won
           ? `« On savait qu'on pouvait battre ${ctx.opponentName} — ce n'est qu'un début, on vise mieux que la ${ctx.rank}e place. »`
-          : `« Cette défaite contre ${ctx.opponentName} ne représente pas notre vrai niveau, on va le prouver très vite. »`;
-      case "critical":
-        return `« Il y a eu des détails, des choix d'arbitrage aussi, qui nous ont coûté cher face à ${ctx.opponentName} — on doit en reparler en interne. »`;
-      case "humble":
-        return ctx.won
+          : `« Cette défaite contre ${ctx.opponentName} ne représente pas notre vrai niveau, on va le prouver très vite. »`
+        : ctx.won
+          ? `"We knew we could beat ${ctx.opponentName} — this is just the start, we're aiming higher than ${ctx.rank}${ordinalSuffix(ctx.rank, locale)} place."`
+          : `"That loss to ${ctx.opponentName} doesn't reflect our real level, and we'll prove it soon."`,
+    critical: (ctx, locale) =>
+      locale === "fr"
+        ? `« Il y a eu des détails, des choix d'arbitrage aussi, qui nous ont coûté cher face à ${ctx.opponentName} — on doit en reparler en interne. »`
+        : `"There were some details, and some officiating calls too, that cost us against ${ctx.opponentName} — we need to talk about that internally."`,
+    humble: (ctx, locale) =>
+      locale === "fr"
+        ? ctx.won
           ? `« On a eu de la réussite ce soir contre ${ctx.opponentName}, il reste beaucoup de travail. »`
-          : `« ${ctx.opponentName} était meilleure que nous ce soir, on doit apprendre de cette défaite. »`;
-    }
-  }
-  switch (tone) {
-    case "diplomatic":
-      return ctx.won
-        ? `"We stay focused on the work — this ${ctx.teamScore}-${ctx.opponentScore} win over ${ctx.opponentName} doesn't change our approach."`
-        : `"We stay focused on the work — this loss to ${ctx.opponentName} doesn't change our approach."`;
-    case "confident":
-      return ctx.won
-        ? `"We knew we could beat ${ctx.opponentName} — this is just the start, we're aiming higher than ${ctx.rank}${ordinalSuffix(ctx.rank, locale)} place."`
-        : `"That loss to ${ctx.opponentName} doesn't reflect our real level, and we'll prove it soon."`;
-    case "critical":
-      return `"There were some details, and some officiating calls too, that cost us against ${ctx.opponentName} — we need to talk about that internally."`;
-    case "humble":
-      return ctx.won
-        ? `"We caught some breaks tonight against ${ctx.opponentName}, there's still plenty of work to do."`
-        : `"${ctx.opponentName} was the better team tonight — we need to learn from this loss."`;
-  }
+          : `« ${ctx.opponentName} était meilleure que nous ce soir, on doit apprendre de cette défaite. »`
+        : ctx.won
+          ? `"We caught some breaks tonight against ${ctx.opponentName}, there's still plenty of work to do."`
+          : `"${ctx.opponentName} was the better team tonight — we need to learn from this loss."`,
+  },
+  roster: {
+    diplomatic: (ctx, locale) =>
+      locale === "fr"
+        ? `« Le groupe travaille dur pour ${ctx.teamName}, je ne vais pas pointer une joueuse en particulier, on avance ensemble. »`
+        : `"The group is working hard for ${ctx.teamName} — I'm not calling anyone out, we move forward together."`,
+    confident: (ctx, locale) =>
+      locale === "fr"
+        ? ctx.topPerformerName
+          ? `« Avec des joueuses comme ${ctx.topPerformerName}, j'ai une confiance totale dans cet effectif. »`
+          : `« J'ai une confiance totale dans cet effectif, il a le niveau pour nous emmener loin. »`
+        : ctx.topPerformerName
+          ? `"With players like ${ctx.topPerformerName} on this roster, I have total confidence in this group."`
+          : `"I have total confidence in this roster — it has what it takes to take us far."`,
+    critical: (_ctx, locale) =>
+      locale === "fr"
+        ? "« Il y a des ajustements à faire dans la rotation, tout le monde doit encore progresser dans son rôle. »"
+        : `"There are adjustments to make in the rotation — everyone still needs to grow into their role."`,
+    humble: (_ctx, locale) =>
+      locale === "fr"
+        ? "« Chaque joueuse doit encore progresser, moi le premier dans la gestion du groupe. »"
+        : `"Every player still has room to grow — starting with how I manage this group."`,
+  },
+  management: {
+    diplomatic: (_ctx, locale) =>
+      locale === "fr"
+        ? "« J'ai une relation professionnelle et respectueuse avec la direction, on avance dans le même sens. »"
+        : `"I have a professional, respectful relationship with the front office — we're moving in the same direction."`,
+    confident: (_ctx, locale) =>
+      locale === "fr"
+        ? "« La direction me fait confiance et je le leur rends bien — on construit quelque chose de solide ensemble. »"
+        : `"The front office trusts me and I trust them right back — we're building something solid together."`,
+    critical: (_ctx, locale) =>
+      locale === "fr"
+        ? "« Il y a des décisions de la direction que je ne partage pas forcément, mais ça reste entre nous. »"
+        : `"There are front-office decisions I don't necessarily agree with, but that stays internal."`,
+    humble: (_ctx, locale) =>
+      locale === "fr"
+        ? "« Je dois encore gagner la confiance de la direction, c'est un travail de tous les jours. »"
+        : `"I still have work to do to earn the front office's full trust — it's a day-to-day effort."`,
+  },
+  future: {
+    diplomatic: (ctx, locale) =>
+      locale === "fr"
+        ? `« On avance match après match avec ${ctx.teamName}, sans se projeter trop loin pour l'instant. »`
+        : `"We're taking it game by game with ${ctx.teamName}, without looking too far ahead for now."`,
+    confident: (ctx, locale) =>
+      locale === "fr"
+        ? `« On vise clairement mieux que la ${ctx.rank}e place, cette équipe a de l'ambition. »`
+        : `"We're clearly aiming higher than ${ctx.rank}${ordinalSuffix(ctx.rank, locale)} place — this team has ambition."`,
+    critical: (_ctx, locale) =>
+      locale === "fr"
+        ? "« Il faudra sans doute du mouvement sur le marché des transferts si on veut vraiment avancer. »"
+        : `"We'll probably need some moves on the trade market if we want to really move forward."`,
+    humble: (_ctx, locale) =>
+      locale === "fr"
+        ? "« On préfère rester prudentes sur nos objectifs et avancer étape par étape. »"
+        : `"We'd rather stay cautious about our goals and take it step by step."`,
+  },
+};
+
+function buildOptions(locale: Locale, ctx: PressGameContext, category: QuestionCategory): PressOption[] {
+  const tones: AnswerTone[] = ["diplomatic", "confident", "critical", "humble"];
+  return tones.map((tone) => ({ id: tone, label: ANSWER_BANK[category][tone](ctx, locale), tone }));
 }
 
 // Tire `count` questions (3 ou 4) réparties sur des catégories différentes
@@ -221,7 +278,7 @@ export function generateQuestions(count: number, locale: Locale, ctx: PressGameC
     const category = categories[i % categories.length];
     const bank = QUESTION_BANK[category];
     const template = bank[Math.floor(Math.random() * bank.length)];
-    questions.push({ prompt: template(ctx, locale), category, options: buildOptions(locale, ctx) });
+    questions.push({ prompt: template(ctx, locale), category, options: buildOptions(locale, ctx, category) });
   }
   return questions;
 }
