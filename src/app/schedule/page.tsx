@@ -10,6 +10,14 @@ import type { Locale } from "@/lib/i18n/locale";
 import { formatGameDate, teamFullName } from "@/lib/utils";
 import type { Game, Team } from "@/lib/types";
 
+// Plafond relevé pour les Server Actions de cette page (voir
+// simulate-bulk.ts) : un match simulé prend 30-50s, largement au-dessus du
+// défaut de la plateforme (10s sur Vercel Hobby sans ce réglage) — sans ce
+// plafond, "Simuler tous les matchs IA restants" se fait tuer avant de
+// répondre. D'après la doc Next.js, pour les Server Actions ce réglage se
+// fait au niveau de la page, pas dans le fichier de l'action elle-même.
+export const maxDuration = 60;
+
 export default async function SchedulePage({
   searchParams,
 }: {

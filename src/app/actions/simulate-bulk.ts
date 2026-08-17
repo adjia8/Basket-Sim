@@ -20,10 +20,14 @@ import { getTranslator } from "@/lib/i18n/translate";
 // Traité par petits lots séquentiels plutôt qu'en un seul appel géant : une
 // saison complète peut compter plusieurs centaines de matchs IA, et chacun
 // enchaîne une bonne quinzaine de requêtes (fatigue, blessures, chimie,
-// renommée...) — largement de quoi dépasser un timeout de fonction
-// serverless en un seul aller-retour. Le client relance l'action tant que
+// renommée...) — en pratique 30-50s par match. Un lot de 15 dépassait de
+// loin le maxDuration de la page (voir schedule/page.tsx) : la fonction
+// serverless se faisait tuer par la plateforme avant de renvoyer quoi que
+// ce soit, ce qui laissait l'UI figée indéfiniment. Un match à la fois tient
+// large sous ce plafond et fait progresser l'affichage à chaque match plutôt
+// qu'une fois tous les dix. Le client relance l'action tant que
 // `remaining > 0`, avec un indicateur de progression entre chaque lot.
-const BATCH_SIZE = 15;
+const BATCH_SIZE = 1;
 
 export interface SimulateAllAiGamesResult {
   simulated: number;
