@@ -10,6 +10,13 @@ export const keys = [
   "schedule.simulateAllAiRemainingSuffix",
   "schedule.simulateAllAiDone",
   "schedule.simulateAllAiError",
+  "schedule.simulateNextMyLabel",
+  "schedule.simulateNextMyButton",
+  "schedule.simulateNextMyRunningPrefix",
+  "schedule.simulateNextMyRemainingSuffix",
+  "schedule.simulateNextMyDone",
+  "schedule.simulateNextMyError",
+  "schedule.simulateNextMyWaiting",
 ] as const;
 
 export type ScheduleKey = (typeof keys)[number];
@@ -26,6 +33,14 @@ export const fr: Record<ScheduleKey, string> = {
   "schedule.simulateAllAiRemainingSuffix": "restants",
   "schedule.simulateAllAiDone": "Tous les matchs IA-vs-IA ont été simulés.",
   "schedule.simulateAllAiError": "La simulation en masse a échoué — réessaie.",
+  "schedule.simulateNextMyLabel": "Simuler les prochains matchs :",
+  "schedule.simulateNextMyButton": "Simuler",
+  "schedule.simulateNextMyRunningPrefix": "Simulation en cours — matchs simulés :",
+  "schedule.simulateNextMyRemainingSuffix": "matchs restants pour ta franchise",
+  "schedule.simulateNextMyDone": "Les matchs demandés ont été simulés.",
+  "schedule.simulateNextMyError": "La simulation a échoué — réessaie.",
+  "schedule.simulateNextMyWaiting":
+    "Le prochain match implique un autre manager — impossible de le simuler automatiquement.",
 };
 
 export const en: Record<ScheduleKey, string> = {
@@ -40,4 +55,11 @@ export const en: Record<ScheduleKey, string> = {
   "schedule.simulateAllAiRemainingSuffix": "remaining",
   "schedule.simulateAllAiDone": "All AI-vs-AI games have been simulated.",
   "schedule.simulateAllAiError": "Bulk simulation failed — try again.",
+  "schedule.simulateNextMyLabel": "Simulate next games:",
+  "schedule.simulateNextMyButton": "Simulate",
+  "schedule.simulateNextMyRunningPrefix": "Simulating — games simulated:",
+  "schedule.simulateNextMyRemainingSuffix": "games remaining for your franchise",
+  "schedule.simulateNextMyDone": "The requested games have been simulated.",
+  "schedule.simulateNextMyError": "Simulation failed — try again.",
+  "schedule.simulateNextMyWaiting": "The next game involves another manager — it can't be auto-simulated.",
 };

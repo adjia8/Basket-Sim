@@ -89,3 +89,71 @@ export async function simulateAllAiGames(): Promise<SimulateAllAiGamesResult> {
 
   return { simulated: simulatedCount, remaining: totalPending - simulatedCount };
 }
+
+export interface SimulateNextMyGamesResult {
+  simulated: number; // 0 ou 1
+  remaining: number; // total de matchs non "final" de mon équipe
+  blockedByOtherManager?: boolean; // le prochain match oppose deux humains, doit rester manuel
+  error?: string;
+}
+
+// Pendant du bouton IA ci-dessus, mais pour les matchs DE l'équipe du
+// joueur — jusqu'ici, il fallait cliquer "Simuler" un par un sur chaque
+// /game/[gameId]. Même contrainte de coût par match (~30-50s) donc même
+// principe : un match par appel, le client relance tant qu'il n'a pas
+// atteint le nombre demandé.
+//
+// On ne saute JAMAIS le prochain match chronologique de l'équipe, même
+// s'il oppose deux managers humains (donc pas auto-simulable, voir
+// /api/simulate-game/route.ts) : le repos/la fatigue de l'équipe dépendent
+// de l'ordre réel de ses matchs, simuler un match IA plus tardif d'abord
+// produirait des jours de repos incohérents. Dans ce cas, le lot s'arrête
+// simplement là — `blockedByOtherManager` permet au client de l'expliquer
+// plutôt que de paraître figé.
+export async function simulateNextMyGames(): Promise<SimulateNextMyGamesResult> {
+  const { userId } = await verifySession();
+  const { locale } = await getTranslator();
+
+  const membership = await prisma.membership.findUnique({ where: { userId } });
+  if (!membership) {
+    return { simulated: 0, remaining: 0, error: "No career" };
+  }
+
+  const careerId = membership.careerId;
+  const myTeamId = membership.teamId;
+
+  const otherHumanTeamIds = (
+    await prisma.membership.findMany({ where: { careerId, teamId: { not: myTeamId } }, select: { teamId: true } })
+  ).map((m) => m.teamId);
+
+  const myPendingWhere = {
+    careerId,
+    status: { not: "final" },
+    OR: [{ homeTeamId: myTeamId }, { awayTeamId: myTeamId }],
+  };
+  const remaining = await prisma.game.count({ where: myPendingWhere });
+  const nextGame = await prisma.game.findFirst({ where: myPendingWhere, orderBy: { gameDate: "asc" } });
+  if (!nextGame) {
+    return { simulated: 0, remaining: 0 };
+  }
+
+  const opponentTeamId = nextGame.homeTeamId === myTeamId ? nextGame.awayTeamId : nextGame.homeTeamId;
+  if (otherHumanTeamIds.includes(opponentTeamId)) {
+    return { simulated: 0, remaining, blockedByOtherManager: true };
+  }
+
+  const game = toDomainGame(nextGame);
+  let simulatedCount = 0;
+  try {
+    await simulateAndResolveGame(careerId, game, locale);
+    simulatedCount = 1;
+  } catch {
+    // Laisse le match "scheduled" ; l'appelant s'arrête car simulated === 0.
+  }
+
+  revalidatePath("/schedule");
+  revalidatePath("/standings");
+  revalidatePath("/", "layout");
+
+  return { simulated: simulatedCount, remaining: remaining - simulatedCount };
+}

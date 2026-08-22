@@ -6,6 +6,7 @@ import { preseasonSeasonLabel } from "@/lib/careers/schedule-rules";
 import { getTranslator } from "@/lib/i18n/translate";
 import { prisma } from "@/lib/prisma";
 import { SimulateAllAiButton } from "@/components/schedule/SimulateAllAiButton";
+import { SimulateNextMyGamesButton } from "@/components/schedule/SimulateNextMyGamesButton";
 import type { Locale } from "@/lib/i18n/locale";
 import { formatGameDate, teamFullName } from "@/lib/utils";
 import type { Game, Team } from "@/lib/types";
@@ -53,12 +54,34 @@ export default async function SchedulePage({
       awayTeamId: { notIn: humanTeamIds },
     },
   });
+  const myPendingGamesCount = await prisma.game.count({
+    where: {
+      careerId: membership.careerId,
+      status: { not: "final" },
+      OR: [{ homeTeamId: membership.teamId }, { awayTeamId: membership.teamId }],
+    },
+  });
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">{t("schedule.title")}</h1>
         <div className="flex flex-wrap items-center gap-3">
+          {myPendingGamesCount > 0 && (
+            <SimulateNextMyGamesButton
+              initialRemaining={myPendingGamesCount}
+              maxCount={Math.min(myPendingGamesCount, 20)}
+              labels={{
+                label: t("schedule.simulateNextMyLabel"),
+                button: t("schedule.simulateNextMyButton"),
+                runningPrefix: t("schedule.simulateNextMyRunningPrefix"),
+                remainingSuffix: t("schedule.simulateNextMyRemainingSuffix"),
+                done: t("schedule.simulateNextMyDone"),
+                error: t("schedule.simulateNextMyError"),
+                waiting: t("schedule.simulateNextMyWaiting"),
+              }}
+            />
+          )}
           {pendingAiGamesCount > 0 && (
             <SimulateAllAiButton
               initialCount={pendingAiGamesCount}
