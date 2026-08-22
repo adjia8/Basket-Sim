@@ -4,6 +4,7 @@ import type { Locale } from "@/lib/i18n/locale";
 import { formatGameDate, formatSalary, teamFullName } from "@/lib/utils";
 import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
 import { DeleteCareerButton } from "@/components/dashboard/DeleteCareerButton";
+import { AdvanceCalendarButton } from "@/components/dashboard/AdvanceCalendarButton";
 import type { Game, Player, StandingsRow, Team } from "@/lib/types";
 
 // Composant client : tout le texte arrive déjà traduit en props depuis le
@@ -23,6 +24,10 @@ export interface DashboardLabels {
   payroll: string;
   nextGame: string;
   noGameScheduled: string;
+  advanceCalendar: string;
+  advanceCalendarRunningPrefix: string;
+  advanceCalendarUpToDate: string;
+  advanceCalendarError: string;
   recentForm: string;
   noGamePlayedYet: string;
   topPlayers: string;
@@ -183,14 +188,26 @@ export function DashboardClient({
       <section>
         <h2 className="mb-3 text-lg font-semibold">{labels.nextGame}</h2>
         {nextGame ? (
-          <GameLine
-            game={nextGame}
-            teams={teams}
-            myTeamId={teamId}
-            isPreseason={preseasonGameIds.has(nextGame.id)}
-            locale={locale}
-            preseasonTag={labels.preseasonTag}
-          />
+          <div className="space-y-3">
+            <GameLine
+              game={nextGame}
+              teams={teams}
+              myTeamId={teamId}
+              isPreseason={preseasonGameIds.has(nextGame.id)}
+              locale={locale}
+              preseasonTag={labels.preseasonTag}
+            />
+            {!seasonComplete && (
+              <AdvanceCalendarButton
+                labels={{
+                  button: labels.advanceCalendar,
+                  runningPrefix: labels.advanceCalendarRunningPrefix,
+                  upToDate: labels.advanceCalendarUpToDate,
+                  error: labels.advanceCalendarError,
+                }}
+              />
+            )}
+          </div>
         ) : (
           <p className="text-sm text-black/50 dark:text-white/50">{labels.noGameScheduled}</p>
         )}

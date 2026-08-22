@@ -12,6 +12,12 @@ import { preseasonSeasonLabel } from "@/lib/careers/schedule-rules";
 import { getTranslator } from "@/lib/i18n/translate";
 import { teamFullName } from "@/lib/utils";
 
+// Plafond relevé pour la Server Action advanceCalendar (voir
+// simulate-bulk.ts) : un match simulé prend 30-50s, même contrainte déjà
+// rencontrée sur schedule/page.tsx (défaut de la plateforme trop bas sans
+// ce réglage — voir son commentaire pour le détail).
+export const maxDuration = 60;
+
 export default async function DashboardPage() {
   const membership = await getCurrentMembership();
   const { t, locale } = await getTranslator();
@@ -66,6 +72,10 @@ export default async function DashboardPage() {
         payroll: t("dashboard.payroll"),
         nextGame: t("dashboard.nextGame"),
         noGameScheduled: t("dashboard.noGameScheduled"),
+        advanceCalendar: t("dashboard.advanceCalendar"),
+        advanceCalendarRunningPrefix: t("dashboard.advanceCalendarRunningPrefix"),
+        advanceCalendarUpToDate: t("dashboard.advanceCalendarUpToDate"),
+        advanceCalendarError: t("dashboard.advanceCalendarError"),
         recentForm: t("dashboard.recentForm"),
         noGamePlayedYet: t("dashboard.noGamePlayedYet"),
         topPlayers: t("dashboard.topPlayers"),

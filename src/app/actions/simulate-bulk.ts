@@ -157,3 +157,76 @@ export async function simulateNextMyGames(): Promise<SimulateNextMyGamesResult> 
 
   return { simulated: simulatedCount, remaining: remaining - simulatedCount };
 }
+
+export interface AdvanceCalendarResult {
+  simulated: number; // 0 ou 1 — un match IA simulé à cet appel
+  arrivedAtMyGame: boolean; // plus aucun match IA avant mon prochain match
+  myGameId?: string;
+  myGameDate?: string; // ISO, pour affichage
+  seasonComplete: boolean; // plus aucun match du tout (ni IA ni le mien)
+  error?: string;
+}
+
+// "Continuer" façon Football Manager : simule un match IA à la fois (même
+// contrainte de coût que les deux actions ci-dessus), mais borné par mon
+// propre prochain match — jamais simulé à ma place. Dès qu'il ne reste plus
+// aucun match IA daté avant (ou le même jour que) mon prochain match, on
+// s'arrête et on le signale au lieu de continuer : c'est là que le joueur
+// reprend la main, exactement comme le "Continuer" de Football Manager
+// s'arrête au jour de ton propre match.
+export async function advanceCalendar(): Promise<AdvanceCalendarResult> {
+  const { userId } = await verifySession();
+  const { locale } = await getTranslator();
+  const membership = await prisma.membership.findUnique({ where: { userId } });
+  if (!membership) {
+    return { simulated: 0, arrivedAtMyGame: false, seasonComplete: false, error: "No career" };
+  }
+
+  const careerId = membership.careerId;
+  const myTeamId = membership.teamId;
+
+  const nextMyGame = await prisma.game.findFirst({
+    where: { careerId, status: { not: "final" }, OR: [{ homeTeamId: myTeamId }, { awayTeamId: myTeamId }] },
+    orderBy: { gameDate: "asc" },
+  });
+
+  const humanTeamIds = (
+    await prisma.membership.findMany({ where: { careerId }, select: { teamId: true } })
+  ).map((m) => m.teamId);
+
+  const nextAiGame = await prisma.game.findFirst({
+    where: {
+      careerId,
+      status: { not: "final" },
+      homeTeamId: { notIn: humanTeamIds },
+      awayTeamId: { notIn: humanTeamIds },
+      ...(nextMyGame ? { gameDate: { lte: nextMyGame.gameDate } } : {}),
+    },
+    orderBy: { gameDate: "asc" },
+  });
+
+  if (nextAiGame) {
+    const game = toDomainGame(nextAiGame);
+    try {
+      await simulateAndResolveGame(careerId, game, locale);
+    } catch {
+      // Laisse le match "scheduled" ; le prochain appel retentera.
+    }
+    revalidatePath("/");
+    revalidatePath("/schedule");
+    revalidatePath("/standings");
+    return { simulated: 1, arrivedAtMyGame: false, seasonComplete: false };
+  }
+
+  if (nextMyGame) {
+    return {
+      simulated: 0,
+      arrivedAtMyGame: true,
+      myGameId: nextMyGame.id,
+      myGameDate: nextMyGame.gameDate.toISOString(),
+      seasonComplete: false,
+    };
+  }
+
+  return { simulated: 0, arrivedAtMyGame: false, seasonComplete: true };
+}
