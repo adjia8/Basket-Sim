@@ -6,6 +6,16 @@ import { getGameById, setGameReady } from "@/lib/data-access/schedule";
 import { simulateAndResolveGame } from "@/lib/data-access/simulate";
 import { getTranslator } from "@/lib/i18n/translate";
 
+// Plafond relevé pour cette route : simuler un match coûte ~20-50s (voir
+// simulate-bulk.ts pour le détail), largement au-dessus du défaut de la
+// plateforme (10s sur Vercel Hobby sans ce réglage) — c'est cette route qui
+// joue le match du manager humain à chaque clic sur "Simuler le match", pas
+// juste les lots IA en arrière-plan, donc son absence ici passait
+// jusque-là inaperçue. Contrairement aux Server Actions (réglées au niveau
+// de la page qui les déclenche), une route handler comme celle-ci se
+// configure directement.
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   const { t, locale } = await getTranslator();
   const session = await getSession();

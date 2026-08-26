@@ -122,6 +122,7 @@ export default async function GamePage({
                   simulationFailed: t("game.simulationFailed"),
                   unknownError: t("game.unknownError"),
                   otherManagerFallback: t("game.otherManagerFallback"),
+                  timedOut: t("game.timedOut"),
                 }}
               />
             ) : (

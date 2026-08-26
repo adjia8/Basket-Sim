@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { withClientTimeout, ClientTimeoutError } from "@/lib/client-timeout";
 
 // Composant client : tout le texte arrive déjà traduit en props depuis le
 // Server Component appelant (voir game/[gameId]/page.tsx).
@@ -12,6 +13,7 @@ export interface SimulateButtonLabels {
   simulationFailed: string;
   unknownError: string;
   otherManagerFallback: string;
+  timedOut: string; // appel anormalement long (voir client-timeout.ts)
 }
 
 export function SimulateButton({
@@ -32,11 +34,13 @@ export function SimulateButton({
     setIsPending(true);
     setError(null);
     try {
-      const res = await fetch("/api/simulate-game", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gameId }),
-      });
+      const res = await withClientTimeout(
+        fetch("/api/simulate-game", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ gameId }),
+        })
+      );
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         // 409 = le match est déjà terminé côté serveur (déclenché par
@@ -57,7 +61,11 @@ export function SimulateButton({
         setWaitingFor(data?.waitingFor ?? labels.otherManagerFallback);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : labels.unknownError);
+      if (err instanceof ClientTimeoutError) {
+        setError(labels.timedOut);
+      } else {
+        setError(err instanceof Error ? err.message : labels.unknownError);
+      }
     } finally {
       setIsPending(false);
     }
