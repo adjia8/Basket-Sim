@@ -22,6 +22,18 @@ const QUARTER_MINUTES: Record<string, number> = { wnba: 10, nba: 12 };
 // coup" — répartie sur 4 quart-temps pour que l'effet cumulé sur la partie
 // reste comparable.
 const STRENGTH_COEFFICIENT = 0.9 / QUARTERS;
+// Le basket ne finit jamais sur une égalité — durée réelle d'une
+// prolongation (5 minutes, WNBA comme NBA), bien plus courte qu'un
+// quart-temps de 10-12 minutes (voir simulateGame : tous les paramètres
+// d'une prolongation — score attendu, avantage du terrain, bruit, plancher
+// de score — sont dérivés de ceux d'un quart-temps au prorata de cette
+// durée, pas une nouvelle échelle inventée).
+const OVERTIME_MINUTES: Record<string, number> = { wnba: 5, nba: 5 };
+// Garde-fou : avec des scores entiers, une prolongation peut retomber sur
+// une nouvelle égalité exacte (improbable, pas impossible) — au-delà de ce
+// nombre de prolongations, un vrai dernier mot est forcé (voir la fin de
+// simulateGame) plutôt que de boucler indéfiniment.
+const MAX_OVERTIME_PERIODS = 10;
 
 function average(values: number[]): number {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
@@ -278,9 +290,23 @@ function applyQuarterBoxScore(
   );
   const totalWeight = weights.reduce((sum, w) => sum + w, 0);
 
-  const quarterPoints = rotation.map((_, i) => Math.round((weights[i] / totalWeight) * quarterScore));
-  const distributed = quarterPoints.reduce((sum, p) => sum + p, 0);
-  quarterPoints[0] = Math.max(0, quarterPoints[0] + (quarterScore - distributed));
+  // Méthode des plus grands restes (comme la répartition de sièges en
+  // élection à la proportionnelle) : arrondit chaque part à l'entier
+  // inférieur, puis distribue le reliquat un point à la fois aux joueuses
+  // dont la part arrondie a perdu le plus. Garantit TOUJOURS que la somme
+  // distribuée vaut exactement quarterScore — l'ancien correctif (tout
+  // l'écart d'arrondi concentré sur une seule joueuse, plafonné à 0)
+  // pouvait perdre des points dès que cet écart dépassait sa propre part,
+  // cassant l'invariant "somme du box score = score final de l'équipe".
+  const rawShares = rotation.map((_, i) => (weights[i] / totalWeight) * quarterScore);
+  const quarterPoints = rawShares.map((share) => Math.floor(share));
+  let remainder = quarterScore - quarterPoints.reduce((sum, p) => sum + p, 0);
+  const byLeftoverFraction = rawShares
+    .map((share, i) => ({ i, fraction: share - quarterPoints[i] }))
+    .sort((a, b) => b.fraction - a.fraction);
+  for (let k = 0; k < byLeftoverFraction.length && remainder > 0; k++, remainder--) {
+    quarterPoints[byLeftoverFraction[k].i] += 1;
+  }
 
   rotation.forEach((player, i) => {
     const entry = totals.get(player.id) ?? emptyBoxEntry(player.id, teamId);
@@ -329,11 +355,10 @@ function applyQuarterMinutes(
   totals: Map<string, BoxScoreEntry>,
   teamId: string,
   rotation: Player[],
-  leagueId: string
+  periodMinutes: number
 ): void {
   if (rotation.length === 0) return;
-  const quarterMinutes = QUARTER_MINUTES[leagueId] ?? QUARTER_MINUTES.nba;
-  const totalPlayerMinutes = quarterMinutes * 5;
+  const totalPlayerMinutes = periodMinutes * 5;
 
   const starters = rotation.slice(0, 5);
   const bench = rotation.slice(5);
@@ -400,6 +425,62 @@ function applyQuarterFouls(
   }
 }
 
+interface PeriodTeamsContext {
+  home: Team;
+  away: Team;
+  homeRosterFull: Player[];
+  awayRosterFull: Player[];
+  homeChemistry: number;
+  awayChemistry: number;
+  homeGmBonus: number;
+  awayGmBonus: number;
+  homeRotationOrder?: string[];
+  awayRotationOrder?: string[];
+  disqualified: Set<string>;
+  totals: Map<string, BoxScoreEntry>;
+}
+
+// Simule une période de jeu (un quart-temps, ou une prolongation avec des
+// paramètres réduits au prorata — voir simulateGame) : force d'équipe ->
+// score de la période -> répartition dans le box score/les minutes/les
+// fautes. Extraite de l'ancienne boucle de quart-temps pour être réutilisée
+// telle quelle par les prolongations, sans dupliquer cette mécanique.
+function simulatePeriod(
+  ctx: PeriodTeamsContext,
+  periodBase: number,
+  periodHomeAdvantage: number,
+  noiseSpread: number,
+  minScore: number,
+  periodMinutes: number
+): { homeScore: number; awayScore: number } {
+  const homeActive = ctx.homeRosterFull.filter((p) => !ctx.disqualified.has(p.id));
+  const awayActive = ctx.awayRosterFull.filter((p) => !ctx.disqualified.has(p.id));
+  const homeRotation = rotationOf(homeActive, ctx.homeRotationOrder);
+  const awayRotation = rotationOf(awayActive, ctx.awayRotationOrder);
+
+  const homeStrength =
+    teamStrength(homeActive, ctx.homeChemistry, ctx.homeGmBonus, ctx.homeRotationOrder) + periodHomeAdvantage;
+  const awayStrength = teamStrength(awayActive, ctx.awayChemistry, ctx.awayGmBonus, ctx.awayRotationOrder);
+
+  const homeScore = Math.max(
+    minScore,
+    Math.round(periodBase + (homeStrength - 75) * STRENGTH_COEFFICIENT + noise(noiseSpread))
+  );
+  const awayScore = Math.max(
+    minScore,
+    Math.round(periodBase + (awayStrength - 75) * STRENGTH_COEFFICIENT + noise(noiseSpread))
+  );
+
+  applyQuarterBoxScore(ctx.totals, ctx.home.id, homeRotation, homeScore);
+  applyQuarterBoxScore(ctx.totals, ctx.away.id, awayRotation, awayScore);
+  applyQuarterFouls(ctx.totals, ctx.home.id, homeRotation, ctx.disqualified);
+  applyQuarterFouls(ctx.totals, ctx.away.id, awayRotation, ctx.disqualified);
+  applyQuarterMinutes(ctx.totals, ctx.home.id, homeRotation, periodMinutes);
+  applyQuarterMinutes(ctx.totals, ctx.away.id, awayRotation, periodMinutes);
+
+  return { homeScore, awayScore };
+}
+
 export class MockSimulationEngine implements SimulationEngine {
   simulateGame(
     home: Team,
@@ -414,6 +495,7 @@ export class MockSimulationEngine implements SimulationEngine {
     const awayGmBonus = options?.awayGmBonus ?? 0;
     const homeRotationOrder = options?.homeRotationOrder;
     const awayRotationOrder = options?.awayRotationOrder;
+    const quarterMinutes = QUARTER_MINUTES[home.leagueId] ?? QUARTER_MINUTES.nba;
     const quarterBase = basePointsForLeague(home.leagueId) / QUARTERS;
     const quarterHomeAdvantage = HOME_ADVANTAGE / QUARTERS;
 
@@ -422,36 +504,56 @@ export class MockSimulationEngine implements SimulationEngine {
     const playersById = new Map(
       [...homeRosterFull, ...awayRosterFull].map((p) => [p.id, p] as const)
     );
+    const ctx: PeriodTeamsContext = {
+      home,
+      away,
+      homeRosterFull,
+      awayRosterFull,
+      homeChemistry,
+      awayChemistry,
+      homeGmBonus,
+      awayGmBonus,
+      homeRotationOrder,
+      awayRotationOrder,
+      disqualified,
+      totals,
+    };
     let homeScore = 0;
     let awayScore = 0;
 
     for (let q = 0; q < QUARTERS; q++) {
-      const homeActive = homeRosterFull.filter((p) => !disqualified.has(p.id));
-      const awayActive = awayRosterFull.filter((p) => !disqualified.has(p.id));
-      const homeRotation = rotationOf(homeActive, homeRotationOrder);
-      const awayRotation = rotationOf(awayActive, awayRotationOrder);
+      const period = simulatePeriod(ctx, quarterBase, quarterHomeAdvantage, 4.5, 15, quarterMinutes);
+      homeScore += period.homeScore;
+      awayScore += period.awayScore;
+    }
 
-      const homeStrength =
-        teamStrength(homeActive, homeChemistry, homeGmBonus, homeRotationOrder) + quarterHomeAdvantage;
-      const awayStrength = teamStrength(awayActive, awayChemistry, awayGmBonus, awayRotationOrder);
+    // Le basket ne finit jamais sur une égalité — prolongations successives
+    // (même mécanique qu'un quart-temps, voir simulatePeriod, mais tous les
+    // paramètres réduits au prorata d'une durée réelle de 5 minutes plutôt
+    // que 10-12) jusqu'à ce que les scores se départagent. Avant la dérive
+    // des tirs (applyShotStats, plus bas) : les points de prolongation sont
+    // du vrai jeu, pas un point synthétique — ils doivent compter dans le
+    // volume de tir dérivé comme n'importe quel quart-temps.
+    const overtimeMinutes = OVERTIME_MINUTES[home.leagueId] ?? OVERTIME_MINUTES.nba;
+    const overtimeRatio = overtimeMinutes / quarterMinutes;
+    const overtimeBase = quarterBase * overtimeRatio;
+    const overtimeHomeAdvantage = quarterHomeAdvantage * overtimeRatio;
+    const overtimeNoiseSpread = 4.5 * overtimeRatio;
+    const overtimeMinScore = Math.max(3, Math.round(15 * overtimeRatio));
 
-      const homeQuarterScore = Math.max(
-        15,
-        Math.round(quarterBase + (homeStrength - 75) * STRENGTH_COEFFICIENT + noise(4.5))
+    let overtimePeriods = 0;
+    while (homeScore === awayScore && overtimePeriods < MAX_OVERTIME_PERIODS) {
+      const period = simulatePeriod(
+        ctx,
+        overtimeBase,
+        overtimeHomeAdvantage,
+        overtimeNoiseSpread,
+        overtimeMinScore,
+        overtimeMinutes
       );
-      const awayQuarterScore = Math.max(
-        15,
-        Math.round(quarterBase + (awayStrength - 75) * STRENGTH_COEFFICIENT + noise(4.5))
-      );
-      homeScore += homeQuarterScore;
-      awayScore += awayQuarterScore;
-
-      applyQuarterBoxScore(totals, home.id, homeRotation, homeQuarterScore);
-      applyQuarterBoxScore(totals, away.id, awayRotation, awayQuarterScore);
-      applyQuarterFouls(totals, home.id, homeRotation, disqualified);
-      applyQuarterFouls(totals, away.id, awayRotation, disqualified);
-      applyQuarterMinutes(totals, home.id, homeRotation, home.leagueId);
-      applyQuarterMinutes(totals, away.id, awayRotation, away.leagueId);
+      homeScore += period.homeScore;
+      awayScore += period.awayScore;
+      overtimePeriods++;
     }
 
     applyShotStats(totals, playersById);
@@ -467,6 +569,26 @@ export class MockSimulationEngine implements SimulationEngine {
         homeScore += 1;
         creditClutchPoint(totals, home.id, homeActive, homeRotationOrder);
       } else if (awayClutch > homeClutch) {
+        awayScore += 1;
+        creditClutchPoint(totals, away.id, awayActive, awayRotationOrder);
+      }
+    }
+
+    // Garde-fou ultime (probabilité quasi nulle en pratique) : si le nombre
+    // maximal de prolongations est épuisé sans départage, ou si l'effet
+    // clutch ci-dessus n'a rien tranché (moyennes de clutch strictement
+    // égales), un dernier mot est forcé sur la force d'équipe — jamais un
+    // match nul rendu, jamais un point fantôme (même mécanique que le point
+    // clutch : crédité à une joueuse via creditClutchPoint).
+    if (homeScore === awayScore) {
+      const homeActive = homeRosterFull.filter((p) => !disqualified.has(p.id));
+      const awayActive = awayRosterFull.filter((p) => !disqualified.has(p.id));
+      const homeFinalStrength = teamStrength(homeActive, homeChemistry, homeGmBonus, homeRotationOrder);
+      const awayFinalStrength = teamStrength(awayActive, awayChemistry, awayGmBonus, awayRotationOrder);
+      if (homeFinalStrength >= awayFinalStrength) {
+        homeScore += 1;
+        creditClutchPoint(totals, home.id, homeActive, homeRotationOrder);
+      } else {
         awayScore += 1;
         creditClutchPoint(totals, away.id, awayActive, awayRotationOrder);
       }
