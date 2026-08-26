@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { simulateAllAiGames } from "@/app/actions/simulate-bulk";
+import { withClientTimeout, ClientTimeoutError } from "@/lib/client-timeout";
 
 // Composant client : ne fait qu'orchestrer les appels répétés à l'action
 // serveur (elle-même limitée à un petit lot par appel, voir
@@ -13,6 +14,7 @@ export interface SimulateAllAiButtonLabels {
   remainingSuffix: string; // "matchs restants"
   done: string;
   error: string;
+  timedOut: string; // appel anormalement long (voir client-timeout.ts)
 }
 
 export function SimulateAllAiButton({
@@ -33,7 +35,13 @@ export function SimulateAllAiButton({
     setError(null);
     let currentRemaining = remaining;
     while (currentRemaining > 0) {
-      const res = await simulateAllAiGames();
+      let res;
+      try {
+        res = await withClientTimeout(simulateAllAiGames());
+      } catch (err) {
+        setError(err instanceof ClientTimeoutError ? labels.timedOut : labels.error);
+        break;
+      }
       if (res.error) {
         setError(labels.error);
         break;

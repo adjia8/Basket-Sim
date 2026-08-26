@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { advanceCalendar } from "@/app/actions/simulate-bulk";
+import { withClientTimeout, ClientTimeoutError } from "@/lib/client-timeout";
 
 // Façon Football Manager : simule les matchs IA un par un (même contrainte
 // de coût que les boutons de /schedule) jusqu'à tomber sur mon propre
@@ -11,6 +12,7 @@ export interface AdvanceCalendarButtonLabels {
   runningPrefix: string; // "Avancement en cours — matchs IA simulés :"
   upToDate: string; // "Tu es à jour — il ne reste plus qu'à jouer ton prochain match."
   error: string;
+  timedOut: string; // appel anormalement long (voir client-timeout.ts)
 }
 
 export function AdvanceCalendarButton({ labels }: { labels: AdvanceCalendarButtonLabels }) {
@@ -25,7 +27,13 @@ export function AdvanceCalendarButton({ labels }: { labels: AdvanceCalendarButto
     setUpToDate(false);
     setSimulated(0);
     while (true) {
-      const res = await advanceCalendar();
+      let res;
+      try {
+        res = await withClientTimeout(advanceCalendar());
+      } catch (err) {
+        setError(err instanceof ClientTimeoutError ? labels.timedOut : labels.error);
+        break;
+      }
       if (res.error) {
         setError(labels.error);
         break;

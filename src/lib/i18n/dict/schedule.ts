@@ -10,6 +10,7 @@ export const keys = [
   "schedule.simulateAllAiRemainingSuffix",
   "schedule.simulateAllAiDone",
   "schedule.simulateAllAiError",
+  "schedule.simulateAllAiTimedOut",
   "schedule.simulateNextMyLabel",
   "schedule.simulateNextMyButton",
   "schedule.simulateNextMyRunningPrefix",
@@ -17,6 +18,7 @@ export const keys = [
   "schedule.simulateNextMyDone",
   "schedule.simulateNextMyError",
   "schedule.simulateNextMyWaiting",
+  "schedule.simulateNextMyTimedOut",
 ] as const;
 
 export type ScheduleKey = (typeof keys)[number];
@@ -33,6 +35,8 @@ export const fr: Record<ScheduleKey, string> = {
   "schedule.simulateAllAiRemainingSuffix": "restants",
   "schedule.simulateAllAiDone": "Tous les matchs IA-vs-IA ont été simulés.",
   "schedule.simulateAllAiError": "La simulation en masse a échoué — réessaie.",
+  "schedule.simulateAllAiTimedOut":
+    "Ça prend anormalement longtemps (probablement un souci de connexion à la base de données) — réessaie dans un instant.",
   "schedule.simulateNextMyLabel": "Simuler les prochains matchs :",
   "schedule.simulateNextMyButton": "Simuler",
   "schedule.simulateNextMyRunningPrefix": "Simulation en cours — matchs simulés :",
@@ -41,6 +45,8 @@ export const fr: Record<ScheduleKey, string> = {
   "schedule.simulateNextMyError": "La simulation a échoué — réessaie.",
   "schedule.simulateNextMyWaiting":
     "Le prochain match implique un autre manager — impossible de le simuler automatiquement.",
+  "schedule.simulateNextMyTimedOut":
+    "Ça prend anormalement longtemps (probablement un souci de connexion à la base de données) — réessaie dans un instant.",
 };
 
 export const en: Record<ScheduleKey, string> = {
@@ -55,6 +61,7 @@ export const en: Record<ScheduleKey, string> = {
   "schedule.simulateAllAiRemainingSuffix": "remaining",
   "schedule.simulateAllAiDone": "All AI-vs-AI games have been simulated.",
   "schedule.simulateAllAiError": "Bulk simulation failed — try again.",
+  "schedule.simulateAllAiTimedOut": "This is taking unusually long (likely a database connection hiccup) — try again shortly.",
   "schedule.simulateNextMyLabel": "Simulate next games:",
   "schedule.simulateNextMyButton": "Simulate",
   "schedule.simulateNextMyRunningPrefix": "Simulating — games simulated:",
@@ -62,4 +69,5 @@ export const en: Record<ScheduleKey, string> = {
   "schedule.simulateNextMyDone": "The requested games have been simulated.",
   "schedule.simulateNextMyError": "Simulation failed — try again.",
   "schedule.simulateNextMyWaiting": "The next game involves another manager — it can't be auto-simulated.",
+  "schedule.simulateNextMyTimedOut": "This is taking unusually long (likely a database connection hiccup) — try again shortly.",
 };

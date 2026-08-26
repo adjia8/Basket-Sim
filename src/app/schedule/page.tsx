@@ -79,6 +79,7 @@ export default async function SchedulePage({
                 done: t("schedule.simulateNextMyDone"),
                 error: t("schedule.simulateNextMyError"),
                 waiting: t("schedule.simulateNextMyWaiting"),
+                timedOut: t("schedule.simulateNextMyTimedOut"),
               }}
             />
           )}
@@ -91,6 +92,7 @@ export default async function SchedulePage({
                 remainingSuffix: t("schedule.simulateAllAiRemainingSuffix"),
                 done: t("schedule.simulateAllAiDone"),
                 error: t("schedule.simulateAllAiError"),
+                timedOut: t("schedule.simulateAllAiTimedOut"),
               }}
             />
           )}

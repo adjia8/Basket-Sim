@@ -28,6 +28,7 @@ export interface DashboardLabels {
   advanceCalendarRunningPrefix: string;
   advanceCalendarUpToDate: string;
   advanceCalendarError: string;
+  advanceCalendarTimedOut: string;
   recentForm: string;
   noGamePlayedYet: string;
   topPlayers: string;
@@ -204,6 +205,7 @@ export function DashboardClient({
                   runningPrefix: labels.advanceCalendarRunningPrefix,
                   upToDate: labels.advanceCalendarUpToDate,
                   error: labels.advanceCalendarError,
+                  timedOut: labels.advanceCalendarTimedOut,
                 }}
               />
             )}

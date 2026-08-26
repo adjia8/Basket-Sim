@@ -76,6 +76,7 @@ export default async function DashboardPage() {
         advanceCalendarRunningPrefix: t("dashboard.advanceCalendarRunningPrefix"),
         advanceCalendarUpToDate: t("dashboard.advanceCalendarUpToDate"),
         advanceCalendarError: t("dashboard.advanceCalendarError"),
+        advanceCalendarTimedOut: t("dashboard.advanceCalendarTimedOut"),
         recentForm: t("dashboard.recentForm"),
         noGamePlayedYet: t("dashboard.noGamePlayedYet"),
         topPlayers: t("dashboard.topPlayers"),

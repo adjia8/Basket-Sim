@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { simulateNextMyGames } from "@/app/actions/simulate-bulk";
+import { withClientTimeout, ClientTimeoutError } from "@/lib/client-timeout";
 
 // Pendant de SimulateAllAiButton pour les matchs DE l'équipe du joueur —
 // même principe (petit lot par appel serveur, boucle côté client), mais
@@ -16,6 +17,7 @@ export interface SimulateNextMyGamesButtonLabels {
   done: string;
   error: string;
   waiting: string; // le prochain match implique un autre manager
+  timedOut: string; // appel anormalement long (voir client-timeout.ts)
 }
 
 export function SimulateNextMyGamesButton({
@@ -42,7 +44,13 @@ export function SimulateNextMyGamesButton({
     setFinished(false);
     let done = 0;
     while (done < count) {
-      const res = await simulateNextMyGames();
+      let res;
+      try {
+        res = await withClientTimeout(simulateNextMyGames());
+      } catch (err) {
+        setError(err instanceof ClientTimeoutError ? labels.timedOut : labels.error);
+        break;
+      }
       if (res.error) {
         setError(labels.error);
         break;
