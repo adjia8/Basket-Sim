@@ -16,20 +16,30 @@ import {
   conditioningLossOnInjury,
 } from "@/lib/careers/conditioning-rules";
 
+export interface NewInjury {
+  playerId: string;
+  severity: string;
+  durationGames: number;
+}
+
 // Appelé une fois par équipe juste après la résolution d'un match (pas les
 // deux rosters concaténés : `facilitiesLevel` diffère d'une équipe à
 // l'autre) : pour chaque joueur du roster, décompte l'indisponibilité en
 // cours (guérison, repos ou jeu forcé sur blessure mineure) ou tire une
 // nouvelle blessure — et ajuste le conditionnement physique dans tous les
 // cas. `boxScore` sert à savoir qui a réellement joué ce match (nécessaire
-// pour distinguer repos complet et jeu forcé malgré la blessure).
+// pour distinguer repos complet et jeu forcé malgré la blessure). Retourne
+// les blessures VRAIMENT nouvelles ce match (pas les aggravations/rechutes
+// d'une blessure déjà en cours) — l'appelant (simulate.ts) s'en sert pour
+// notifier la boîte de réception, gaté aux équipes gérées par un humain.
 export async function advanceRosterInjuries(
   careerId: string,
   roster: Player[],
   boxScore: BoxScoreEntry[],
   facilitiesLevel = 50
-): Promise<void> {
+): Promise<NewInjury[]> {
   const playedIds = new Set(boxScore.map((e) => e.playerId));
+  const newInjuries: NewInjury[] = [];
 
   for (const player of roster) {
     if (player.injured) {
@@ -125,6 +135,7 @@ export async function advanceRosterInjuries(
           conditioning: clampConditioning(player.conditioning - conditioningLossOnInjury(severity)),
         },
       });
+      newInjuries.push({ playerId: player.id, severity, durationGames: duration });
     } else if (player.conditioning < 100) {
       await prisma.playerState.updateMany({
         where: { careerId, playerId: player.id },
@@ -134,4 +145,6 @@ export async function advanceRosterInjuries(
       });
     }
   }
+
+  return newInjuries;
 }

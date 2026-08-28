@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getStandings } from "@/lib/data-access/standings";
 import { getTeamById } from "@/lib/data-access/teams";
+import { createInboxMessage } from "@/lib/data-access/inbox";
+import { tradeRequestMessageText } from "@/lib/careers/inbox-rules";
+import type { Locale } from "@/lib/i18n/locale";
 import type { StandingsRow } from "@/lib/types";
 import type { TeamState } from "@prisma/client";
 import {
@@ -29,7 +32,8 @@ export async function maybeFlagTradeRequest(
   teamId: string,
   leagueId: string,
   season: string,
-  gameDate: Date
+  gameDate: Date,
+  locale: Locale
 ): Promise<void> {
   const teamState = await getOrCreateTeamState(careerId, teamId, leagueId);
 
@@ -53,6 +57,7 @@ export async function maybeFlagTradeRequest(
   });
   const states = await prisma.playerState.findMany({
     where: { careerId, playerId: { in: contracts.map((c) => c.playerId) }, retired: false },
+    include: { player: { select: { firstName: true, lastName: true } } },
   });
 
   for (const state of states) {
@@ -85,6 +90,10 @@ export async function maybeFlagTradeRequest(
         data: { lastTradeRequestDate: gameDate },
       }),
     ]);
+
+    const playerName = `${state.player.firstName} ${state.player.lastName}`;
+    const { title, body } = tradeRequestMessageText(locale, playerName);
+    await createInboxMessage(careerId, teamId, season, "trade_request", title, body, `/teams/${teamId}`);
     break; // une seule nouvelle demande par appel — garantit l'anti-cluster même si plusieurs joueuses sont éligibles le même match
   }
 }

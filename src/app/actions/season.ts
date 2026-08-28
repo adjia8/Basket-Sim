@@ -24,6 +24,10 @@ import { winPctForStandings } from "@/lib/careers/player-demands";
 import { getPlayoffResultTier } from "@/lib/data-access/playoffs";
 import { evaluateGmSeason, expectationForRoster, type ExpectationTier } from "@/lib/careers/gm-rules";
 import { evaluatePendingPromises } from "@/lib/data-access/trade-requests";
+import { createInboxMessage } from "@/lib/data-access/inbox";
+import { poachOfferMessageText } from "@/lib/careers/inbox-rules";
+import { getTranslator } from "@/lib/i18n/translate";
+import { teamFullName } from "@/lib/utils";
 
 const POACH_OFFER_CHANCE = 0.25;
 
@@ -43,6 +47,7 @@ async function averageOverallForTeam(careerId: string, teamId: string): Promise<
 
 export async function advanceSeason(): Promise<void> {
   const { userId } = await verifySession();
+  const { locale } = await getTranslator();
   const membership = await prisma.membership.findUnique({
     where: { userId },
     include: { career: { include: { league: { include: { conferences: true } } } } },
@@ -218,7 +223,10 @@ export async function advanceSeason(): Promise<void> {
         (t) => !takenTeamIds.has(t.id) && t.marketAppeal > (currentTeam?.marketAppeal ?? 0)
       );
       if (candidates.length > 0) {
-        pendingOfferTeamId = candidates[Math.floor(Math.random() * candidates.length)].id;
+        const chosenTeam = candidates[Math.floor(Math.random() * candidates.length)];
+        pendingOfferTeamId = chosenTeam.id;
+        const { title, body } = poachOfferMessageText(locale, teamFullName(chosenTeam));
+        await createInboxMessage(career.id, member.teamId, newSeason, "poach_offer", title, body, "/gm");
       }
     }
 

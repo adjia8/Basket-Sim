@@ -7,7 +7,7 @@ import { getStandings } from "@/lib/data-access/standings";
 import { getTeamById } from "@/lib/data-access/teams";
 import { simulationEngine } from "@/lib/simulation/mockEngine";
 import { recordPlayoffGameResult } from "@/lib/data-access/playoffs";
-import { advanceRosterInjuries } from "@/lib/data-access/injuries";
+import { advanceRosterInjuries, type NewInjury } from "@/lib/data-access/injuries";
 import { advancePlayerRenown } from "@/lib/data-access/renown";
 import { advanceRosterFatigue, getRestDays } from "@/lib/data-access/fatigue";
 import { advanceAttendance, advanceTeamChemistry, getOrCreateTeamState } from "@/lib/data-access/team-state";
@@ -16,9 +16,19 @@ import { getGmBonusForTeam } from "@/lib/data-access/gm";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { maybeCreatePressConference } from "@/lib/data-access/press";
 import { maybeFlagTradeRequest } from "@/lib/data-access/trade-requests";
-import { winPctForStandings } from "@/lib/careers/player-demands";
+import { getFreeAgents } from "@/lib/data-access/contracts";
+import { createInboxMessage } from "@/lib/data-access/inbox";
+import { winPctForStandings, minAcceptableSalary } from "@/lib/careers/player-demands";
 import { parseRotationOrder } from "@/lib/careers/rotation-rules";
 import { DEVELOPMENT_CONTRACT_GAME_LIMIT } from "@/lib/careers/contract-type-rules";
+import {
+  conferenceRankChanged,
+  injuryMessageText,
+  standingsMessageText,
+  freeAgentMessageText,
+  FREE_AGENT_NEWS_COOLDOWN_DAYS,
+  NOTABLE_FREE_AGENT_RENOWN_THRESHOLD,
+} from "@/lib/careers/inbox-rules";
 import {
   chemistryTrainingBonus,
   trainingFatigueDelta,
@@ -45,6 +55,74 @@ function topScorer(
   const player = roster.find((p) => p.id === best.playerId);
   if (!player) return undefined;
   return { name: `${player.firstName} ${player.lastName}`, points: best.points };
+}
+
+// Génère les messages de boîte de réception "actus de la ligue" pour UNE
+// équipe humaine après résolution d'un match : blessures qui viennent de
+// survenir CE match (voir advanceRosterInjuries), mouvement de classement
+// depuis la dernière vérification (jamais suivi avant l'ajout de ce champ,
+// donc pas de message tant qu'aucun rang précédent n'est connu), et — sous
+// cooldown — signalement d'un agent libre notable disponible sur le marché.
+// Volontairement séquentiel (pas Promise.all) : peu d'appels, pas de contrainte
+// de latence particulière ici contrairement à la boucle de simulation elle-même.
+async function notifyHumanTeamNews(
+  careerId: string,
+  teamId: string,
+  season: string,
+  leagueId: string,
+  locale: Locale,
+  roster: Player[],
+  newInjuries: NewInjury[],
+  currentRank: number,
+  teamState: { id: string; lastKnownConferenceRank: number | null; lastFreeAgentNewsDate: Date | null },
+  gameDate: Date
+): Promise<void> {
+  for (const injury of newInjuries) {
+    const player = roster.find((p) => p.id === injury.playerId);
+    if (!player) continue;
+    const { title, body } = injuryMessageText(
+      locale,
+      `${player.firstName} ${player.lastName}`,
+      injury.severity,
+      injury.durationGames
+    );
+    await createInboxMessage(careerId, teamId, season, "injury", title, body, `/teams/${teamId}/players/${player.id}`);
+  }
+
+  if (conferenceRankChanged(teamState.lastKnownConferenceRank, currentRank)) {
+    const team = await getTeamById(teamId);
+    if (team) {
+      const { title, body } = standingsMessageText(
+        locale,
+        teamFullName(team),
+        teamState.lastKnownConferenceRank!,
+        currentRank
+      );
+      await createInboxMessage(careerId, teamId, season, "standings", title, body, "/standings");
+    }
+  }
+  if (teamState.lastKnownConferenceRank !== currentRank) {
+    await prisma.teamState.update({ where: { id: teamState.id }, data: { lastKnownConferenceRank: currentRank } });
+  }
+
+  const freeAgentCooldownOk =
+    !teamState.lastFreeAgentNewsDate ||
+    (gameDate.getTime() - teamState.lastFreeAgentNewsDate.getTime()) / 86_400_000 >= FREE_AGENT_NEWS_COOLDOWN_DAYS;
+  if (freeAgentCooldownOk) {
+    const freeAgents = await getFreeAgents(careerId, leagueId);
+    const notable = [...freeAgents].sort((a, b) => b.renown - a.renown)[0];
+    if (notable && notable.renown >= NOTABLE_FREE_AGENT_RENOWN_THRESHOLD) {
+      const expectedSalary = minAcceptableSalary(notable.renown, notable.overallRating, leagueId);
+      const { title, body } = freeAgentMessageText(
+        locale,
+        `${notable.firstName} ${notable.lastName}`,
+        notable.position,
+        expectedSalary
+      );
+      await createInboxMessage(careerId, teamId, season, "free_agent", title, body, "/free-agents");
+      await prisma.teamState.update({ where: { id: teamState.id }, data: { lastFreeAgentNewsDate: gameDate } });
+    }
+  }
 }
 
 // Cœur de la simulation d'un match, partagé entre l'endpoint /api/simulate-
@@ -147,7 +225,7 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   // diffèrent d'une équipe à l'autre) : décompte les indisponibilités en
   // cours, ajuste le conditionnement physique, et tire de nouvelles
   // blessures parmi les joueurs valides.
-  await Promise.all([
+  const [homeNewInjuries, awayNewInjuries] = await Promise.all([
     advanceRosterInjuries(careerId, homeRoster, result.boxScore, homeTeamState.facilitiesLevel),
     advanceRosterInjuries(careerId, awayRoster, result.boxScore, awayTeamState.facilitiesLevel),
   ]);
@@ -259,10 +337,10 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   };
   await Promise.all([
     homeManager
-      ? maybeCreatePressConference(careerId, game.homeTeamId, game.leagueId, gameDate, locale, homeGameContext)
+      ? maybeCreatePressConference(careerId, game.homeTeamId, game.leagueId, game.season, gameDate, locale, homeGameContext)
       : Promise.resolve(),
     awayManager
-      ? maybeCreatePressConference(careerId, game.awayTeamId, game.leagueId, gameDate, locale, awayGameContext)
+      ? maybeCreatePressConference(careerId, game.awayTeamId, game.leagueId, game.season, gameDate, locale, awayGameContext)
       : Promise.resolve(),
   ]);
 
@@ -270,12 +348,45 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   // maybeFlagTradeRequest) — même restriction aux équipes humaines.
   await Promise.all([
     homeManager
-      ? maybeFlagTradeRequest(careerId, game.homeTeamId, game.leagueId, game.season, gameDate)
+      ? maybeFlagTradeRequest(careerId, game.homeTeamId, game.leagueId, game.season, gameDate, locale)
       : Promise.resolve(),
     awayManager
-      ? maybeFlagTradeRequest(careerId, game.awayTeamId, game.leagueId, game.season, gameDate)
+      ? maybeFlagTradeRequest(careerId, game.awayTeamId, game.leagueId, game.season, gameDate, locale)
       : Promise.resolve(),
   ]);
+
+  // Boîte de réception : blessures nouvelles, mouvement de classement, agent
+  // libre notable — même restriction aux équipes humaines que ci-dessus.
+  const homeRank = homeRankIndex >= 0 ? homeRankIndex + 1 : standings.length;
+  const awayRank = awayRankIndex >= 0 ? awayRankIndex + 1 : standings.length;
+  if (homeManager) {
+    await notifyHumanTeamNews(
+      careerId,
+      game.homeTeamId,
+      game.season,
+      game.leagueId,
+      locale,
+      homeRoster,
+      homeNewInjuries,
+      homeRank,
+      homeTeamState,
+      gameDate
+    );
+  }
+  if (awayManager) {
+    await notifyHumanTeamNews(
+      careerId,
+      game.awayTeamId,
+      game.season,
+      game.leagueId,
+      locale,
+      awayRoster,
+      awayNewInjuries,
+      awayRank,
+      awayTeamState,
+      gameDate
+    );
+  }
 
   return updated;
 }

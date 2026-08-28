@@ -3,6 +3,7 @@ import { logout } from "@/app/actions/auth";
 import { getOptionalCurrentMembership } from "@/lib/auth/dal";
 import { getTeamById } from "@/lib/data-access/teams";
 import { getPendingPressConference } from "@/lib/data-access/press";
+import { getUnreadInboxCount } from "@/lib/data-access/inbox";
 import { prisma } from "@/lib/prisma";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageToggle } from "./LanguageToggle";
@@ -19,7 +20,7 @@ export async function NavBar() {
   // "Club", Échanges sous "Transactions") sont maintenant cachés derrière
   // un clic sur le menu déroulant : un point rouge restaure la visibilité
   // "en un coup d'œil" qu'avait la nav à plat.
-  const [pendingPress, pendingTradeCount, gmProfile] = membership
+  const [pendingPress, pendingTradeCount, gmProfile, unreadInboxCount] = membership
     ? await Promise.all([
         getPendingPressConference(membership.careerId, membership.teamId),
         prisma.tradeOffer.count({
@@ -29,17 +30,21 @@ export async function NavBar() {
           where: { membershipId: membership.id },
           select: { pendingOfferTeamId: true },
         }),
+        getUnreadInboxCount(membership.careerId, membership.teamId),
       ])
-    : [null, 0, null];
+    : [null, 0, null, 0];
   const hasPendingPress = pendingPress !== null;
   const hasPendingTrade = pendingTradeCount > 0;
   const hasPendingPoach = Boolean(gmProfile?.pendingOfferTeamId);
 
   // Liens autonomes : les pages les plus consultées, en accès direct.
   // Le reste est regroupé par thème (ligue / transactions / club) pour ne
-  // pas aligner 12 onglets à plat dans la barre.
+  // pas aligner 12 onglets à plat dans la barre. La boîte de réception est
+  // transversale (presse/agents/blessures/classement...) plutôt que liée à
+  // un seul thème, donc rangée ici plutôt que sous un des groupes.
   const NAV_LINKS = [
     { href: "/", label: t("common.nav.dashboard") },
+    ...(membership ? [{ href: "/inbox", label: t("common.nav.inbox"), badge: unreadInboxCount }] : []),
     ...(membership ? [{ href: `/teams/${membership.teamId}`, label: t("common.nav.myTeam") }] : []),
     { href: "/teams", label: t("common.nav.teams") },
     { href: "/schedule", label: t("common.nav.schedule") },
@@ -88,9 +93,14 @@ export async function NavBar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-black/70 transition hover:text-black dark:text-white/70 dark:hover:text-white"
+                className="flex items-center gap-1.5 text-black/70 transition hover:text-black dark:text-white/70 dark:hover:text-white"
               >
                 {link.label}
+                {"badge" in link && (link.badge ?? 0) > 0 && (
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
+                    {(link.badge ?? 0) > 9 ? "9+" : link.badge}
+                  </span>
+                )}
               </Link>
             ))}
             {NAV_GROUPS.map((group) => (

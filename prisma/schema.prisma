@@ -38,6 +38,29 @@ model Career {
   teamStates       TeamState[]
   playerTeamStints PlayerTeamStint[]
   pressConferences PressConference[]
+  inboxMessages    InboxMessage[]
+}
+
+// Boîte de réception du GM — journal d'événements jamais modifié après
+// création (même esprit que GmSeasonRecord), pas juste un état "pending"
+// comme PressConference/TradeOffer : un message reste visible (dans la
+// section "lus") une fois traité, contrairement à ces mécaniques qui
+// disparaissent après réponse. teamId en simple string (pas de relation
+// formelle), même convention que PressConference/DeadCap.
+model InboxMessage {
+  id        String   @id @default(cuid())
+  careerId  String
+  career    Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  teamId    String
+  season    String
+  type      String // "press" | "trade_request" | "injury" | "standings" | "free_agent" | "poach_offer"
+  title     String
+  body      String
+  linkHref  String? // ex: "/press", "/teams/{id}/players/{id}" — null si purement informatif
+  status    String   @default("unread") // "unread" | "read"
+  createdAt DateTime @default(now())
+
+  @@index([careerId, teamId, status])
 }
 
 // Une conférence = 3-4 questions générées ensemble, répondues en un seul
@@ -499,6 +522,8 @@ model TeamState {
   publicOpinion           Int       @default(50) // 0-99, opinion fans/autres franchises, pilotée par les réponses en conférence de presse
   lastPressConferenceDate DateTime?
   lastTradeRequestDate    DateTime? // anti-cluster : dernière fois qu'UNE joueuse de cette équipe a levé une demande de trade
+  lastKnownConferenceRank Int? // dernier rang conférence connu — détecte les mouvements de classement pour la boîte de réception (voir inbox.ts)
+  lastFreeAgentNewsDate   DateTime? // anti-spam pour les messages "agent libre notable disponible" en boîte de réception
   rotationOrderJson       String? // JSON: string[] d'ids joueuses, ordre GM voulu (5 majeures + 6ème femme + banc) — null = tri automatique (voir rotationOf dans mockEngine.ts)
   attendance               Int       @default(50) // 0-99, dérive vers une cible pilotée par le bilan de l'équipe — voir attendance-rules.ts
 

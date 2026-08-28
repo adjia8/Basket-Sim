@@ -2,7 +2,9 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getStandings } from "@/lib/data-access/standings";
+import { createInboxMessage } from "@/lib/data-access/inbox";
 import { winPctForStandings } from "@/lib/careers/player-demands";
+import { pressMessageText } from "@/lib/careers/inbox-rules";
 import type { Locale } from "@/lib/i18n/locale";
 import {
   generateQuestions,
@@ -65,6 +67,7 @@ export async function maybeCreatePressConference(
   careerId: string,
   teamId: string,
   leagueId: string,
+  season: string,
   gameDate: Date,
   locale: Locale,
   gameContext: PressGameContext
@@ -106,6 +109,9 @@ export async function maybeCreatePressConference(
       data: { lastPressConferenceDate: gameDate },
     }),
   ]);
+
+  const { title, body } = pressMessageText(locale);
+  await createInboxMessage(careerId, teamId, season, "press", title, body, "/press");
 }
 
 export async function getPendingPressConference(
