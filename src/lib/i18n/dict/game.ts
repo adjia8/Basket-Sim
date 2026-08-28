@@ -12,6 +12,7 @@ export const keys = [
   "game.unknownError",
   "game.otherManagerFallback",
   "game.timedOut",
+  "game.simulatingHint",
   "game.noGamesPlayedYet",
   "boxScore.away",
   "boxScore.home",
@@ -58,6 +59,7 @@ export const fr: Record<GameKey, string> = {
   "game.otherManagerFallback": "l'autre manager",
   "game.timedOut":
     "Ça prend anormalement longtemps (probablement un souci de connexion à la base de données) — réessaie dans un instant.",
+  "game.simulatingHint": "Ça peut prendre jusqu'à une minute — la page se mettra à jour toute seule.",
   "game.noGamesPlayedYet": "Aucun match joué cette saison — stats indisponibles.",
   "boxScore.away": "Extérieur",
   "boxScore.home": "Domicile",
@@ -101,6 +103,7 @@ export const en: Record<GameKey, string> = {
   "game.unknownError": "Unknown error",
   "game.otherManagerFallback": "the other manager",
   "game.timedOut": "This is taking unusually long (likely a database connection hiccup) — try again shortly.",
+  "game.simulatingHint": "This can take up to a minute — the page will update on its own.",
   "game.noGamesPlayedYet": "No games played this season yet — stats unavailable.",
   "boxScore.away": "Away",
   "boxScore.home": "Home",
