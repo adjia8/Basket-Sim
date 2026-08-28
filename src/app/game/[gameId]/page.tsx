@@ -1,9 +1,10 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { BoxScoreTable } from "@/components/game/BoxScoreTable";
 import { GameRosterPreview } from "@/components/game/GameRosterPreview";
 import { SimulateButton } from "@/components/game/SimulateButton";
-import { getCurrentMembership } from "@/lib/auth/dal";
+import { verifySession, flattenMembership } from "@/lib/auth/dal";
+import { prisma } from "@/lib/prisma";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getPlayerById, getRosterForTeam } from "@/lib/data-access/players";
 import { getGameById } from "@/lib/data-access/schedule";
@@ -14,12 +15,26 @@ import { getTranslator, type Translator } from "@/lib/i18n/translate";
 import { formatGameDate, ordinalSuffix, teamFullName } from "@/lib/utils";
 import type { Team } from "@/lib/types";
 
+// Ne passe volontairement pas par getCurrentMembership() : celle-ci redirige
+// vers /press dès qu'une conférence de presse est en attente, y compris
+// celle que le match qu'on vient de simuler peut lui-même déclencher — ce
+// qui empêcherait de voir le résultat de SON PROPRE match. Cette page reste
+// donc volontairement consultable même avec une conférence en attente
+// (répondre peut attendre ; voir son propre score, non). Le contrôle
+// pendingReassignment reste appliqué, lui, comme sur les autres pages.
 export default async function GamePage({
   params,
 }: {
   params: Promise<{ gameId: string }>;
 }) {
-  const membership = await getCurrentMembership();
+  const { userId } = await verifySession();
+  const membershipRow = await prisma.membership.findUnique({
+    where: { userId },
+    include: { career: true, gmProfile: { select: { pendingReassignment: true } } },
+  });
+  if (!membershipRow) redirect("/onboarding");
+  if (membershipRow.gmProfile?.pendingReassignment) redirect("/onboarding/reassign");
+  const membership = flattenMembership(membershipRow);
   const { t, locale } = await getTranslator();
   const { gameId } = await params;
   const game = await getGameById(membership.careerId, gameId);

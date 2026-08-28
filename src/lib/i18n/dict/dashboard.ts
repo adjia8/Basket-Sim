@@ -1,6 +1,4 @@
 export const keys = [
-  "dashboard.pressConferencePending",
-  "dashboard.answerMedia",
   "dashboard.regularSeasonOverPlayoffs",
   "dashboard.viewPlayoffs",
   "dashboard.seasonOverChampionPrefix",
@@ -32,8 +30,6 @@ export const keys = [
 export type DashboardKey = (typeof keys)[number];
 
 export const fr: Record<DashboardKey, string> = {
-  "dashboard.pressConferencePending": "Conférence de presse en attente.",
-  "dashboard.answerMedia": "Répondre aux médias",
   "dashboard.regularSeasonOverPlayoffs": "Saison régulière terminée — playoffs en cours.",
   "dashboard.viewPlayoffs": "Voir les playoffs",
   "dashboard.seasonOverChampionPrefix": "Saison terminée ! Champion :",
@@ -65,8 +61,6 @@ export const fr: Record<DashboardKey, string> = {
 };
 
 export const en: Record<DashboardKey, string> = {
-  "dashboard.pressConferencePending": "Press conference pending.",
-  "dashboard.answerMedia": "Answer the media",
   "dashboard.regularSeasonOverPlayoffs": "Regular season over — playoffs in progress.",
   "dashboard.viewPlayoffs": "View playoffs",
   "dashboard.seasonOverChampionPrefix": "Season over! Champion:",

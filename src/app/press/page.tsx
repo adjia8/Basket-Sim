@@ -1,4 +1,5 @@
-import { getCurrentMembership } from "@/lib/auth/dal";
+import { redirect } from "next/navigation";
+import { verifySession, flattenMembership } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getPendingPressConference, getPressHistory } from "@/lib/data-access/press";
@@ -14,8 +15,20 @@ const CATEGORY_KEYS: Record<string, DictionaryKey> = {
   future: "pressPage.categoryFuture",
 };
 
+// Ne passe volontairement pas par getCurrentMembership() : celle-ci redirige
+// déjà ici dès qu'une conférence de presse est en attente (obligatoire avant
+// d'accéder au reste de l'app), ce qui créerait une boucle de redirection si
+// cette page l'appelait aussi — même principe que /onboarding/reassign pour
+// pendingReassignment.
 export default async function PressPage() {
-  const membership = await getCurrentMembership();
+  const { userId } = await verifySession();
+  const membershipRow = await prisma.membership.findUnique({
+    where: { userId },
+    include: { career: true, gmProfile: { select: { pendingReassignment: true } } },
+  });
+  if (!membershipRow) redirect("/onboarding");
+  if (membershipRow.gmProfile?.pendingReassignment) redirect("/onboarding/reassign");
+  const membership = flattenMembership(membershipRow);
   const { t } = await getTranslator();
 
   const [teamState, gmProfile, pending, history] = await Promise.all([

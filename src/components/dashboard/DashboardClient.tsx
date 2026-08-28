@@ -11,8 +11,6 @@ import type { Game, Player, StandingsRow, Team } from "@/lib/types";
 // Server Component appelant (voir app/page.tsx) — jamais de fonction `t`
 // passée à travers la frontière serveur/client.
 export interface DashboardLabels {
-  pressConferencePending: string;
-  answerMedia: string;
   regularSeasonOverPlayoffs: string;
   viewPlayoffs: string;
   seasonOverChampionPrefix: string;
@@ -58,7 +56,6 @@ export function DashboardClient({
   playoffsInProgress,
   championTeamName,
   inviteCode,
-  hasPendingPressConference,
   locale,
   labels,
 }: {
@@ -74,7 +71,6 @@ export function DashboardClient({
   playoffsInProgress: boolean;
   championTeamName?: string;
   inviteCode: string;
-  hasPendingPressConference: boolean;
   locale: Locale;
   labels: DashboardLabels;
 }) {
@@ -115,18 +111,6 @@ export function DashboardClient({
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 px-4 py-8">
-      {hasPendingPressConference && (
-        <div className="flex items-center justify-between rounded-lg border border-black/10 bg-black/5 px-4 py-3 dark:border-white/10 dark:bg-white/10">
-          <p className="text-sm font-medium">{labels.pressConferencePending}</p>
-          <Link
-            href="/press"
-            className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
-          >
-            {labels.answerMedia}
-          </Link>
-        </div>
-      )}
-
       {seasonComplete && playoffsInProgress && (
         <div className="flex items-center justify-between rounded-lg border border-black/10 bg-black/5 px-4 py-3 dark:border-white/10 dark:bg-white/10">
           <p className="text-sm font-medium">{labels.regularSeasonOverPlayoffs}</p>

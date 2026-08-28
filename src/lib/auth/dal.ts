@@ -3,6 +3,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { decrypt, getSessionCookie } from "./session";
 import { prisma } from "@/lib/prisma";
+import { getPendingPressConference } from "@/lib/data-access/press";
 
 export const getSession = cache(async () => {
   return decrypt(await getSessionCookie());
@@ -26,7 +27,7 @@ export interface CurrentMembership {
   inviteCode: string;
 }
 
-function flattenMembership(membership: {
+export function flattenMembership(membership: {
   id: string;
   userId: string;
   teamId: string;
@@ -59,6 +60,14 @@ export const getCurrentMembership = cache(async (): Promise<CurrentMembership> =
   // boucle de redirection).
   if (membership.gmProfile?.pendingReassignment) {
     redirect("/onboarding/reassign");
+  }
+  // Conférence de presse en attente : obligatoire avant de pouvoir accéder
+  // au reste de l'app, comme pendingReassignment ci-dessus (voir
+  // src/app/press/page.tsx, qui ne passe volontairement pas par
+  // getCurrentMembership pour éviter une boucle de redirection).
+  const pendingPress = await getPendingPressConference(membership.careerId, membership.teamId);
+  if (pendingPress) {
+    redirect("/press");
   }
   return flattenMembership(membership);
 });
