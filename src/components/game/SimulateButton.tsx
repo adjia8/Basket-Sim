@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { withClientTimeout, ClientTimeoutError } from "@/lib/client-timeout";
 
@@ -26,11 +26,21 @@ export function SimulateButton({
   initialWaitingFor?: string | null;
   labels: SimulateButtonLabels;
 }) {
-  const [isPending, setIsPending] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+  const [isRefreshing, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [waitingFor, setWaitingFor] = useState<string | null>(initialWaitingFor ?? null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const router = useRouter();
+  // router.refresh() ne bloque pas : il lance juste la mise à jour en
+  // arrière-plan (nouvelle requête RSC + re-rendu), qui peut elle-même
+  // prendre plusieurs secondes sous forte charge — confirmé en pratique
+  // jusqu'à 30s dans cet environnement de dev. En ne suivant que la requête
+  // fetch(), le bouton redevenait cliquable AVANT que le résultat affiché
+  // n'ait réellement changé, laissant l'impression que rien ne s'était
+  // passé. startTransition (via useTransition) garde isRefreshing vrai
+  // jusqu'à ce que React ait fini d'appliquer les nouvelles données.
+  const isPending = isFetching || isRefreshing;
 
   // Un match coûte ~20-50s à simuler (voir simulate-bulk.ts) — sans retour
   // visuel pendant l'attente, ce délai normal se voit signalé comme "rien
@@ -44,7 +54,7 @@ export function SimulateButton({
   }, [isPending]);
 
   async function handleClick() {
-    setIsPending(true);
+    setIsFetching(true);
     setError(null);
     setElapsedSeconds(0);
     try {
@@ -64,13 +74,13 @@ export function SimulateButton({
         // afficher : on rafraîchit plutôt que de bloquer sur une erreur qui
         // ne reflète qu'un état client périmé.
         if (res.status === 409) {
-          router.refresh();
+          startTransition(() => router.refresh());
           return;
         }
         throw new Error(data?.error ?? labels.simulationFailed);
       }
       if (data?.simulated) {
-        router.refresh();
+        startTransition(() => router.refresh());
       } else {
         setWaitingFor(data?.waitingFor ?? labels.otherManagerFallback);
       }
@@ -81,7 +91,7 @@ export function SimulateButton({
         setError(err instanceof Error ? err.message : labels.unknownError);
       }
     } finally {
-      setIsPending(false);
+      setIsFetching(false);
     }
   }
 
