@@ -17,7 +17,8 @@ import {
 import { toDomainLeague, toDomainPlayer } from "@/lib/data-access/mappers";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { GM_POINT_POOL, expectationForRoster } from "@/lib/careers/gm-rules";
-import { INITIAL_FREE_AGENT_IDS, INITIAL_DEVELOPMENT_CONTRACT_IDS } from "@/lib/mock-data/players-wnba";
+import { INITIAL_DEVELOPMENT_CONTRACT_IDS } from "@/lib/mock-data/players-wnba";
+import { initialFreeAgentIds } from "@/lib/mock-data/initial-free-agents";
 import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import { ALT_CONTRACT_SLOTS_PER_TEAM } from "@/lib/careers/contract-type-rules";
 
@@ -119,10 +120,10 @@ export async function createCareer(
   // d'équipe) : sans exception, le vivier d'agents libres serait vide dès la
   // création d'une carrière, jusqu'à ce qu'un contrat expire ou qu'une
   // équipe coupe une joueuse (donc au plus tôt à l'intersaison suivante).
-  // INITIAL_FREE_AGENT_IDS liste les joueuses qui ne reçoivent pas de
-  // contrat au départ (voir sa doc dans players-wnba.ts) — exclues aussi du
+  // initialFreeAgentIds liste les joueurs/joueuses qui ne reçoivent pas de
+  // contrat au départ (voir initial-free-agents.ts) — exclus aussi du
   // calcul de force d'effectif ci-dessous, cohérence oblige.
-  const initiallyFreeAgentIds = new Set(leagueId === "wnba" ? INITIAL_FREE_AGENT_IDS : []);
+  const initiallyFreeAgentIds = initialFreeAgentIds(leagueId);
   const developmentPlayerIds = new Set(leagueId === "wnba" ? INITIAL_DEVELOPMENT_CONTRACT_IDS : []);
 
   // Certaines franchises du catalogue (roster réel complet, camp

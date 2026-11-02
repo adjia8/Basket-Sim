@@ -1,10 +1,11 @@
 // Barème salarial pur — extrait de generate-contracts.ts pour être réutilisable
 // depuis player-demands.ts sans dépendance circulaire.
 
-// Bornes réelles saison 2025-26 (NBA) / 2026 (WNBA, nouvelle convention collective
-// qui a fait passer le salaire minimum de ~66k$ à 270-300k$ et le supermax à 1,4M$).
+// Bornes réelles saison 2026-27 (NBA : minimum rookie / maximum 10+ ans) / 2026
+// (WNBA, nouvelle convention collective qui a fait passer le salaire minimum de
+// ~66k$ à 270-300k$ et le supermax à 1,4M$).
 export const SALARY_RANGES: Record<string, { min: number; max: number }> = {
-  nba: { min: 1_200_000, max: 51_000_000 },
+  nba: { min: 1_358_000, max: 57_736_000 },
   wnba: { min: 270_000, max: 1_400_000 },
 };
 

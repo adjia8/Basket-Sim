@@ -8,7 +8,9 @@ async function main() {
   for (const league of leagues) {
     await prisma.league.upsert({
       where: { id: league.id },
-      update: {},
+      // Saison de départ et plafond salarial suivent le catalogue (passage à
+      // une nouvelle saison réelle) ; chaque Career garde sa propre saison.
+      update: { season: league.season, salaryCap: league.salaryCap },
       create: {
         id: league.id,
         code: league.code,

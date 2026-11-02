@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { Team } from "@/lib/types";
 import { toDomainTeam } from "./mappers";
+import { initialFreeAgentIds } from "@/lib/mock-data/initial-free-agents";
 import { initialFacilityLevel, initialFinances, initialTrainingStaffLevel } from "@/lib/careers/finance-rules";
 import { expectationForRoster, type ExpectationTier } from "@/lib/careers/gm-rules";
 
@@ -53,8 +54,12 @@ export async function getFranchiseSummariesForNewCareer(leagueId: string): Promi
     prisma.team.findMany({ where: { leagueId } }),
     prisma.player.findMany({ where: { leagueId } }),
   ]);
+  // Les agents libres de départ gardent leur dernière équipe connue dans
+  // teamId : sans ce filtre, ils compteraient dans l'effectif affiché.
+  const freeAgentIds = initialFreeAgentIds(leagueId);
   const playersByTeam = new Map<string, typeof playerRows>();
   for (const player of playerRows) {
+    if (freeAgentIds.has(player.id)) continue;
     const list = playersByTeam.get(player.teamId) ?? [];
     list.push(player);
     playersByTeam.set(player.teamId, list);

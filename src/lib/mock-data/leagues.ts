@@ -5,8 +5,8 @@ export const leagues: League[] = [
     id: "nba",
     code: "NBA",
     name: "National Basketball Association",
-    season: "2025-2026",
-    salaryCap: 154_647_000, // cap réel saison 2025-26
+    season: "2026-2027",
+    salaryCap: 164_961_000, // cap officiel saison 2026-27 (pr.nba.com, 30 juin 2026)
     conferenceIds: ["nba-east", "nba-west"],
   },
   {
