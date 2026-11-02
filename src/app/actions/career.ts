@@ -133,10 +133,10 @@ export async function createCareer(
   // Career déjà hors plafond, ce qui bloque en silence tout échange ou toute
   // signature d'agent libre dès le premier jour (aucune transaction
   // "neutre" en effectif ne peut jamais faire redescendre un total déjà
-  // trop haut sous la barre). Repli en cascade, comme en vraie WNBA (12
-  // standard + jusqu'à 2 développement par équipe) : les joueuses en
-  // surnombre les moins bien notées comblent d'abord les places de
-  // développement restantes ; seul un reliquat au-delà des 2 places
+  // trop haut sous la barre). Repli en cascade, comme en vrai (WNBA : 12
+  // standard + 2 développement ; NBA : 15 standard + 3 two-way) : les
+  // joueurs en surnombre les moins bien notés comblent d'abord les places
+  // alternatives restantes ; seul un reliquat au-delà de ces places
   // rejoint le vivier d'agents libres.
   const maxRosterSize = MAX_ROSTER_SIZE[leagueId] ?? MAX_ROSTER_SIZE.nba;
   const rosterByTeam = new Map<string, typeof domainPlayers>();
@@ -151,7 +151,7 @@ export async function createCareer(
     if (standardRoster.length <= maxRosterSize) continue;
 
     const devSlotsUsed = roster.length - standardRoster.length;
-    const devSlotsAvailable = Math.max(0, ALT_CONTRACT_SLOTS_PER_TEAM - devSlotsUsed);
+    const devSlotsAvailable = Math.max(0, (ALT_CONTRACT_SLOTS_PER_TEAM[leagueId] ?? 0) - devSlotsUsed);
     const overflow = [...standardRoster]
       .sort((a, b) => a.overallRating - b.overallRating) // pire d'abord
       .slice(0, standardRoster.length - maxRosterSize);

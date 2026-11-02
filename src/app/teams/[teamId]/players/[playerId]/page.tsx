@@ -126,7 +126,7 @@ export default async function PlayerDetailPage({
     contract.contractType === "standard" &&
     !!altType &&
     isEligibleForAlternateContract(player.age) &&
-    altSlotsUsed < ALT_CONTRACT_SLOTS_PER_TEAM;
+    altSlotsUsed < (ALT_CONTRACT_SLOTS_PER_TEAM[team.leagueId] ?? 0);
   const canPromote = isMyTeam && contract.contractType !== "standard";
   const activationLimitReached =
     contract.contractType === "development" &&

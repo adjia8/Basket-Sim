@@ -363,7 +363,7 @@ export async function offerAlternateContract(formData: FormData): Promise<void> 
   ]);
   if (!player) return;
   if (!isEligibleForAlternateContract(playerState?.age ?? player.age)) return;
-  if (altSlotsUsed >= ALT_CONTRACT_SLOTS_PER_TEAM) return;
+  if (altSlotsUsed >= (ALT_CONTRACT_SLOTS_PER_TEAM[membership.career.leagueId] ?? 0)) return;
 
   const altType = ALT_CONTRACT_TYPE[membership.career.leagueId];
   if (!altType) return;

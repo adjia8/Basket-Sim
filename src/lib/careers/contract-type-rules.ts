@@ -25,7 +25,12 @@ export const ALT_CONTRACT_SALARY: Record<string, number> = {
 // Pas de notion d'"années d'expérience" dans ce modèle : l'âge sert
 // d'approximation pour l'éligibilité (joueurs en développement/marginaux).
 export const ALT_CONTRACT_AGE_LIMIT = 23;
-export const ALT_CONTRACT_SLOTS_PER_TEAM = 2;
+// Vraies limites : 3 two-way par équipe NBA, 2 contrats de développement
+// par équipe WNBA.
+export const ALT_CONTRACT_SLOTS_PER_TEAM: Record<string, number> = {
+  nba: 3,
+  wnba: 2,
+};
 
 export function isEligibleForAlternateContract(age: number): boolean {
   return age <= ALT_CONTRACT_AGE_LIMIT;

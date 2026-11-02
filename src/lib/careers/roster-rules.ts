@@ -2,9 +2,9 @@
 // NBA / développement WNBA, voir contract-type-rules.ts — sont des slots à
 // part, hors de ces bornes). Depuis la saison 2026, le roster standard WNBA
 // est passé à 12 places (+ jusqu'à 2 places de développement, soit 14 au
-// total) ; la NBA reste sur le format simplifié existant de ce jeu.
+// total) ; la NBA suit la vraie convention : 15 places standard + 3 two-way.
 export const MAX_ROSTER_SIZE: Record<string, number> = {
-  nba: 10,
+  nba: 15,
   wnba: 12,
 };
 export const MIN_ROSTER_SIZE: Record<string, number> = {
