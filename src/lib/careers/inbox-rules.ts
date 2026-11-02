@@ -47,12 +47,12 @@ export function pressMessageText(locale: Locale): InboxMessageText {
 export function tradeRequestMessageText(locale: Locale, playerName: string): InboxMessageText {
   return locale === "fr"
     ? {
-        title: `${playerName} souhaite être transférée`,
-        body: `L'agent de ${playerName} a fait savoir qu'elle n'est plus satisfaite de sa situation et souhaite un transfert.`,
+        title: `${playerName} demande un transfert`,
+        body: `L'agent de ${playerName} fait savoir que la situation actuelle ne convient plus et réclame un transfert.`,
       }
     : {
         title: `${playerName} wants a trade`,
-        body: `${playerName}'s agent has let it be known she's unhappy with her situation and is requesting a trade.`,
+        body: `${playerName}'s agent says the current situation isn't working and is requesting a trade.`,
       };
 }
 
@@ -71,8 +71,8 @@ export function injuryMessageText(
   const severityLabel = SEVERITY_LABEL[severity]?.[locale] ?? severity;
   return locale === "fr"
     ? {
-        title: `${playerName} blessée`,
-        body: `${playerName} s'est blessée (gravité ${severityLabel}) — indisponible pour environ ${gamesRemaining} match(s).`,
+        title: `Blessure : ${playerName}`,
+        body: `Blessure ${severityLabel} pour ${playerName} — indisponible pour environ ${gamesRemaining} match(s).`,
       }
     : {
         title: `${playerName} injured`,
@@ -126,7 +126,7 @@ export function freeAgentMessageText(
       }
     : {
         title: `Free agent available: ${playerName}`,
-        body: `${playerName}'s (${position}) agent has flagged her availability on the market — asking around ${salary}.`,
+        body: `${playerName}'s (${position}) agent is shopping their client on the market — asking around ${salary}.`,
       };
 }
 

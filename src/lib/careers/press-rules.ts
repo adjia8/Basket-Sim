@@ -206,12 +206,12 @@ const ANSWER_BANK: Record<QuestionCategory, ToneAnswerBank> = {
   roster: {
     diplomatic: (ctx, locale) =>
       locale === "fr"
-        ? `« Le groupe travaille dur pour ${ctx.teamName}, je ne vais pas pointer une joueuse en particulier, on avance ensemble. »`
+        ? `« Le groupe travaille dur pour ${ctx.teamName}, je ne vais pointer personne en particulier, on avance ensemble. »`
         : `"The group is working hard for ${ctx.teamName} — I'm not calling anyone out, we move forward together."`,
     confident: (ctx, locale) =>
       locale === "fr"
         ? ctx.topPerformerName
-          ? `« Avec des joueuses comme ${ctx.topPerformerName}, j'ai une confiance totale dans cet effectif. »`
+          ? `« Avec ${ctx.topPerformerName} dans l'effectif, j'ai une confiance totale dans cet effectif. »`
           : `« J'ai une confiance totale dans cet effectif, il a le niveau pour nous emmener loin. »`
         : ctx.topPerformerName
           ? `"With players like ${ctx.topPerformerName} on this roster, I have total confidence in this group."`
@@ -222,7 +222,7 @@ const ANSWER_BANK: Record<QuestionCategory, ToneAnswerBank> = {
         : `"There are adjustments to make in the rotation — everyone still needs to grow into their role."`,
     humble: (_ctx, locale) =>
       locale === "fr"
-        ? "« Chaque joueuse doit encore progresser, moi le premier dans la gestion du groupe. »"
+        ? "« Tout le monde doit encore progresser, moi le premier dans la gestion du groupe. »"
         : `"Every player still has room to grow — starting with how I manage this group."`,
   },
   management: {

@@ -122,10 +122,10 @@ export const fr: Record<GmKey, string> = {
   "franchisePage.recordBestSeason": "Meilleur bilan saison régulière :",
   "franchisePage.recordWinStreak": "Plus longue série de victoires :",
   "franchisePage.recordTeamScore": "Plus gros score marqué :",
-  "franchisePage.recordPlayerGame": "Plus gros match d'une joueuse :",
+  "franchisePage.recordPlayerGame": "Plus gros match individuel :",
   "franchisePage.noRecords": "Aucun match joué pour l'instant.",
   "franchisePage.legendsHeading": "Légendes du club",
-  "franchisePage.noLegends": "Aucune légende pour l'instant — les joueuses au Hall of Fame retraitées dans ce club apparaîtront ici.",
+  "franchisePage.noLegends": "Aucune légende pour l'instant — les membres du Hall of Fame ayant fini leur carrière dans ce club apparaîtront ici.",
 };
 
 export const en: Record<GmKey, string> = {

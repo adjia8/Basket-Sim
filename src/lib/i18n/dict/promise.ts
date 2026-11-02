@@ -21,9 +21,9 @@ export const fr: Record<PromiseKey, string> = {
   "promise.submitButton": "Faire cette promesse",
   "promise.pendingPrefix": "Promesse en attente :",
   "promise.made": "Promesse faite — à honorer d'ici la fin de la saison.",
-  "promise.playerDoesNotWantTrade": "Cette joueuse ne demande pas à être échangée.",
-  "promise.alreadyPending": "Une promesse est déjà en attente pour cette joueuse.",
-  "promise.renewalNotEligible": "Cette joueuse n'est pas encore éligible à une prolongation.",
+  "promise.playerDoesNotWantTrade": "Aucune demande d'échange en cours pour ce contrat.",
+  "promise.alreadyPending": "Une promesse est déjà en attente pour ce contrat.",
+  "promise.renewalNotEligible": "Ce contrat n'est pas encore éligible à une prolongation.",
   "promise.tradeDeadlinePassed": "La date limite des échanges est passée.",
   "promise.invalidType": "Type de promesse invalide.",
 };
