@@ -21,12 +21,12 @@ export const metadata: Metadata = {
 
 // Appliqué avant l'hydratation pour éviter un flash du mauvais thème :
 // respecte le choix explicite de l'utilisateur (localStorage) s'il existe,
-// sinon retombe sur la préférence système.
+// sinon thème sombre (ambiance "bureau de GM" par défaut).
 const THEME_INIT_SCRIPT = `
 (function () {
   try {
     var stored = localStorage.getItem("theme");
-    var dark = stored ? stored === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    var dark = stored ? stored === "dark" : true;
     document.documentElement.classList.toggle("dark", dark);
   } catch (e) {}
 })();
@@ -41,14 +41,15 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      suppressHydrationWarning
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full">
         <NavBar />
-        <main className="flex-1">{children}</main>
+        <main className="min-w-0 pb-12">{children}</main>
       </body>
     </html>
   );

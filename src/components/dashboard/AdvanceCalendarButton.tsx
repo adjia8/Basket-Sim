@@ -53,17 +53,17 @@ export function AdvanceCalendarButton({ labels }: { labels: AdvanceCalendarButto
         type="button"
         onClick={run}
         disabled={running}
-        className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/80"
+        className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-fg transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
       >
         {labels.button}
       </button>
       {running && (
-        <p className="text-xs text-black/50 dark:text-white/50">
+        <p className="text-xs text-muted">
           {labels.runningPrefix} {simulated}
         </p>
       )}
-      {!running && upToDate && <p className="text-xs text-green-600 dark:text-green-400">{labels.upToDate}</p>}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {!running && upToDate && <p className="text-xs text-good">{labels.upToDate}</p>}
+      {error && <p className="text-xs text-bad">{error}</p>}
     </div>
   );
 }

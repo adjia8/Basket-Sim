@@ -29,7 +29,7 @@ export function LoginForm({ labels }: { labels: LoginFormLabels }) {
           name="email"
           type="email"
           required
-          className="w-full rounded-lg border border-black/10 px-3 py-2 dark:border-white/10 dark:bg-transparent"
+          className="w-full field px-3 py-2"
         />
       </div>
       <div>
@@ -41,21 +41,21 @@ export function LoginForm({ labels }: { labels: LoginFormLabels }) {
           name="password"
           type="password"
           required
-          className="w-full rounded-lg border border-black/10 px-3 py-2 dark:border-white/10 dark:bg-transparent"
+          className="w-full field px-3 py-2"
         />
       </div>
 
-      {state?.error && <p className="text-sm text-red-500">{state.error}</p>}
+      {state?.error && <p className="text-sm text-bad">{state.error}</p>}
 
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-full bg-black px-6 py-2 font-medium text-white transition hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/80"
+        className="w-full rounded-md bg-accent px-6 py-2 font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
       >
         {pending ? labels.loggingIn : labels.loginButton}
       </button>
 
-      <p className="text-center text-sm text-black/50 dark:text-white/50">
+      <p className="text-center text-sm text-muted">
         {labels.noAccountYet}{" "}
         <Link href="/register" className="underline underline-offset-2">
           {labels.createAccount}

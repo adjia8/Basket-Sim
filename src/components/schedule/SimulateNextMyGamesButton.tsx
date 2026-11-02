@@ -70,7 +70,7 @@ export function SimulateNextMyGamesButton({
   return (
     <div className="flex flex-col items-start gap-1">
       <div className="flex items-center gap-2">
-        <span className="text-sm text-black/70 dark:text-white/70">{labels.label}</span>
+        <span className="text-sm text-soft">{labels.label}</span>
         <input
           type="number"
           min={1}
@@ -78,25 +78,25 @@ export function SimulateNextMyGamesButton({
           value={count}
           onChange={(e) => setCount(Math.max(1, Math.min(maxCount, Number(e.target.value) || 1)))}
           disabled={running}
-          className="w-16 rounded-full border border-black/10 bg-transparent px-3 py-1 text-sm dark:border-white/10"
+          className="w-16 rounded-full border border-line bg-transparent px-3 py-1 text-sm"
         />
         <button
           type="button"
           onClick={run}
           disabled={running || remaining === 0}
-          className="rounded-full bg-black/5 px-3 py-1 text-sm transition hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white/10 dark:hover:bg-white/20"
+          className="rounded-full bg-surface-2 px-3 py-1 text-sm transition hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {labels.button}
         </button>
       </div>
       {running && (
-        <p className="text-xs text-black/50 dark:text-white/50">
+        <p className="text-xs text-muted">
           {labels.runningPrefix} {totalSimulated} · {remaining} {labels.remainingSuffix}
         </p>
       )}
-      {!running && finished && <p className="text-xs text-green-600 dark:text-green-400">{labels.done}</p>}
-      {!running && waiting && <p className="text-xs text-orange-500 dark:text-orange-400">{labels.waiting}</p>}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {!running && finished && <p className="text-xs text-good">{labels.done}</p>}
+      {!running && waiting && <p className="text-xs text-warn">{labels.waiting}</p>}
+      {error && <p className="text-xs text-bad">{error}</p>}
     </div>
   );
 }

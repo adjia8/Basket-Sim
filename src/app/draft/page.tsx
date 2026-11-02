@@ -36,9 +36,9 @@ export default async function DraftPage() {
       where: { careerId: membership.careerId, season: membership.season },
     });
     return (
-      <div className="mx-auto max-w-5xl px-4 py-8">
-        <h1 className="text-2xl font-bold">{t("draft.title")}</h1>
-        <p className="mt-4 text-sm text-black/50 dark:text-white/50">
+      <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
+        <h1 className="text-2xl font-bold tracking-tight">{t("draft.title")}</h1>
+        <p className="mt-4 text-sm text-muted">
           {hasDraftPicks > 0 ? t("draft.overForSeason") : t("draft.noneInProgress")}
         </p>
       </div>
@@ -54,9 +54,9 @@ export default async function DraftPage() {
   const pickTerms = rookieScaleContract(currentPick.pickNumber, picksPerRound, membership.leagueId);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="text-2xl font-bold">{t("draft.title")}</h1>
-      <p className="mt-1 text-black/60 dark:text-white/60">
+    <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
+      <h1 className="text-2xl font-bold tracking-tight">{t("draft.title")}</h1>
+      <p className="mt-1 text-soft">
         {t("draft.pickLinePrefix", { number: currentPick.pickNumber, round: currentPick.round })}{" "}
         {pickTeam ? (
           <Link href={`/teams/${pickTeam.id}`} className="hover:underline">
@@ -72,14 +72,14 @@ export default async function DraftPage() {
       {isMyTurn ? (
         <p className="mt-3 text-sm font-medium">{t("draft.yourTurn")}</p>
       ) : manager ? (
-        <p className="mt-3 text-sm text-black/50 dark:text-white/50">
+        <p className="mt-3 text-sm text-muted">
           {t("draft.waitingForPrefix")} {manager.email}…
         </p>
       ) : (
         <form action={draftForAiTeam} className="mt-4">
           <button
             type="submit"
-            className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+            className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-fg transition hover:bg-accent-hover"
           >
             {t("draft.draftForAi", { team: pickTeam ? teamFullName(pickTeam) : t("draft.aiFallback") })}
           </button>
@@ -87,12 +87,12 @@ export default async function DraftPage() {
       )}
 
       {prospects.length === 0 ? (
-        <p className="mt-6 text-sm text-black/50 dark:text-white/50">{t("draft.noProspects")}</p>
+        <p className="mt-6 text-sm text-muted">{t("draft.noProspects")}</p>
       ) : (
         <div className="mt-6 overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left text-sm">
+          <table className="data-table w-full min-w-[560px] text-left text-sm">
             <thead>
-              <tr className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
+              <tr className="border-b border-line text-muted">
                 <th className="py-2 pr-4">{t("draft.colProspect")}</th>
                 <th className="py-2 pr-4">{t("draft.colPosition")}</th>
                 <th className="py-2 pr-4">{t("draft.colOverall")}</th>
@@ -102,7 +102,7 @@ export default async function DraftPage() {
             </thead>
             <tbody>
               {prospects.map((prospect) => (
-                <tr key={prospect.id} className="border-b border-black/5 dark:border-white/5">
+                <tr key={prospect.id} className="border-b border-line-soft">
                   <td className="py-2 pr-4 font-medium">
                     {prospect.firstName} {prospect.lastName}
                   </td>
@@ -115,7 +115,7 @@ export default async function DraftPage() {
                         <input type="hidden" name="prospectId" value={prospect.id} />
                         <button
                           type="submit"
-                          className="rounded-full bg-black px-3 py-1 text-xs font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+                          className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-accent-fg transition hover:bg-accent-hover"
                         >
                           {t("draft.draftButton")}
                         </button>

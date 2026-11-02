@@ -17,13 +17,13 @@ export default async function TeamsPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="text-2xl font-bold">{t("teamsPage.title")}</h1>
+    <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
+      <h1 className="text-2xl font-bold tracking-tight">{t("teamsPage.title")}</h1>
 
       <div className="mt-6 space-y-8">
         {conferences.map((conference) => (
           <div key={conference.id}>
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
               {conference.name}
             </h2>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -36,12 +36,12 @@ export default async function TeamsPage() {
                     <Link
                       key={team.id}
                       href={`/teams/${team.id}`}
-                      className="flex items-center justify-between rounded-lg border border-black/10 px-4 py-3 transition hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
+                      className="flex items-center justify-between card px-4 py-3 transition hover:bg-surface-2"
                       style={{ borderLeftColor: team.primaryColor, borderLeftWidth: 4 }}
                     >
                       <div className="flex flex-col">
                         <span>{teamFullName(team)}</span>
-                        <span className="text-xs text-black/40 dark:text-white/40">
+                        <span className="text-xs text-faint">
                           {managedByMe
                             ? t("team.managedByMe")
                             : manager
@@ -49,7 +49,7 @@ export default async function TeamsPage() {
                               : t("team.managedByAi")}
                         </span>
                       </div>
-                      <span className="text-xs text-black/40 dark:text-white/40">
+                      <span className="text-xs text-faint">
                         {team.abbreviation}
                       </span>
                     </Link>

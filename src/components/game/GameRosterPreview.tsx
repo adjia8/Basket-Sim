@@ -35,12 +35,12 @@ export function GameRosterPreview({
   const sorted = [...roster].sort((a, b) => b.overallRating - a.overallRating);
 
   return (
-    <div className="rounded-xl border border-black/10 p-4 dark:border-white/10">
+    <div className="card p-4">
       <div className="flex items-baseline justify-between gap-2">
         <Link href={`/teams/${team.id}`} className="font-semibold hover:underline">
           {teamFullName(team)}
         </Link>
-        <span className="text-xs text-black/50 dark:text-white/50">
+        <span className="text-xs text-muted">
           {labels.record} · {labels.rank}
         </span>
       </div>
@@ -48,13 +48,13 @@ export function GameRosterPreview({
       {/* Sans ça, une colonne de "-" ressemble à des stats cassées plutôt
           qu'à une équipe qui n'a simplement encore joué aucun match. */}
       {gamesPlayed === 0 && (
-        <p className="mt-1 text-xs text-black/40 dark:text-white/40">{labels.noGamesPlayedYet}</p>
+        <p className="mt-1 text-xs text-faint">{labels.noGamesPlayedYet}</p>
       )}
 
       <div className="mt-3 overflow-x-auto">
-        <table className="w-full text-left text-sm">
+        <table className="data-table w-full text-left text-sm">
           <thead>
-            <tr className="border-b border-black/10 text-xs text-black/50 dark:border-white/10 dark:text-white/50">
+            <tr className="border-b border-line text-xs text-muted">
               <th className="py-1.5 pr-3">{labels.player}</th>
               <th className="py-1.5 pr-3">{labels.position}</th>
               <th className="py-1.5 pr-3 text-right">{labels.overall}</th>
@@ -67,13 +67,13 @@ export function GameRosterPreview({
             {sorted.map((player) => {
               const stats = seasonStats.get(player.id);
               return (
-                <tr key={player.id} className="border-b border-black/5 dark:border-white/5">
+                <tr key={player.id} className="border-b border-line-soft">
                   <td className="py-1.5 pr-3">
                     <Link href={`/teams/${team.id}/players/${player.id}`} className="hover:underline">
                       {player.firstName} {player.lastName}
                     </Link>
                   </td>
-                  <td className="py-1.5 pr-3 text-black/60 dark:text-white/60">{player.position}</td>
+                  <td className="py-1.5 pr-3 text-soft">{player.position}</td>
                   <td className="py-1.5 pr-3 text-right">{player.overallRating}</td>
                   <td className="py-1.5 pr-3 text-right">{stats?.ppg.toFixed(1) ?? "-"}</td>
                   <td className="py-1.5 pr-3 text-right">{stats?.rpg.toFixed(1) ?? "-"}</td>

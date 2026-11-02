@@ -1,29 +1,173 @@
 @import "tailwindcss";
 /* Bascule clair/sombre pilotée par la classe .dark sur <html> (voir
-   ThemeToggle.tsx + le script anti-flash dans layout.tsx) plutôt que par
-   prefers-color-scheme seul — permet à l'utilisateur de choisir
-   explicitement, tout en respectant la préférence système par défaut. */
+   ThemeToggle.tsx + le script anti-flash dans layout.tsx) : sombre par
+   défaut (ambiance "bureau de GM"), le clair reste un choix explicite. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Palette sémantique — les composants n'utilisent jamais black/white en
+   dur mais ces rôles (surface, ligne, texte atténué, accent...), redéfinis
+   une seule fois par thème ici. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #eef1f5;
+  --surface: #ffffff;
+  --surface-2: #f3f5f8;
+  --surface-3: #e4e8ee;
+  --line: #d6dce4;
+  --line-soft: #e7ebf0;
+  --line-strong: #aab4c0;
+  --fg: #0f1720;
+  --soft: #364352;
+  --muted: #5a6777;
+  --faint: #8592a1;
+  --accent: #f26b1d;
+  --accent-hover: #e15d10;
+  --accent-fg: #1a0b02;
+  --accent-text: #b44a08;
+  --good: #1a7f37;
+  --bad: #cf222e;
+  --warn: #9a6700;
+  --info: #0969da;
 }
 
 .dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  --bg: #0a0e13;
+  --surface: #11171f;
+  --surface-2: #171f29;
+  --surface-3: #202a36;
+  --line: #243040;
+  --line-soft: #19222d;
+  --line-strong: #3a4859;
+  --fg: #e6edf3;
+  --soft: #b6c2ce;
+  --muted: #8794a3;
+  --faint: #5d6b7b;
+  --accent: #f5782b;
+  --accent-hover: #ff8a42;
+  --accent-fg: #1a0b02;
+  --accent-text: #ff9a5a;
+  --good: #3fb950;
+  --bad: #f8645b;
+  --warn: #d6a01e;
+  --info: #58a6ff;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-soft: var(--soft);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-text: var(--accent-text);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+  --color-warn: var(--warn);
+  --color-info: var(--info);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* Tous les chiffres alignés en colonnes (stats, salaires, bilans) : un jeu
+   de gestion se lit surtout en tableaux. */
+table,
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Barre latérale fixe (voir SidebarNav.tsx) : le contenu se décale de sa
+   largeur, uniquement quand elle est présente (visiteur connecté). */
+@media (min-width: 64rem) {
+  body:has(> .app-sidebar) > main {
+    padding-left: 15rem;
+  }
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@layer components {
+  /* Panneau de base (carte, encart) — remplace l'ancien
+     "rounded-lg border border-black/10 dark:border-white/10". */
+  .card {
+    border-radius: 0.75rem;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  /* Petit libellé de section en capitales (en-têtes de tableaux, titres
+     d'encarts, libellés de stats). */
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* Tableaux de données : en-tête discret sur surface-2, lignes séparées
+     par une ligne fine, survol léger. */
+  .data-table th,
+  .data-table td {
+    white-space: nowrap;
+  }
+  .data-table thead tr {
+    border-bottom: 1px solid var(--line);
+  }
+  .data-table thead th {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .data-table tbody tr {
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .data-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .data-table tbody tr:hover {
+    background: var(--surface-2);
+  }
+
+  /* Champs de formulaire. */
+  .field {
+    border-radius: 0.5rem;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--fg);
+  }
+  .field:focus {
+    border-color: var(--accent);
+    outline: none;
+  }
 }

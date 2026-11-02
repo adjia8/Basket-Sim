@@ -22,7 +22,7 @@ export function EnergyRing({ fatigue, size = 40 }: { fatigue: number; size?: num
         r={radius}
         fill="none"
         strokeWidth={strokeWidth}
-        className="stroke-black/10 dark:stroke-white/10"
+        className="stroke-line"
       />
       <circle
         cx={center}

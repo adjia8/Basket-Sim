@@ -47,8 +47,8 @@ export default async function PlayoffsPage() {
   if (!playoffs) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="text-2xl font-bold">{t("playoffsPage.title")}</h1>
-        <p className="mt-4 text-sm text-black/50 dark:text-white/50">{t("playoffsPage.regularSeasonNotOver")}</p>
+        <h1 className="text-2xl font-bold tracking-tight">{t("playoffsPage.title")}</h1>
+        <p className="mt-4 text-sm text-muted">{t("playoffsPage.regularSeasonNotOver")}</p>
       </div>
     );
   }
@@ -72,7 +72,7 @@ export default async function PlayoffsPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-8 px-4 py-8">
       <div>
-        <h1 className="text-2xl font-bold">{t("playoffsPage.title")}</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t("playoffsPage.title")}</h1>
         {championTeam && (
           <p className="mt-2 text-sm font-medium">
             {t("playoffsPage.championPrefix")}{" "}
@@ -106,10 +106,10 @@ export default async function PlayoffsPage() {
                 return (
                   <div
                     key={series.id}
-                    className="rounded-lg border border-black/10 p-4 dark:border-white/10"
+                    className="card p-4"
                   >
                     {series.conference && (
-                      <p className="mb-1 text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
+                      <p className="mb-1 text-xs uppercase tracking-wide text-muted">
                         {CONFERENCE_KEYS[series.conference] ? t(CONFERENCE_KEYS[series.conference]) : series.conference}
                       </p>
                     )}
@@ -125,7 +125,7 @@ export default async function PlayoffsPage() {
                       wins={series.awayWins}
                       isWinner={series.winnerTeamId === series.awayTeamId}
                     />
-                    <p className="mt-2 text-xs text-black/50 dark:text-white/50">
+                    <p className="mt-2 text-xs text-muted">
                       {series.bestOf === 1
                         ? t("playoffsPage.singleGame")
                         : `${t("playoffsPage.bestOfPrefix")} ${series.bestOf}`}

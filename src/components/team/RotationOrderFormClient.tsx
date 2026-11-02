@@ -146,8 +146,8 @@ export function RotationOrderFormClient({
         }}
         className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm transition ${
           draggingId === player.id
-            ? "border-black/30 bg-black/5 shadow-sm dark:border-white/30 dark:bg-white/10"
-            : "border-black/5 dark:border-white/5"
+            ? "border-line-strong bg-surface-2 shadow-sm"
+            : "border-line-soft"
         }`}
       >
         <button
@@ -158,20 +158,20 @@ export function RotationOrderFormClient({
             startDrag(player.id);
           }}
           onKeyDown={(e) => handleHandleKeyDown(e, player.id, index)}
-          className="touch-none cursor-grab select-none rounded px-1.5 py-1 text-base leading-none text-black/40 hover:bg-black/5 active:cursor-grabbing dark:text-white/40 dark:hover:bg-white/10"
+          className="touch-none cursor-grab select-none rounded px-1.5 py-1 text-base leading-none text-faint hover:bg-surface-2 active:cursor-grabbing"
         >
           ⠿
         </button>
-        <span className="w-6 text-center text-black/40 dark:text-white/40">{index + 1}</span>
+        <span className="w-6 text-center text-faint">{index + 1}</span>
         <span className="flex-1">
           #{player.jerseyNumber} {player.firstName} {player.lastName}{" "}
-          <span className="text-black/40 dark:text-white/40">
+          <span className="text-faint">
             ({player.position}, {player.overallRating})
           </span>
         </span>
         <EnergyRing fatigue={player.fatigue} />
         {inRotation ? (
-          <span className="w-24 shrink-0 rounded-full bg-black/5 px-2 py-0.5 text-center text-xs font-medium text-black/60 dark:bg-white/10 dark:text-white/60">
+          <span className="w-24 shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-center text-xs font-medium text-soft">
             {roleLabel(index, labels)}
           </span>
         ) : (
@@ -187,8 +187,8 @@ export function RotationOrderFormClient({
           onClick={() => (inRotation ? removeFromRotation(player.id) : addToRotation(player.id))}
           className={`flex h-6 w-6 items-center justify-center rounded-full text-sm font-bold transition ${
             inRotation
-              ? "bg-red-500/10 text-red-600 hover:bg-red-500/20 dark:text-red-400"
-              : "bg-green-500/10 text-green-600 hover:bg-green-500/20 dark:text-green-400"
+              ? "bg-bad/10 text-bad hover:bg-bad/20"
+              : "bg-good/10 text-good hover:bg-good/20"
           }`}
         >
           {inRotation ? "−" : "+"}
@@ -201,17 +201,17 @@ export function RotationOrderFormClient({
   const reservePlayers = order.slice(ROTATION_SIZE);
 
   return (
-    <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
-      <p className="text-xs text-black/50 dark:text-white/50">{labels.description}</p>
+    <div className="card p-4">
+      <p className="text-xs text-muted">{labels.description}</p>
 
-      <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+      <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted">
         {labels.activeHeading}
       </h3>
       <ul className="mt-2 space-y-1">{activePlayers.map((player, index) => renderRow(player, index, true))}</ul>
 
       {reservePlayers.length > 0 && (
         <>
-          <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+          <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted">
             {labels.reserveHeading}
           </h3>
           <ul className="mt-2 space-y-1">
@@ -225,12 +225,12 @@ export function RotationOrderFormClient({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/80"
+          className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
         >
           {pending ? labels.saving : labels.save}
         </button>
-        {state?.error && <p className="mt-2 text-sm text-red-500">{state.error}</p>}
-        {state?.success && <p className="mt-2 text-sm text-green-600 dark:text-green-400">{state.success}</p>}
+        {state?.error && <p className="mt-2 text-sm text-bad">{state.error}</p>}
+        {state?.success && <p className="mt-2 text-sm text-good">{state.success}</p>}
       </form>
     </div>
   );

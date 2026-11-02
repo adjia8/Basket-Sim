@@ -32,8 +32,8 @@ export default async function OnboardingPage({
     if (!career) {
       return (
         <div className="mx-auto max-w-md px-4 py-10">
-          <h1 className="text-2xl font-bold">{t("onboarding.invalidCodeTitle")}</h1>
-          <p className="mt-2 text-black/60 dark:text-white/60">
+          <h1 className="text-2xl font-bold tracking-tight">{t("onboarding.invalidCodeTitle")}</h1>
+          <p className="mt-2 text-soft">
             {t("onboarding.invalidCodeBody", { code: inviteCode })}
           </p>
           <Link href="/onboarding" className="mt-6 inline-block text-sm underline underline-offset-2">
@@ -47,8 +47,8 @@ export default async function OnboardingPage({
 
     return (
       <div className="mx-auto max-w-3xl px-4 py-10">
-        <h1 className="text-2xl font-bold">{t("onboarding.joinLeagueTitle")}</h1>
-        <p className="mt-1 text-black/60 dark:text-white/60">{t("onboarding.joinLeagueSubtitle")}</p>
+        <h1 className="text-2xl font-bold tracking-tight">{t("onboarding.joinLeagueTitle")}</h1>
+        <p className="mt-1 text-soft">{t("onboarding.joinLeagueSubtitle")}</p>
         <div className="mt-8">
           <JoinCareerForm
             inviteCode={inviteCode}
@@ -70,8 +70,8 @@ export default async function OnboardingPage({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="text-2xl font-bold">{t("onboarding.chooseTeamTitle")}</h1>
-      <p className="mt-1 text-black/60 dark:text-white/60">{t("onboarding.chooseTeamSubtitle")}</p>
+      <h1 className="text-2xl font-bold tracking-tight">{t("onboarding.chooseTeamTitle")}</h1>
+      <p className="mt-1 text-soft">{t("onboarding.chooseTeamSubtitle")}</p>
       <div className="mt-8">
         <CareerForm
           leagues={leagues}
@@ -81,9 +81,9 @@ export default async function OnboardingPage({
         />
       </div>
 
-      <div className="mt-12 border-t border-black/10 pt-8 dark:border-white/10">
+      <div className="mt-12 border-t border-line pt-8">
         <h2 className="text-lg font-semibold">{t("onboarding.orJoinExisting")}</h2>
-        <p className="mt-1 text-sm text-black/60 dark:text-white/60">{t("onboarding.orJoinExistingSubtitle")}</p>
+        <p className="mt-1 text-sm text-soft">{t("onboarding.orJoinExistingSubtitle")}</p>
         <div className="mt-4">
           <JoinByCodeForm placeholder={t("onboarding.joinByCodePlaceholder")} button={t("onboarding.joinButton")} />
         </div>

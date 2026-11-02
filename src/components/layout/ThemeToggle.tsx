@@ -17,11 +17,11 @@ function getSnapshot(): boolean {
   return document.documentElement.classList.contains("dark");
 }
 
-// Rendu serveur : toujours clair par défaut, corrigé dès l'hydratation par
+// Rendu serveur : sombre par défaut (comme le script anti-flash), corrigé dès l'hydratation par
 // useSyncExternalStore lui-même (voir le script anti-flash de layout.tsx
 // pour la classe réellement appliquée avant le premier paint).
 function getServerSnapshot(): boolean {
-  return false;
+  return true;
 }
 
 function setTheme(dark: boolean): void {
@@ -39,7 +39,7 @@ export function ThemeToggle({ toLightLabel, toDarkLabel }: { toLightLabel: strin
       onClick={() => setTheme(!isDark)}
       aria-label={isDark ? toLightLabel : toDarkLabel}
       title={isDark ? toLightLabel : toDarkLabel}
-      className="text-sm text-black/50 transition hover:text-black dark:text-white/50 dark:hover:text-white"
+      className="text-sm text-muted transition hover:text-fg"
     >
       {isDark ? "☀️" : "🌙"}
     </button>

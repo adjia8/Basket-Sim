@@ -24,21 +24,21 @@ export default async function SeasonRecapPage() {
   const teamById = new Map(teams.map((t) => [t.id, t]));
 
   return (
-    <div className="mx-auto max-w-5xl space-y-10 px-4 py-8">
+    <div className="mx-auto max-w-6xl space-y-10 px-4 py-8 lg:px-8">
       <div>
-        <h1 className="text-2xl font-bold">{t("seasonRecap.title")}</h1>
-        <p className="mt-1 text-black/60 dark:text-white/60">{t("seasonRecap.subtitle")}</p>
+        <h1 className="text-2xl font-bold tracking-tight">{t("seasonRecap.title")}</h1>
+        <p className="mt-1 text-soft">{t("seasonRecap.subtitle")}</p>
       </div>
 
       <section>
         <h2 className="mb-3 text-lg font-semibold">{t("seasonRecap.freeAgentsHeading")}</h2>
         {freeAgentReport.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">{t("seasonRecap.noFreeAgents")}</p>
+          <p className="text-sm text-muted">{t("seasonRecap.noFreeAgents")}</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="data-table w-full min-w-[720px] text-left text-sm">
               <thead>
-                <tr className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
+                <tr className="border-b border-line text-muted">
                   <th className="py-2 pr-4">{t("seasonRecap.colPlayer")}</th>
                   <th className="py-2 pr-4">{t("seasonRecap.colOverall")}</th>
                   <th className="py-2 pr-4">{t("seasonRecap.colRenown")}</th>
@@ -49,14 +49,14 @@ export default async function SeasonRecapPage() {
               </thead>
               <tbody>
                 {freeAgentReport.map(({ player, desiredContract, wantsCompetitiveTeam, wantsAttractiveMarket, wantsGoodFacilities, interestedTeamIds }) => (
-                  <tr key={player.id} className="border-b border-black/5 dark:border-white/5">
+                  <tr key={player.id} className="border-b border-line-soft">
                     <td className="py-2 pr-4 font-medium">
                       {player.firstName} {player.lastName}
                     </td>
                     <td className="py-2 pr-4">{player.overallRating}</td>
                     <td className="py-2 pr-4">{player.renown}</td>
                     <td className="py-2 pr-4">{formatSalary(desiredContract, locale)}</td>
-                    <td className="py-2 pr-4 text-xs text-black/60 dark:text-white/60">
+                    <td className="py-2 pr-4 text-xs text-soft">
                       {[
                         wantsCompetitiveTeam && t("seasonRecap.prefCompetitive"),
                         wantsAttractiveMarket && t("seasonRecap.prefBigMarket"),
@@ -83,12 +83,12 @@ export default async function SeasonRecapPage() {
       <section>
         <h2 className="mb-3 text-lg font-semibold">{t("seasonRecap.nextDraftClassHeading")}</h2>
         {prospects.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">{t("seasonRecap.noDraftClass")}</p>
+          <p className="text-sm text-muted">{t("seasonRecap.noDraftClass")}</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-left text-sm">
+            <table className="data-table w-full min-w-[560px] text-left text-sm">
               <thead>
-                <tr className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
+                <tr className="border-b border-line text-muted">
                   <th className="py-2 pr-4">{t("seasonRecap.colProspect")}</th>
                   <th className="py-2 pr-4">{t("seasonRecap.colPosition")}</th>
                   <th className="py-2 pr-4">{t("seasonRecap.colOverall")}</th>
@@ -98,14 +98,14 @@ export default async function SeasonRecapPage() {
               </thead>
               <tbody>
                 {prospects.map((prospect) => (
-                  <tr key={prospect.id} className="border-b border-black/5 dark:border-white/5">
+                  <tr key={prospect.id} className="border-b border-line-soft">
                     <td className="py-2 pr-4 font-medium">
                       {prospect.firstName} {prospect.lastName}
                     </td>
                     <td className="py-2 pr-4">{prospect.position}</td>
                     <td className="py-2 pr-4">{prospect.overallRating}</td>
                     <td className="py-2 pr-4">{prospect.age}</td>
-                    <td className="py-2 text-xs text-black/60 dark:text-white/60">
+                    <td className="py-2 text-xs text-soft">
                       {prospect.scoutingNote ?? "—"}
                     </td>
                   </tr>
@@ -119,26 +119,26 @@ export default async function SeasonRecapPage() {
       <section>
         <h2 className="mb-3 text-lg font-semibold">{t("seasonRecap.hallOfFameHeading")}</h2>
         {retirees.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">{t("seasonRecap.noRetirees")}</p>
+          <p className="text-sm text-muted">{t("seasonRecap.noRetirees")}</p>
         ) : (
           <div className="space-y-2">
             {retirees.map((state) => (
               <div
                 key={state.id}
-                className="flex items-center justify-between rounded-lg border border-black/10 px-4 py-3 text-sm dark:border-white/10"
+                className="flex items-center justify-between card px-4 py-3 text-sm"
               >
                 <span>
                   {state.player.firstName} {state.player.lastName}
-                  <span className="ml-2 text-xs text-black/50 dark:text-white/50">
+                  <span className="ml-2 text-xs text-muted">
                     ({t("seasonRecap.peakOverallPrefix")} {state.peakOverallRating})
                   </span>
                 </span>
                 {state.hallOfFame ? (
-                  <span className="rounded-full bg-yellow-500/10 px-2 py-0.5 text-xs font-medium text-yellow-600 dark:text-yellow-400">
+                  <span className="rounded-full bg-warn/10 px-2 py-0.5 text-xs font-medium text-warn">
                     {t("seasonRecap.hallOfFame")}
                   </span>
                 ) : (
-                  <span className="text-xs text-black/40 dark:text-white/40">{t("seasonRecap.retired")}</span>
+                  <span className="text-xs text-faint">{t("seasonRecap.retired")}</span>
                 )}
               </div>
             ))}
@@ -146,7 +146,7 @@ export default async function SeasonRecapPage() {
         )}
       </section>
 
-      <p className="text-xs text-black/40 dark:text-white/40">{t("seasonRecap.footnote")}</p>
+      <p className="text-xs text-faint">{t("seasonRecap.footnote")}</p>
     </div>
   );
 }

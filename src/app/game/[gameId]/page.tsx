@@ -103,9 +103,9 @@ export default async function GamePage({
   const canAct = mySide !== null || (!homeManager && !awayManager);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
       <div className="mx-auto max-w-3xl">
-        <p className="text-sm text-black/50 dark:text-white/50">
+        <p className="text-sm text-muted">
           {formatGameDate(game.gameDate, locale)}
         </p>
         <h1 className="mt-1 text-2xl font-bold">
@@ -118,9 +118,9 @@ export default async function GamePage({
           </Link>
         </h1>
 
-        <div className="mt-6 flex items-center justify-center gap-8 rounded-xl border border-black/10 py-8 dark:border-white/10">
+        <div className="mt-6 flex items-center justify-center gap-8 card py-8">
           <TeamScore team={awayTeam} score={game.awayScore} />
-          <span className="text-black/30 dark:text-white/30">–</span>
+          <span className="text-faint">–</span>
           <TeamScore team={homeTeam} score={game.homeScore} />
         </div>
 
@@ -142,7 +142,7 @@ export default async function GamePage({
                 }}
               />
             ) : (
-              <p className="text-sm text-black/50 dark:text-white/50">
+              <p className="text-sm text-muted">
                 {readinessLine(t, awayTeam, game.awayReady, awayManager)} ·{" "}
                 {readinessLine(t, homeTeam, game.homeReady, homeManager)}
               </p>

@@ -1,13 +1,14 @@
 // Échelle de couleurs partagée pour les "notes" (attributs, overall) et les
-// bilans financiers — vert = bon, orange = moyen, rouge = mauvais. Purement
+// bilans financiers — vert = bon, ambre = moyen, rouge = mauvais (tokens
+// good/warn/bad de globals.css ; l'orange reste réservé à l'accent). Purement
 // visuel, aucune règle de jeu ici.
 
 export type ScaleTone = "good" | "average" | "bad";
 
 export const TONE_CLASSES: Record<ScaleTone, string> = {
-  good: "text-green-600 dark:text-green-400",
-  average: "text-orange-500 dark:text-orange-400",
-  bad: "text-red-600 dark:text-red-400",
+  good: "text-good",
+  average: "text-warn",
+  bad: "text-bad",
 };
 
 // Échelle générique 0-99 (overall, attributs techniques, infrastructures...).
@@ -51,9 +52,9 @@ export function toneClass(tone: ScaleTone): string {
 // jauges en anneau SVG (voir FatigueRing.tsx), où la couleur porte sur le
 // trait du cercle plutôt que sur du texte.
 export const TONE_STROKE_CLASSES: Record<ScaleTone, string> = {
-  good: "stroke-green-600 dark:stroke-green-400",
-  average: "stroke-orange-500 dark:stroke-orange-400",
-  bad: "stroke-red-600 dark:stroke-red-400",
+  good: "stroke-good",
+  average: "stroke-warn",
+  bad: "stroke-bad",
 };
 
 export function toneStrokeClass(tone: ScaleTone): string {

@@ -162,40 +162,40 @@ export default async function TeamRosterPage({
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
       <div className="flex items-center gap-3">
         <TeamColorSwatch primaryColor={team.primaryColor} secondaryColor={team.secondaryColor} size="lg" />
-        <h1 className="text-2xl font-bold">{teamFullName(team)}</h1>
-        <span className="text-sm text-black/40 dark:text-white/40">
+        <h1 className="text-2xl font-bold tracking-tight">{teamFullName(team)}</h1>
+        <span className="text-sm text-faint">
           · {managerLabel}
         </span>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-4">
-        <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
-          <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-muted">
             {t("team.payroll")}
           </p>
-          <p className={`mt-1 text-xl font-semibold ${overCap ? "text-red-500" : ""}`}>
+          <p className={`mt-1 text-xl font-semibold ${overCap ? "text-bad" : ""}`}>
             {formatSalary(totalPayroll, locale)} / {formatSalary(salaryCap, locale)}
             {overCap && <span className="ml-2 text-sm font-normal">{t("team.overCap")}</span>}
           </p>
           {deadCapTotal > 0 && (
-            <p className="mt-1 text-xs text-black/50 dark:text-white/50">
+            <p className="mt-1 text-xs text-muted">
               {t("team.deadCapNote", { amount: formatSalary(deadCapTotal, locale) })}
             </p>
           )}
         </div>
-        <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
-          <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-muted">
             {t("team.roster")}
           </p>
           <p className="mt-1 text-xl font-semibold">
             {t("team.rosterCount", { count: standardRosterSize, max: maxRosterSize })}
           </p>
         </div>
-        <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
-          <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-muted">
             {t("team.chemistry")}
           </p>
           <p className="mt-1 text-xl font-semibold">{teamState.chemistry} / 99</p>
@@ -261,14 +261,14 @@ export default async function TeamRosterPage({
 
       {picks.length > 0 && (
         <div className="mt-6">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">
             {t("team.draftPicks")}
           </h2>
           <ul className="flex flex-wrap gap-2 text-sm">
             {picks.map((pick) => (
               <li
                 key={pick.id}
-                className="rounded-full border border-black/10 px-3 py-1 dark:border-white/10"
+                className="rounded-full border border-line px-3 py-1"
               >
                 {pick.label}
               </li>
@@ -278,7 +278,7 @@ export default async function TeamRosterPage({
       )}
 
       {isOpponentInMyLeague && tradeDeadlinePassed && (
-        <p className="mt-8 rounded-lg border border-black/10 p-4 text-sm text-red-500 dark:border-white/10">
+        <p className="mt-8 card p-4 text-sm text-bad">
           {t("team.tradeDeadlinePassed")}
         </p>
       )}

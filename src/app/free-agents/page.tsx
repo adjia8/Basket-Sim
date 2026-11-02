@@ -47,29 +47,29 @@ export default async function FreeAgentsPage() {
   const teamMarketAppeal = myTeam?.marketAppeal ?? 50;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="text-2xl font-bold">{t("freeAgents.title")}</h1>
-      <p className="mt-1 text-black/60 dark:text-white/60">{t("freeAgents.subtitle")}</p>
+    <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
+      <h1 className="text-2xl font-bold tracking-tight">{t("freeAgents.title")}</h1>
+      <p className="mt-1 text-soft">{t("freeAgents.subtitle")}</p>
 
-      <p className="mt-4 text-sm text-black/60 dark:text-white/60">
+      <p className="mt-4 text-sm text-soft">
         {t("freeAgents.payrollPrefix")}{" "}
-        <span className={capReached ? "font-semibold text-red-500" : "font-semibold"}>
+        <span className={capReached ? "font-semibold text-bad" : "font-semibold"}>
           {formatSalary(payroll, locale)} / {formatSalary(salaryCap, locale)}
         </span>
       </p>
 
-      {!faOpen && <p className="mt-2 text-sm text-red-500">{t("freeAgents.notOpenYet")}</p>}
+      {!faOpen && <p className="mt-2 text-sm text-bad">{t("freeAgents.notOpenYet")}</p>}
       {rosterFull && (
-        <p className="mt-2 text-sm text-red-500">
+        <p className="mt-2 text-sm text-bad">
           {t("freeAgents.rosterFull", { size: rosterSize, max: maxRosterSize })}
         </p>
       )}
-      {capReached && <p className="mt-2 text-sm text-red-500">{t("freeAgents.capReached")}</p>}
+      {capReached && <p className="mt-2 text-sm text-bad">{t("freeAgents.capReached")}</p>}
 
       <div className="mt-6 overflow-x-auto">
-        <table className="w-full min-w-[560px] text-left text-sm">
+        <table className="data-table w-full min-w-[560px] text-left text-sm">
           <thead>
-            <tr className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
+            <tr className="border-b border-line text-muted">
               <th className="py-2 pr-4">{t("freeAgents.colPlayer")}</th>
               <th className="py-2 pr-4">{t("freeAgents.colPosition")}</th>
               <th className="py-2 pr-4">{t("freeAgents.colOverall")}</th>
@@ -95,7 +95,7 @@ export default async function FreeAgentsPage() {
               );
 
               return (
-                <tr key={player.id} className="border-b border-black/5 dark:border-white/5">
+                <tr key={player.id} className="border-b border-line-soft">
                   <td className="py-2 pr-4 font-medium">
                     {player.firstName} {player.lastName}
                   </td>
@@ -105,7 +105,7 @@ export default async function FreeAgentsPage() {
                   <td className="py-2 pr-4">
                     {player.injuryRisk}
                     {player.injured && (
-                      <span className="ml-1 text-xs text-red-500">
+                      <span className="ml-1 text-xs text-bad">
                         {t("roster.unavailable")} ({player.injuryGamesRemaining})
                       </span>
                     )}
@@ -119,13 +119,13 @@ export default async function FreeAgentsPage() {
                           <input type="hidden" name="playerId" value={player.id} />
                           <button
                             type="submit"
-                            className="rounded-full bg-black px-3 py-1 text-xs font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+                            className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-accent-fg transition hover:bg-accent-hover"
                           >
                             {t("freeAgents.sign")}
                           </button>
                         </form>
                       ) : (
-                        <span className="text-xs text-red-500">{t("freeAgents.refuses")}</span>
+                        <span className="text-xs text-bad">{t("freeAgents.refuses")}</span>
                       )}
                     </td>
                   )}
@@ -135,7 +135,7 @@ export default async function FreeAgentsPage() {
           </tbody>
         </table>
         {freeAgents.length === 0 && (
-          <p className="mt-4 text-sm text-black/50 dark:text-white/50">{t("freeAgents.none")}</p>
+          <p className="mt-4 text-sm text-muted">{t("freeAgents.none")}</p>
         )}
       </div>
     </div>

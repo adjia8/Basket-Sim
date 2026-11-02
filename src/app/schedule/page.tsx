@@ -63,9 +63,9 @@ export default async function SchedulePage({
   });
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">{t("schedule.title")}</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t("schedule.title")}</h1>
         <div className="flex flex-wrap items-center gap-3">
           {myPendingGamesCount > 0 && (
             <SimulateNextMyGamesButton
@@ -98,7 +98,7 @@ export default async function SchedulePage({
           )}
           <Link
             href={showAll ? "/schedule" : "/schedule?all=1"}
-            className="rounded-full bg-black/5 px-3 py-1 text-sm dark:bg-white/10"
+            className="rounded-full bg-surface-2 px-3 py-1 text-sm"
           >
             {showAll ? t("schedule.myTeam") : t("schedule.wholeLeague")}
           </Link>
@@ -107,7 +107,7 @@ export default async function SchedulePage({
 
       {preseasonGames.length > 0 && (
         <div className="mt-6">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">
             {t("schedule.preseasonHeading")}
           </h2>
           <GameList games={preseasonGames} teamById={teamById} locale={locale} upcomingLabel={t("schedule.upcoming")} />
@@ -116,7 +116,7 @@ export default async function SchedulePage({
 
       <div className="mt-6">
         {preseasonGames.length > 0 && (
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">
             {t("schedule.regularSeasonHeading")}
           </h2>
         )}
@@ -146,19 +146,19 @@ function GameList({
           <Link
             key={game.id}
             href={`/game/${game.id}`}
-            className="flex items-center justify-between rounded-lg border border-black/10 px-4 py-3 text-sm transition hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
+            className="flex items-center justify-between card px-4 py-3 text-sm transition hover:bg-surface-2"
           >
             <span>
               {away ? teamFullName(away) : "?"} @ {home ? teamFullName(home) : "?"}
             </span>
-            <span className="flex items-center gap-3 text-black/50 dark:text-white/50">
+            <span className="flex items-center gap-3 text-muted">
               <span>{formatGameDate(game.gameDate, locale)}</span>
               {game.status === "final" ? (
-                <span className="font-medium text-black dark:text-white">
+                <span className="font-medium text-fg">
                   {game.awayScore}-{game.homeScore}
                 </span>
               ) : (
-                <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs dark:bg-white/10">
+                <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs">
                   {upcomingLabel}
                 </span>
               )}

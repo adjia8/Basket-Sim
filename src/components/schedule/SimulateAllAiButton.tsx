@@ -63,17 +63,17 @@ export function SimulateAllAiButton({
         type="button"
         onClick={run}
         disabled={running || remaining === 0}
-        className="rounded-full bg-black/5 px-3 py-1 text-sm transition hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white/10 dark:hover:bg-white/20"
+        className="rounded-full bg-surface-2 px-3 py-1 text-sm transition hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {labels.button}
       </button>
       {running && (
-        <p className="text-xs text-black/50 dark:text-white/50">
+        <p className="text-xs text-muted">
           {labels.runningPrefix} {totalSimulated} · {remaining} {labels.remainingSuffix}
         </p>
       )}
-      {!running && finished && <p className="text-xs text-green-600 dark:text-green-400">{labels.done}</p>}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {!running && finished && <p className="text-xs text-good">{labels.done}</p>}
+      {error && <p className="text-xs text-bad">{error}</p>}
     </div>
   );
 }

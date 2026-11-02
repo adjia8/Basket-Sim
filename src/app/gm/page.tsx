@@ -73,10 +73,10 @@ export default async function GmPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-bold">{t("gm.pageTitle")}</h1>
+      <h1 className="text-2xl font-bold tracking-tight">{t("gm.pageTitle")}</h1>
 
       {offerTeam && (
-        <div className="mt-6 rounded-xl border border-blue-500/30 bg-blue-500/5 p-4">
+        <div className="mt-6 rounded-xl border border-info/30 bg-info/5 p-4">
           <p className="font-medium">
             {t("gm.poachOfferPrefix")}{" "}
             <Link href={`/teams/${offerTeam.id}`} className="hover:underline">
@@ -88,7 +88,7 @@ export default async function GmPage() {
             <form action={acceptPoachOffer}>
               <button
                 type="submit"
-                className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+                className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-fg transition hover:bg-accent-hover"
               >
                 {t("gm.accept")}
               </button>
@@ -96,7 +96,7 @@ export default async function GmPage() {
             <form action={declinePoachOffer}>
               <button
                 type="submit"
-                className="rounded-full border border-black/10 px-4 py-1.5 text-sm hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+                className="rounded-full border border-line px-4 py-1.5 text-sm hover:bg-surface-2"
               >
                 {t("gm.decline")}
               </button>
@@ -105,14 +105,14 @@ export default async function GmPage() {
         </div>
       )}
 
-      <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+      <div className="mt-6 card p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           {t("gm.identity")}
         </h2>
         <p className="text-lg font-semibold">
           {gm.firstName} {gm.lastName}
         </p>
-        <p className="text-sm text-black/50 dark:text-white/50">
+        <p className="text-sm text-muted">
           {t("player.ageLabel", { age: gm.age })} · {sexLabel[gm.sex] ?? gm.sex}
         </p>
         <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
@@ -125,8 +125,8 @@ export default async function GmPage() {
       </div>
 
       <div className="mt-6 flex flex-wrap gap-4">
-        <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
-          <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">{t("gm.treasury")}</p>
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-muted">{t("gm.treasury")}</p>
           <p
             className={`mt-1 text-xl font-semibold ${toneClass(
               financeTone(teamState.finances, healthyFinancesThreshold(membership.leagueId))
@@ -135,20 +135,20 @@ export default async function GmPage() {
             {formatSalary(teamState.finances, locale)}
           </p>
         </div>
-        <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
-          <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">{t("gm.facilities")}</p>
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-muted">{t("gm.facilities")}</p>
           <p className={`mt-1 text-xl font-semibold ${toneClass(ratingTone(teamState.facilitiesLevel))}`}>
             {teamState.facilitiesLevel} / 99
           </p>
         </div>
-        <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
-          <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">{t("gm.trainingStaff")}</p>
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-muted">{t("gm.trainingStaff")}</p>
           <p className={`mt-1 text-xl font-semibold ${toneClass(ratingTone(teamState.trainingStaffLevel))}`}>
             {teamState.trainingStaffLevel} / 99
           </p>
         </div>
-        <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
-          <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-muted">
             {t("gm.frontOfficeApproval")}
           </p>
           <p className={`mt-1 text-xl font-semibold ${toneClass(neutralTone(gm.frontOfficeApproval))}`}>
@@ -157,20 +157,20 @@ export default async function GmPage() {
         </div>
       </div>
 
-      <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+      <div className="mt-6 card p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           {t("gm.currentSeasonRecord")}
         </h2>
         <p className="text-lg font-semibold">
           {myStandingsRow ? `${myStandingsRow.wins}-${myStandingsRow.losses}` : "0-0"}
         </p>
-        <p className="text-sm text-black/50 dark:text-white/50">
+        <p className="text-sm text-muted">
           {t("gm.objectivePrefix")} {expectationLabel[gm.currentExpectationTier as ExpectationTier]}
         </p>
       </div>
 
-      <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+      <div className="mt-6 card p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           {t("gm.contract")}
         </h2>
         <p className="text-sm">
@@ -190,17 +190,17 @@ export default async function GmPage() {
         </p>
       </div>
 
-      <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+      <div className="mt-6 card p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           {t("gm.careerRecord")}
         </h2>
         {gm.seasonRecords.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">{t("gm.noSeasonCompleted")}</p>
+          <p className="text-sm text-muted">{t("gm.noSeasonCompleted")}</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <table className="data-table w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
+                <tr className="border-b border-line text-muted">
                   <th className="py-2 pr-4">{t("gm.colSeason")}</th>
                   <th className="py-2 pr-4">{t("gm.colTeam")}</th>
                   <th className="py-2 pr-4">{t("gm.colRecord")}</th>
@@ -211,7 +211,7 @@ export default async function GmPage() {
               </thead>
               <tbody>
                 {gm.seasonRecords.map((record) => (
-                  <tr key={record.id} className="border-b border-black/5 dark:border-white/5">
+                  <tr key={record.id} className="border-b border-line-soft">
                     <td className="py-2 pr-4">{record.season}</td>
                     <td className="py-2 pr-4">
                       <Link href={`/teams/${record.teamId}`} className="hover:underline">
@@ -239,8 +239,8 @@ export default async function GmPage() {
 
 function PointStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-black/10 p-2 text-center dark:border-white/10">
-      <p className="text-xs text-black/50 dark:text-white/50">{label}</p>
+    <div className="card p-2 text-center">
+      <p className="text-xs text-muted">{label}</p>
       <p className="font-semibold">{value}</p>
     </div>
   );

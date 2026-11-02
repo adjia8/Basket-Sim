@@ -17,7 +17,7 @@ export interface TrainingPlanFormLabels {
 }
 
 const SELECT_CLASSES =
-  "rounded-lg border border-black/10 bg-transparent px-3 py-1.5 text-sm dark:border-white/10";
+  "field px-3 py-1.5 text-sm";
 
 export function TrainingPlanFormClient({
   focus,
@@ -44,11 +44,11 @@ export function TrainingPlanFormClient({
   const fatigueSign = fatigueDelta > 0 ? "+" : "";
 
   return (
-    <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
+    <div className="card p-4">
       <p className="font-medium">{labels.title}</p>
-      <p className="mt-1 text-xs text-black/50 dark:text-white/50">{labels.description}</p>
+      <p className="mt-1 text-xs text-muted">{labels.description}</p>
       <form action={action} className="mt-3 flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-xs text-black/50 dark:text-white/50">
+        <label className="flex flex-col gap-1 text-xs text-muted">
           {labels.focusLabel}
           <select
             name="focus"
@@ -63,7 +63,7 @@ export function TrainingPlanFormClient({
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-black/50 dark:text-white/50">
+        <label className="flex flex-col gap-1 text-xs text-muted">
           {labels.intensityLabel}
           <select
             name="intensity"
@@ -81,7 +81,7 @@ export function TrainingPlanFormClient({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/80"
+          className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
         >
           {pending ? labels.applying : labels.apply}
         </button>
@@ -89,17 +89,17 @@ export function TrainingPlanFormClient({
       <p
         className={`mt-2 text-xs font-medium ${
           fatigueDelta > 0
-            ? "text-orange-600 dark:text-orange-400"
+            ? "text-warn"
             : fatigueDelta < 0
-              ? "text-green-600 dark:text-green-400"
-              : "text-black/50 dark:text-white/50"
+              ? "text-good"
+              : "text-muted"
         }`}
       >
         {labels.fatigueImpactPrefix} {fatigueSign}
         {fatigueDelta}
       </p>
-      {state?.error && <p className="mt-2 text-sm text-red-500">{state.error}</p>}
-      {state?.success && <p className="mt-2 text-sm text-green-600 dark:text-green-400">{state.success}</p>}
+      {state?.error && <p className="mt-2 text-sm text-bad">{state.error}</p>}
+      {state?.success && <p className="mt-2 text-sm text-good">{state.success}</p>}
     </div>
   );
 }

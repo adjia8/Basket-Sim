@@ -7,8 +7,7 @@ import { getUnreadInboxCount } from "@/lib/data-access/inbox";
 import { prisma } from "@/lib/prisma";
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageToggle } from "./LanguageToggle";
-import { NavDropdown } from "./NavDropdown";
-import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
+import { SidebarNav, type NavSection } from "./SidebarNav";
 import { getTranslator } from "@/lib/i18n/translate";
 
 export async function NavBar() {
@@ -37,20 +36,22 @@ export async function NavBar() {
   const hasPendingTrade = pendingTradeCount > 0;
   const hasPendingPoach = Boolean(gmProfile?.pendingOfferTeamId);
 
-  // Liens autonomes : les pages les plus consultées, en accès direct.
-  // Le reste est regroupé par thème (ligue / transactions / club) pour ne
-  // pas aligner 12 onglets à plat dans la barre. La boîte de réception est
-  // transversale (presse/agents/blessures/classement...) plutôt que liée à
-  // un seul thème, donc rangée ici plutôt que sous un des groupes.
-  const NAV_LINKS = [
-    { href: "/", label: t("common.nav.dashboard") },
-    ...(membership ? [{ href: "/inbox", label: t("common.nav.inbox"), badge: unreadInboxCount }] : []),
-    ...(membership ? [{ href: `/teams/${membership.teamId}`, label: t("common.nav.myTeam") }] : []),
-    { href: "/teams", label: t("common.nav.teams") },
-    { href: "/schedule", label: t("common.nav.schedule") },
-  ];
-
-  const NAV_GROUPS = [
+  // Sections de la barre latérale : le bureau (pages les plus consultées)
+  // puis les regroupements thématiques, tous visibles d'un coup d'œil — la
+  // place verticale de la barre latérale permet de se passer des menus
+  // déroulants de l'ancienne barre horizontale. La boîte de réception est
+  // transversale (presse/agents/blessures/classement...), donc dans le bureau.
+  const sections: NavSection[] = [
+    {
+      label: t("common.nav.groupMain"),
+      items: [
+        { href: "/", label: t("common.nav.dashboard") },
+        ...(membership ? [{ href: "/inbox", label: t("common.nav.inbox"), badge: unreadInboxCount }] : []),
+        ...(membership ? [{ href: `/teams/${membership.teamId}`, label: t("common.nav.myTeam") }] : []),
+        { href: "/schedule", label: t("common.nav.schedule") },
+        { href: "/teams", label: t("common.nav.teams") },
+      ],
+    },
     {
       label: t("common.nav.groupLeague"),
       items: [
@@ -77,60 +78,73 @@ export async function NavBar() {
     },
   ];
 
-  return (
-    <header className="border-b border-black/10 dark:border-white/10">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-          🏀 Hoops Manager
-          {team && (
-            <TeamColorSwatch primaryColor={team.primaryColor} secondaryColor={team.secondaryColor} />
-          )}
-        </Link>
+  const brand = (
+    <Link href="/" className="flex items-center gap-2 text-[15px] font-bold tracking-tight">
+      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-accent text-sm" aria-hidden>
+        🏀
+      </span>
+      Hoops Manager
+    </Link>
+  );
 
-        {membership && (
-          <nav className="flex items-center gap-4 text-sm">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="flex items-center gap-1.5 text-black/70 transition hover:text-black dark:text-white/70 dark:hover:text-white"
-              >
-                {link.label}
-                {"badge" in link && (link.badge ?? 0) > 0 && (
-                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
-                    {(link.badge ?? 0) > 9 ? "9+" : link.badge}
-                  </span>
-                )}
-              </Link>
-            ))}
-            {NAV_GROUPS.map((group) => (
-              <NavDropdown key={group.label} label={group.label} items={group.items} />
-            ))}
-          </nav>
-        )}
+  const toggles = (
+    <div className="flex items-center gap-3">
+      <LanguageToggle locale={locale} label={t("common.languageToggle.label")} />
+      <ThemeToggle toLightLabel={t("common.themeToggle.toLight")} toDarkLabel={t("common.themeToggle.toDark")} />
+    </div>
+  );
 
-        <div className="flex items-center gap-4">
-          <LanguageToggle locale={locale} label={t("common.languageToggle.label")} />
-          <ThemeToggle toLightLabel={t("common.themeToggle.toLight")} toDarkLabel={t("common.themeToggle.toDark")} />
-          {membership ? (
-            <form action={logout}>
-              <button
-                type="submit"
-                className="text-sm text-black/50 underline-offset-2 hover:underline dark:text-white/50"
-              >
-                {t("common.logout")}
-              </button>
-            </form>
-          ) : (
-            <Link
-              href="/login"
-              className="text-sm text-black/50 underline-offset-2 hover:underline dark:text-white/50"
-            >
+  // Visiteur non connecté : simple barre du haut (connexion/inscription,
+  // onboarding) — la barre latérale n'a de sens qu'avec une carrière.
+  if (!membership) {
+    return (
+      <header className="border-b border-line bg-surface">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+          {brand}
+          <div className="flex items-center gap-4">
+            {toggles}
+            <Link href="/login" className="text-sm text-muted underline-offset-2 hover:text-fg hover:underline">
               {t("common.login")}
             </Link>
-          )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+    );
+  }
+
+  const teamBlock = team && (
+    <Link
+      href={`/teams/${team.id}`}
+      className="flex items-center gap-3 rounded-lg border border-line bg-surface-2 px-3 py-2.5 transition hover:border-line-strong"
+    >
+      <span
+        className="h-9 w-1.5 shrink-0 rounded-full"
+        style={{ background: `linear-gradient(${team.primaryColor} 50%, ${team.secondaryColor} 50%)` }}
+        aria-hidden
+      />
+      <span className="min-w-0">
+        <span className="block text-[11px] font-semibold uppercase tracking-wider text-muted">{team.city}</span>
+        <span className="block truncate text-sm font-semibold">{team.name}</span>
+      </span>
+    </Link>
+  );
+
+  return (
+    <SidebarNav
+      brand={brand}
+      team={teamBlock}
+      sections={sections}
+      menuLabel={t("common.nav.menu")}
+      footer={
+        <div className="flex items-center justify-between gap-3">
+          {toggles}
+          <form action={logout}>
+            <button type="submit" className="text-xs text-muted underline-offset-2 hover:text-fg hover:underline">
+              {t("common.logout")}
+            </button>
+          </form>
+        </div>
+      }
+    />
   );
 }

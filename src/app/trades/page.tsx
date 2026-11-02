@@ -83,23 +83,23 @@ export default async function TradesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="text-2xl font-bold">{t("tradeOffers.title")}</h1>
+    <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
+      <h1 className="text-2xl font-bold tracking-tight">{t("tradeOffers.title")}</h1>
 
       {tradeDeadlinePassed && (
-        <p className="mt-4 text-sm text-red-500">{t("tradeOffers.deadlinePassedNotice")}</p>
+        <p className="mt-4 text-sm text-bad">{t("tradeOffers.deadlinePassedNotice")}</p>
       )}
 
       <section className="mt-8">
         <h2 className="text-lg font-semibold">{t("tradeOffers.received")}</h2>
         {received.length === 0 ? (
-          <p className="mt-2 text-sm text-black/50 dark:text-white/50">{t("tradeOffers.noneePending")}</p>
+          <p className="mt-2 text-sm text-muted">{t("tradeOffers.noneePending")}</p>
         ) : (
           <div className="mt-4 space-y-3">
             {received.map((offer) => {
               const fromTeam = teamById.get(offer.fromTeamId);
               return (
-                <div key={offer.id} className="rounded-lg border border-black/10 p-4 dark:border-white/10">
+                <div key={offer.id} className="card p-4">
                   <p className="text-sm">
                     <span className="font-medium">
                       {fromTeam ? (
@@ -120,7 +120,7 @@ export default async function TradesPage() {
                         <input type="hidden" name="decision" value="accept" />
                         <button
                           type="submit"
-                          className="rounded-full bg-black px-4 py-1.5 text-xs font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+                          className="rounded-md bg-accent px-4 py-1.5 text-xs font-medium text-accent-fg transition hover:bg-accent-hover"
                         >
                           {t("tradeOffers.accept")}
                         </button>
@@ -131,7 +131,7 @@ export default async function TradesPage() {
                       <input type="hidden" name="decision" value="reject" />
                       <button
                         type="submit"
-                        className="rounded-full bg-black/5 px-4 py-1.5 text-xs font-medium transition hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20"
+                        className="rounded-md bg-surface-2 px-4 py-1.5 text-xs font-medium transition hover:bg-surface-3"
                       >
                         {t("tradeOffers.reject")}
                       </button>
@@ -147,13 +147,13 @@ export default async function TradesPage() {
       <section className="mt-10">
         <h2 className="text-lg font-semibold">{t("tradeOffers.sent")}</h2>
         {sent.length === 0 ? (
-          <p className="mt-2 text-sm text-black/50 dark:text-white/50">{t("tradeOffers.noneePending")}</p>
+          <p className="mt-2 text-sm text-muted">{t("tradeOffers.noneePending")}</p>
         ) : (
           <div className="mt-4 space-y-3">
             {sent.map((offer) => {
               const toTeam = teamById.get(offer.toTeamId);
               return (
-                <div key={offer.id} className="rounded-lg border border-black/10 p-4 dark:border-white/10">
+                <div key={offer.id} className="card p-4">
                   <p className="text-sm">
                     {t("tradeOffers.sentToPrefix")}{" "}
                     {toTeam ? (
@@ -170,7 +170,7 @@ export default async function TradesPage() {
                     <input type="hidden" name="tradeOfferId" value={offer.id} />
                     <button
                       type="submit"
-                      className="rounded-full bg-black/5 px-4 py-1.5 text-xs font-medium transition hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20"
+                      className="rounded-md bg-surface-2 px-4 py-1.5 text-xs font-medium transition hover:bg-surface-3"
                     >
                       {t("tradeOffers.cancel")}
                     </button>

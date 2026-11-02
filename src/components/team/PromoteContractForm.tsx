@@ -26,12 +26,12 @@ export function PromoteContractForm({
       <button
         type="submit"
         disabled={pending}
-        className="rounded-full border border-black/10 px-4 py-1.5 text-sm font-medium hover:bg-black/5 disabled:opacity-50 dark:border-white/10 dark:hover:bg-white/10"
+        className="rounded-md border border-line px-4 py-1.5 text-sm font-medium hover:bg-surface-2 disabled:opacity-50"
       >
         {pending ? labels.proposing : labels.button}
       </button>
-      {state?.error && <p className="text-sm text-red-500">{state.error}</p>}
-      {state?.success && <p className="text-sm text-green-600 dark:text-green-400">{state.success}</p>}
+      {state?.error && <p className="text-sm text-bad">{state.error}</p>}
+      {state?.success && <p className="text-sm text-good">{state.success}</p>}
     </form>
   );
 }

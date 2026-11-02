@@ -97,7 +97,7 @@ export function SimulateButton({
 
   if (waitingFor) {
     return (
-      <p className="text-sm text-black/50 dark:text-white/50">
+      <p className="text-sm text-muted">
         {labels.waitingForPrefix} {waitingFor}…
       </p>
     );
@@ -109,12 +109,12 @@ export function SimulateButton({
         type="button"
         onClick={handleClick}
         disabled={isPending}
-        className="rounded-full bg-black px-6 py-2 font-medium text-white transition hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/80"
+        className="rounded-md bg-accent px-6 py-2 font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
       >
         {isPending ? `${labels.simulating} (${elapsedSeconds}s)` : labels.simulate}
       </button>
-      {isPending && <p className="text-xs text-black/50 dark:text-white/50">{labels.simulatingHint}</p>}
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {isPending && <p className="text-xs text-muted">{labels.simulatingHint}</p>}
+      {error && <p className="text-sm text-bad">{error}</p>}
     </div>
   );
 }

@@ -21,11 +21,11 @@ export function JoinByCodeForm({ placeholder, button }: { placeholder: string; b
         onChange={(e) => setCode(e.target.value)}
         placeholder={placeholder}
         maxLength={6}
-        className="rounded-lg border border-black/10 bg-transparent px-3 py-2 text-sm uppercase tracking-widest dark:border-white/10"
+        className="field px-3 py-2 text-sm uppercase tracking-widest"
       />
       <button
         type="submit"
-        className="rounded-full bg-black/5 px-4 py-2 text-sm font-medium transition hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20"
+        className="rounded-md bg-surface-2 px-4 py-2 text-sm font-medium transition hover:bg-surface-3"
       >
         {button}
       </button>

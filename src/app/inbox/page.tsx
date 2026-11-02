@@ -16,12 +16,12 @@ export default async function InboxPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">{t("inbox.title")}</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t("inbox.title")}</h1>
         {unread.length > 0 && (
           <form action={markAllMessagesRead}>
             <button
               type="submit"
-              className="rounded-full bg-black/5 px-3 py-1 text-sm transition hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/20"
+              className="rounded-full bg-surface-2 px-3 py-1 text-sm transition hover:bg-surface-3"
             >
               {t("inbox.markAllRead")}
             </button>
@@ -29,12 +29,12 @@ export default async function InboxPage() {
         )}
       </div>
 
-      <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+      <div className="mt-6 card p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           {t("inbox.unreadHeading")}
         </h2>
         {unread.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">{t("inbox.noUnread")}</p>
+          <p className="text-sm text-muted">{t("inbox.noUnread")}</p>
         ) : (
           <div className="space-y-3">
             {unread.map((message) => (
@@ -43,7 +43,7 @@ export default async function InboxPage() {
                   <input type="hidden" name="messageId" value={message.id} />
                   <button
                     type="submit"
-                    className="rounded-full bg-black px-3 py-1 text-xs font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+                    className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-accent-fg transition hover:bg-accent-hover"
                   >
                     {t("inbox.markRead")}
                   </button>
@@ -54,12 +54,12 @@ export default async function InboxPage() {
         )}
       </div>
 
-      <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+      <div className="mt-6 card p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           {t("inbox.readHeading")}
         </h2>
         {read.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">{t("inbox.noRead")}</p>
+          <p className="text-sm text-muted">{t("inbox.noRead")}</p>
         ) : (
           <div className="space-y-3">
             {read.map((message) => (
@@ -84,12 +84,12 @@ function MessageCard({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
+    <div className="card p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs text-black/40 dark:text-white/40">{formatGameDate(message.createdAt, locale)}</p>
+          <p className="text-xs text-faint">{formatGameDate(message.createdAt, locale)}</p>
           <p className="mt-1 font-medium">{message.title}</p>
-          <p className="mt-1 text-sm text-black/60 dark:text-white/60">{message.body}</p>
+          <p className="mt-1 text-sm text-soft">{message.body}</p>
         </div>
         {children}
       </div>

@@ -32,8 +32,8 @@ export function CareerForm({
             onClick={() => setLeagueId(league.id)}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
               league.id === leagueId
-                ? "bg-black text-white dark:bg-white dark:text-black"
-                : "bg-black/5 text-black/70 hover:bg-black/10 dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/20"
+                ? "bg-accent text-accent-fg"
+                : "bg-surface-2 text-soft hover:bg-surface-3"
             }`}
           >
             {league.code}

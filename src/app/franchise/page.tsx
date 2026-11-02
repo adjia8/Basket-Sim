@@ -36,12 +36,12 @@ export default async function FranchisePage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-bold">{t("franchisePage.title")}</h1>
-      <p className="mt-1 text-black/60 dark:text-white/60">{t("franchisePage.description")}</p>
+      <h1 className="text-2xl font-bold tracking-tight">{t("franchisePage.title")}</h1>
+      <p className="mt-1 text-soft">{t("franchisePage.description")}</p>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
-          <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">{t("gm.treasury")}</p>
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-muted">{t("gm.treasury")}</p>
           <p
             className={`mt-1 text-2xl font-semibold ${toneClass(
               financeTone(teamState.finances, healthyFinancesThreshold(membership.leagueId))
@@ -50,19 +50,19 @@ export default async function FranchisePage() {
             {formatSalary(teamState.finances, locale)}
           </p>
         </div>
-        <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
-          <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-muted">
             {t("franchisePage.attendanceLabel")}
           </p>
-          <p className="mt-1 text-xs text-black/50 dark:text-white/50">
+          <p className="mt-1 text-xs text-muted">
             {t("franchisePage.attendanceDescription")}
           </p>
           <p className={`mt-3 text-2xl font-semibold ${toneClass(ratingTone(teamState.attendance))}`}>
             {teamState.attendance}%
           </p>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-3">
             <div
-              className="h-full rounded-full bg-black dark:bg-white"
+              className="h-full rounded-full bg-accent"
               style={{ width: `${teamState.attendance}%` }}
             />
           </div>
@@ -70,7 +70,7 @@ export default async function FranchisePage() {
       </div>
 
       {!isOffseasonWindow && (
-        <p className="mt-4 text-sm text-red-500">{t("franchisePage.offseasonOnly")}</p>
+        <p className="mt-4 text-sm text-bad">{t("franchisePage.offseasonOnly")}</p>
       )}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -99,10 +99,10 @@ export default async function FranchisePage() {
         {championships.count > 0 ? (
           <p className="mt-2 text-sm">
             {t("franchisePage.championshipsCount", { count: championships.count })}{" "}
-            <span className="text-black/50 dark:text-white/50">({championships.seasons.join(", ")})</span>
+            <span className="text-muted">({championships.seasons.join(", ")})</span>
           </p>
         ) : (
-          <p className="mt-2 text-sm text-black/50 dark:text-white/50">{t("franchisePage.noChampionships")}</p>
+          <p className="mt-2 text-sm text-muted">{t("franchisePage.noChampionships")}</p>
         )}
       </div>
 
@@ -116,7 +116,7 @@ export default async function FranchisePage() {
                 <span className="font-medium">
                   {records.bestSeason.wins}-{records.bestSeason.losses}
                 </span>{" "}
-                <span className="text-black/50 dark:text-white/50">({records.bestSeason.season})</span>
+                <span className="text-muted">({records.bestSeason.season})</span>
               </li>
             )}
             <li>
@@ -126,7 +126,7 @@ export default async function FranchisePage() {
               <li>
                 {t("franchisePage.recordTeamScore")}{" "}
                 <span className="font-medium">{records.highestTeamScore.points}</span>{" "}
-                <span className="text-black/50 dark:text-white/50">
+                <span className="text-muted">
                   (vs {records.highestTeamScore.opponentAbbr}, {records.highestTeamScore.season})
                 </span>
               </li>
@@ -137,12 +137,12 @@ export default async function FranchisePage() {
                 <span className="font-medium">
                   {records.highestPlayerGame.playerName} — {records.highestPlayerGame.points}
                 </span>{" "}
-                <span className="text-black/50 dark:text-white/50">({records.highestPlayerGame.season})</span>
+                <span className="text-muted">({records.highestPlayerGame.season})</span>
               </li>
             )}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-black/50 dark:text-white/50">{t("franchisePage.noRecords")}</p>
+          <p className="mt-2 text-sm text-muted">{t("franchisePage.noRecords")}</p>
         )}
       </div>
 
@@ -153,10 +153,10 @@ export default async function FranchisePage() {
             {legends.map((legend) => (
               <li
                 key={legend.playerId}
-                className="rounded-full border border-black/10 px-3 py-1 dark:border-white/10"
+                className="rounded-full border border-line px-3 py-1"
               >
                 {legend.firstName} {legend.lastName}{" "}
-                <span className="text-black/50 dark:text-white/50">
+                <span className="text-muted">
                   ({legend.position}, {legend.peakOverallRating}
                   {legend.retiredSeason ? `, ${legend.retiredSeason}` : ""})
                 </span>
@@ -164,7 +164,7 @@ export default async function FranchisePage() {
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-black/50 dark:text-white/50">{t("franchisePage.noLegends")}</p>
+          <p className="mt-2 text-sm text-muted">{t("franchisePage.noLegends")}</p>
         )}
       </div>
     </div>
@@ -189,13 +189,13 @@ function FacilityCard({
   upgradeLabel: string;
 }) {
   return (
-    <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
+    <div className="card p-4">
       <p className="font-medium">{label}</p>
-      <p className="mt-1 text-xs text-black/50 dark:text-white/50">{description}</p>
+      <p className="mt-1 text-xs text-muted">{description}</p>
       <p className={`mt-3 text-xl font-semibold ${toneClass(ratingTone(level))}`}>{level} / 99</p>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-3">
         <div
-          className="h-full rounded-full bg-black dark:bg-white"
+          className="h-full rounded-full bg-accent"
           style={{ width: `${level}%` }}
         />
       </div>
@@ -205,7 +205,7 @@ function FacilityCard({
           <button
             type="submit"
             disabled={!canAfford}
-            className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-black dark:hover:bg-white/80"
+            className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-fg transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
           >
             {upgradeLabel}
           </button>

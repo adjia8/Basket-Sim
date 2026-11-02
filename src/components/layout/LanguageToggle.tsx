@@ -12,7 +12,7 @@ export function LanguageToggle({ locale, label }: { locale: Locale; label: strin
         type="submit"
         aria-label={label}
         title={label}
-        className="text-sm text-black/50 transition hover:text-black dark:text-white/50 dark:hover:text-white"
+        className="text-sm text-muted transition hover:text-fg"
       >
         {locale === "fr" ? "🇫🇷 FR" : "🇬🇧 EN"}
       </button>

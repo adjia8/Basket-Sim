@@ -110,13 +110,13 @@ export function DashboardClient({
   const injuredPlayers = players.filter((p) => p.injured);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 px-4 py-8">
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8 lg:px-8">
       {seasonComplete && playoffsInProgress && (
-        <div className="flex items-center justify-between rounded-lg border border-black/10 bg-black/5 px-4 py-3 dark:border-white/10 dark:bg-white/10">
+        <div className="flex items-center justify-between card bg-surface-2 px-4 py-3">
           <p className="text-sm font-medium">{labels.regularSeasonOverPlayoffs}</p>
           <Link
             href="/playoffs"
-            className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+            className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-fg transition hover:bg-accent-hover"
           >
             {labels.viewPlayoffs}
           </Link>
@@ -124,14 +124,14 @@ export function DashboardClient({
       )}
 
       {seasonComplete && !playoffsInProgress && (
-        <div className="flex items-center justify-between rounded-lg border border-black/10 bg-black/5 px-4 py-3 dark:border-white/10 dark:bg-white/10">
+        <div className="flex items-center justify-between card bg-surface-2 px-4 py-3">
           <p className="text-sm font-medium">
             {labels.seasonOverChampionPrefix} {championTeamName ?? "-"}
           </p>
           <form action={advanceSeason}>
             <button
               type="submit"
-              className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+              className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-fg transition hover:bg-accent-hover"
             >
               {labels.advanceSeason}
             </button>
@@ -139,24 +139,38 @@ export function DashboardClient({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <TeamColorSwatch primaryColor={myTeam.primaryColor} secondaryColor={myTeam.secondaryColor} size="lg" />
-          <h1 className="text-2xl font-bold">
-            <Link href={`/teams/${myTeam.id}`} className="hover:underline">
-              {teamFullName(myTeam)}
-            </Link>
-          </h1>
+      <div className="relative overflow-hidden card px-6 py-5">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-25"
+          style={{
+            background: `radial-gradient(120% 140% at 0% 0%, ${myTeam.primaryColor}, transparent 55%)`,
+          }}
+          aria-hidden
+        />
+        <div
+          className="absolute inset-y-0 left-0 w-1.5"
+          style={{ background: `linear-gradient(${myTeam.primaryColor} 50%, ${myTeam.secondaryColor} 50%)` }}
+          aria-hidden
+        />
+        <div className="relative flex flex-wrap items-end justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <TeamColorSwatch primaryColor={myTeam.primaryColor} secondaryColor={myTeam.secondaryColor} size="lg" />
+            <h1 className="text-3xl font-bold tracking-tight">
+              <Link href={`/teams/${myTeam.id}`} className="hover:underline">
+                {teamFullName(myTeam)}
+              </Link>
+            </h1>
+          </div>
+          <p className="text-sm text-muted">
+            {labels.inviteCode}{" "}
+            <span className="rounded bg-surface-3 px-2 py-0.5 font-mono font-semibold tracking-widest text-fg">
+              {inviteCode}
+            </span>
+          </p>
         </div>
-        <p className="text-sm text-black/50 dark:text-white/50">
-          {labels.inviteCode}{" "}
-          <span className="font-mono font-semibold tracking-widest text-black dark:text-white">
-            {inviteCode}
-          </span>
-        </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label={labels.conferenceRank} value={myRank ? `#${myRank}` : "-"} />
         <StatCard
           label={labels.record}
@@ -170,106 +184,119 @@ export function DashboardClient({
         />
       </div>
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">{labels.nextGame}</h2>
-        {nextGame ? (
-          <div className="space-y-3">
-            <GameLine
-              game={nextGame}
-              teams={teams}
-              myTeamId={teamId}
-              isPreseason={preseasonGameIds.has(nextGame.id)}
-              locale={locale}
-              preseasonTag={labels.preseasonTag}
-            />
-            {!seasonComplete && (
-              <AdvanceCalendarButton
-                labels={{
-                  button: labels.advanceCalendar,
-                  runningPrefix: labels.advanceCalendarRunningPrefix,
-                  upToDate: labels.advanceCalendarUpToDate,
-                  error: labels.advanceCalendarError,
-                  timedOut: labels.advanceCalendarTimedOut,
-                }}
-              />
-            )}
-          </div>
-        ) : (
-          <p className="text-sm text-black/50 dark:text-white/50">{labels.noGameScheduled}</p>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">{labels.recentForm}</h2>
-        {recentGames.length > 0 ? (
-          <div className="space-y-2">
-            {recentGames.map((game) => (
-              <GameLine
-                key={game.id}
-                game={game}
-                teams={teams}
-                myTeamId={teamId}
-                isPreseason={preseasonGameIds.has(game.id)}
-                locale={locale}
-                preseasonTag={labels.preseasonTag}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-black/50 dark:text-white/50">{labels.noGamePlayedYet}</p>
-        )}
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">{labels.topPlayers}</h2>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {topPlayers.map((player) => (
-            <div
-              key={player.id}
-              className="rounded-lg border border-black/10 p-4 dark:border-white/10"
-            >
-              <p className="font-medium">
-                <Link href={`/teams/${teamId}/players/${player.id}`} className="hover:underline">
-                  {player.firstName} {player.lastName}
-                </Link>
-              </p>
-              <p className="text-sm text-black/50 dark:text-white/50">
-                {player.position} · {labels.overallLabel} {player.overallRating}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {injuredPlayers.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-lg font-semibold">{labels.infirmary}</h2>
-          <div className="space-y-2">
-            {injuredPlayers.map((player) => (
-              <div
-                key={player.id}
-                className="flex items-center justify-between rounded-lg border border-black/10 px-4 py-3 text-sm dark:border-white/10"
-              >
-                <Link href={`/teams/${teamId}/players/${player.id}`} className="hover:underline">
-                  {player.firstName} {player.lastName}
-                </Link>
-                <span className="text-red-500">
-                  {labels.unavailable} ({player.injuryGamesRemaining} {labels.gamesUnit})
-                </span>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div className="space-y-8">
+          <section>
+            <h2 className="eyebrow mb-3">{labels.nextGame}</h2>
+            {nextGame ? (
+              <div className="space-y-3">
+                <GameLine
+                  game={nextGame}
+                  teams={teams}
+                  myTeamId={teamId}
+                  isPreseason={preseasonGameIds.has(nextGame.id)}
+                  locale={locale}
+                  preseasonTag={labels.preseasonTag}
+                />
+                {!seasonComplete && (
+                  <AdvanceCalendarButton
+                    labels={{
+                      button: labels.advanceCalendar,
+                      runningPrefix: labels.advanceCalendarRunningPrefix,
+                      upToDate: labels.advanceCalendarUpToDate,
+                      error: labels.advanceCalendarError,
+                      timedOut: labels.advanceCalendarTimedOut,
+                    }}
+                  />
+                )}
               </div>
-            ))}
-          </div>
-        </section>
-      )}
+            ) : (
+              <p className="text-sm text-muted">{labels.noGameScheduled}</p>
+            )}
+          </section>
 
-      <Link
-        href={`/teams/${teamId}`}
-        className="inline-block text-sm underline underline-offset-2"
-      >
-        {labels.viewFullRoster}
-      </Link>
+          <section>
+            <h2 className="eyebrow mb-3">{labels.recentForm}</h2>
+            {recentGames.length > 0 ? (
+              <div className="space-y-2">
+                {recentGames.map((game) => (
+                  <GameLine
+                    key={game.id}
+                    game={game}
+                    teams={teams}
+                    myTeamId={teamId}
+                    isPreseason={preseasonGameIds.has(game.id)}
+                    locale={locale}
+                    preseasonTag={labels.preseasonTag}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted">{labels.noGamePlayedYet}</p>
+            )}
+          </section>
 
-      <div className="border-t border-black/10 pt-6 dark:border-white/10">
+        </div>
+        <div className="space-y-8">
+          <section>
+            <h2 className="eyebrow mb-3">{labels.topPlayers}</h2>
+            <div className="space-y-2">
+              {topPlayers.map((player) => (
+                <Link
+                  key={player.id}
+                  href={`/teams/${teamId}/players/${player.id}`}
+                  className="flex items-center gap-3 card px-4 py-3 transition hover:border-line-strong"
+                >
+                  <span
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-surface-3 text-lg font-bold tabular"
+                    title={labels.overallLabel}
+                  >
+                    {player.overallRating}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">
+                      {player.firstName} {player.lastName}
+                    </span>
+                    <span className="block text-xs text-muted">
+                      {player.position} · {labels.overallLabel}
+                    </span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          {injuredPlayers.length > 0 && (
+            <section>
+              <h2 className="eyebrow mb-3">{labels.infirmary}</h2>
+              <div className="space-y-2">
+                {injuredPlayers.map((player) => (
+                  <div
+                    key={player.id}
+                    className="flex items-center justify-between card px-4 py-3 text-sm"
+                  >
+                    <Link href={`/teams/${teamId}/players/${player.id}`} className="hover:underline">
+                      {player.firstName} {player.lastName}
+                    </Link>
+                    <span className="text-bad">
+                      {labels.unavailable} ({player.injuryGamesRemaining} {labels.gamesUnit})
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <Link
+            href={`/teams/${teamId}`}
+            className="inline-block text-sm font-medium text-accent-text hover:underline"
+          >
+            {labels.viewFullRoster}
+          </Link>
+        </div>
+      </div>
+
+      <div className="border-t border-line pt-6">
         <DeleteCareerButton
           labels={{
             button: labels.deleteCareer,
@@ -294,11 +321,9 @@ function StatCard({
   warning?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
-      <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
-        {label}
-      </p>
-      <p className={`mt-1 text-xl font-semibold ${warning ? "text-red-500" : ""}`}>
+    <div className="card px-4 py-3">
+      <p className="eyebrow">{label}</p>
+      <p className={`mt-1 text-2xl font-bold tabular tracking-tight ${warning ? "text-bad" : ""}`}>
         {value}
       </p>
     </div>
@@ -337,31 +362,31 @@ function GameLine({
   return (
     <Link
       href={`/game/${game.id}`}
-      className={`flex items-center justify-between rounded-lg border px-4 py-3 text-sm transition hover:bg-black/5 dark:hover:bg-white/5 ${
+      className={`flex items-center justify-between rounded-lg border px-4 py-3 text-sm transition hover:bg-surface-2 ${
         won
-          ? "border-green-500/30 bg-green-500/5"
+          ? "border-good/30 bg-good/5"
           : lost
-            ? "border-red-500/30 bg-red-500/5"
-            : "border-black/10 dark:border-white/10"
+            ? "border-bad/30 bg-bad/5"
+            : "border-line bg-surface"
       }`}
     >
       <span>
         {isHome ? "vs" : "@"} {opponent ? teamFullName(opponent) : "?"}
         {isPreseason && (
-          <span className="ml-2 rounded-full bg-black/5 px-2 py-0.5 text-xs font-normal text-black/50 dark:bg-white/10 dark:text-white/50">
+          <span className="ml-2 rounded-full bg-surface-2 px-2 py-0.5 text-xs font-normal text-muted">
             {preseasonTag}
           </span>
         )}
       </span>
-      <span className="flex items-center gap-3 text-black/50 dark:text-white/50">
+      <span className="flex items-center gap-3 text-muted">
         {game.status === "final" ? (
           <span
             className={`font-medium ${
               won
-                ? "text-green-600 dark:text-green-400"
+                ? "text-good"
                 : lost
-                  ? "text-red-500"
-                  : "text-black dark:text-white"
+                  ? "text-bad"
+                  : "text-fg"
             }`}
           >
             {game.homeScore}-{game.awayScore}

@@ -26,10 +26,10 @@ test("promoting a player to the active rotation persists after reload", async ({
   const reserveAddButtons = page.locator('button[aria-label="Ajouter à la rotation"]');
   await expect(reserveAddButtons.first()).toBeVisible();
 
-  const activeList = page.locator("ul").first();
+  const activeList = page.locator("main ul").first();
   const activeCountBefore = await activeList.locator("li").count();
 
-  const reserveList = page.locator("ul").nth(1);
+  const reserveList = page.locator("main ul").nth(1);
   const reserveCountBefore = await reserveList.locator("li").count();
   const reserveFirstRowText = await reserveList.locator("li").first().innerText();
   const nameMatch = reserveFirstRowText.match(/#\d+\s+([^(]+?)\s*\(/);
@@ -51,9 +51,9 @@ test("promoting a player to the active rotation persists after reload", async ({
   await expect(page.locator("text=Rotation enregistrée")).toBeVisible({ timeout: 10_000 });
 
   await page.reload();
-  await expect(page.locator("ul").first().locator("li")).toHaveCount(activeCountBefore);
+  await expect(page.locator("main ul").first().locator("li")).toHaveCount(activeCountBefore);
 
-  const activeNamesAfterReload = await page.locator("ul").first().locator("li").allInnerTexts();
+  const activeNamesAfterReload = await page.locator("main ul").first().locator("li").allInnerTexts();
   const promotedIsActive = activeNamesAfterReload.some((row) => row.includes(promotedName));
   expect(promotedIsActive).toBe(true);
 });

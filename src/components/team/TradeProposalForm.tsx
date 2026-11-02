@@ -57,7 +57,7 @@ export function TradeProposalForm({
   const [state, action, pending] = useActionState(proposeTrade, undefined);
 
   return (
-    <div className="mt-8 rounded-lg border border-black/10 p-4 dark:border-white/10">
+    <div className="mt-8 card p-4">
       <h2 className="text-lg font-semibold">{labels.title}</h2>
 
       <form action={action} className="mt-4">
@@ -87,10 +87,10 @@ export function TradeProposalForm({
         </div>
 
         {state?.error && (
-          <p className="mt-4 text-sm text-red-500">{state.error}</p>
+          <p className="mt-4 text-sm text-bad">{state.error}</p>
         )}
         {state?.success && (
-          <p className="mt-4 text-sm text-green-600 dark:text-green-400">
+          <p className="mt-4 text-sm text-good">
             {state.success}
           </p>
         )}
@@ -98,7 +98,7 @@ export function TradeProposalForm({
         <button
           type="submit"
           disabled={pending}
-          className="mt-4 rounded-full bg-black px-6 py-2 text-sm font-medium text-white transition hover:bg-black/80 disabled:opacity-50 dark:bg-white dark:text-black dark:hover:bg-white/80"
+          className="mt-4 rounded-md bg-accent px-6 py-2 text-sm font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
         >
           {pending ? labels.proposing : labels.proposeButton}
         </button>
@@ -122,13 +122,13 @@ function PlayerCheckboxList({
 }) {
   return (
     <div>
-      <h3 className="mb-2 text-sm font-medium text-black/60 dark:text-white/60">
+      <h3 className="mb-2 text-sm font-medium text-soft">
         {title}
       </h3>
       <ul className="space-y-1">
         {roster.map((player) => (
           <li key={player.id}>
-            <label className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-black/5 dark:hover:bg-white/5">
+            <label className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-surface-2">
               <input type="checkbox" name={name} value={player.id} />
               <span className="flex-1">
                 <Link
@@ -138,11 +138,11 @@ function PlayerCheckboxList({
                 >
                   {player.firstName} {player.lastName}
                 </Link>{" "}
-                <span className="text-black/40 dark:text-white/40">
+                <span className="text-faint">
                   ({player.position}, {player.overallRating})
                 </span>
               </span>
-              <span className="text-black/50 dark:text-white/50">
+              <span className="text-muted">
                 {formatSalary(player.salary, locale)}
               </span>
             </label>
@@ -165,13 +165,13 @@ function PickCheckboxList({
   if (picks.length === 0) return null;
   return (
     <div>
-      <h3 className="mb-2 text-sm font-medium text-black/60 dark:text-white/60">
+      <h3 className="mb-2 text-sm font-medium text-soft">
         {title}
       </h3>
       <ul className="space-y-1">
         {picks.map((pick) => (
           <li key={pick.id}>
-            <label className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-black/5 dark:hover:bg-white/5">
+            <label className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-surface-2">
               <input type="checkbox" name={name} value={pick.id} />
               <span className="flex-1">{pick.label}</span>
             </label>

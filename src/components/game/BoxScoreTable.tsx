@@ -108,13 +108,13 @@ function TeamBoxScore({
 
   return (
     <div>
-      <h3 className="mb-2 text-sm font-semibold text-black/50 dark:text-white/50">
+      <h3 className="mb-2 text-sm font-semibold text-muted">
         {label}
       </h3>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="data-table w-full min-w-[720px] text-left text-sm">
           <thead>
-            <tr className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
+            <tr className="border-b border-line text-muted">
               <th className="py-2 pr-4">{labels.player}</th>
               <th className="py-2 pr-4">{labels.minutes}</th>
               <th className="py-2 pr-4">{labels.points}</th>
@@ -131,7 +131,7 @@ function TeamBoxScore({
           </thead>
           <tbody>
             {sorted.map((entry) => (
-              <tr key={entry.playerId} className="border-b border-black/5 dark:border-white/5">
+              <tr key={entry.playerId} className="border-b border-line-soft">
                 <td className="py-2 pr-4">
                   {entry.player ? (
                     <Link href={`/teams/${entry.teamId}/players/${entry.playerId}`} className="hover:underline">
@@ -141,22 +141,22 @@ function TeamBoxScore({
                     entry.playerId
                   )}
                   {entry.technicalFouls > 0 && (
-                    <span className="ml-2 rounded-full bg-yellow-500/10 px-2 py-0.5 text-xs font-normal text-yellow-600 dark:text-yellow-400">
+                    <span className="ml-2 rounded-full bg-warn/10 px-2 py-0.5 text-xs font-normal text-warn">
                       {labels.technical(entry.technicalFouls)}
                     </span>
                   )}
                   {entry.flagrantFouls > 0 && (
-                    <span className="ml-2 rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-normal text-red-500">
+                    <span className="ml-2 rounded-full bg-bad/10 px-2 py-0.5 text-xs font-normal text-bad">
                       {labels.flagrant(entry.flagrantFouls)}
                     </span>
                   )}
                   {entry.disqualifiedReason === "fouled_out" && (
-                    <span className="ml-2 rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-normal text-red-500">
+                    <span className="ml-2 rounded-full bg-bad/10 px-2 py-0.5 text-xs font-normal text-bad">
                       {labels.fouledOut}
                     </span>
                   )}
                   {entry.disqualifiedReason === "ejected" && (
-                    <span className="ml-2 rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-normal text-red-500">
+                    <span className="ml-2 rounded-full bg-bad/10 px-2 py-0.5 text-xs font-normal text-bad">
                       {labels.ejected}
                     </span>
                   )}
@@ -165,19 +165,19 @@ function TeamBoxScore({
                 <td className="py-2 pr-4 font-medium">{entry.points}</td>
                 <td className="py-2 pr-4">
                   {madeAttempted(entry.fieldGoalsMade, entry.fieldGoalsAttempted)}{" "}
-                  <span className="text-black/40 dark:text-white/40">
+                  <span className="text-faint">
                     ({pct(entry.fieldGoalsMade, entry.fieldGoalsAttempted)})
                   </span>
                 </td>
                 <td className="py-2 pr-4">
                   {madeAttempted(entry.threePointersMade, entry.threePointersAttempted)}{" "}
-                  <span className="text-black/40 dark:text-white/40">
+                  <span className="text-faint">
                     ({pct(entry.threePointersMade, entry.threePointersAttempted)})
                   </span>
                 </td>
                 <td className="py-2 pr-4">
                   {madeAttempted(entry.freeThrowsMade, entry.freeThrowsAttempted)}{" "}
-                  <span className="text-black/40 dark:text-white/40">
+                  <span className="text-faint">
                     ({pct(entry.freeThrowsMade, entry.freeThrowsAttempted)})
                   </span>
                 </td>
@@ -191,25 +191,25 @@ function TeamBoxScore({
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t border-black/10 font-medium dark:border-white/10">
+            <tr className="border-t border-line font-medium">
               <td className="py-2 pr-4">{labels.team}</td>
               <td className="py-2 pr-4">{totals.minutesPlayed.toFixed(1)}</td>
               <td className="py-2 pr-4">{totals.points}</td>
               <td className="py-2 pr-4">
                 {madeAttempted(totals.fieldGoalsMade, totals.fieldGoalsAttempted)}{" "}
-                <span className="font-normal text-black/40 dark:text-white/40">
+                <span className="font-normal text-faint">
                   ({pct(totals.fieldGoalsMade, totals.fieldGoalsAttempted)})
                 </span>
               </td>
               <td className="py-2 pr-4">
                 {madeAttempted(totals.threePointersMade, totals.threePointersAttempted)}{" "}
-                <span className="font-normal text-black/40 dark:text-white/40">
+                <span className="font-normal text-faint">
                   ({pct(totals.threePointersMade, totals.threePointersAttempted)})
                 </span>
               </td>
               <td className="py-2 pr-4">
                 {madeAttempted(totals.freeThrowsMade, totals.freeThrowsAttempted)}{" "}
-                <span className="font-normal text-black/40 dark:text-white/40">
+                <span className="font-normal text-faint">
                   ({pct(totals.freeThrowsMade, totals.freeThrowsAttempted)})
                 </span>
               </td>

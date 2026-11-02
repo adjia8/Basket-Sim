@@ -40,17 +40,17 @@ export default async function PressPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-bold">{t("pressPage.title")}</h1>
+      <h1 className="text-2xl font-bold tracking-tight">{t("pressPage.title")}</h1>
 
       <div className="mt-6 flex flex-wrap gap-4">
-        <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
-          <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">{t("pressPage.morale")}</p>
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-muted">{t("pressPage.morale")}</p>
           <p className={`mt-1 text-xl font-semibold ${toneClass(neutralTone(teamState.morale))}`}>
             {teamState.morale} / 99
           </p>
         </div>
-        <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
-          <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-muted">
             {t("pressPage.publicOpinion")}
           </p>
           <p className={`mt-1 text-xl font-semibold ${toneClass(neutralTone(teamState.publicOpinion))}`}>
@@ -58,8 +58,8 @@ export default async function PressPage() {
           </p>
         </div>
         {gmProfile && (
-          <div className="rounded-lg border border-black/10 p-4 dark:border-white/10">
-            <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
+          <div className="card p-4">
+            <p className="text-xs uppercase tracking-wide text-muted">
               {t("pressPage.frontOfficeApproval")}
             </p>
             <p className={`mt-1 text-xl font-semibold ${toneClass(neutralTone(gmProfile.frontOfficeApproval))}`}>
@@ -69,18 +69,18 @@ export default async function PressPage() {
         )}
       </div>
 
-      <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+      <div className="mt-6 card p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           {t("pressPage.pendingHeading")}
         </h2>
         {!pending ? (
-          <p className="text-sm text-black/50 dark:text-white/50">{t("pressPage.noPending")}</p>
+          <p className="text-sm text-muted">{t("pressPage.noPending")}</p>
         ) : (
           <form action={submitPressAnswers} className="space-y-5">
             <input type="hidden" name="conferenceId" value={pending.id} />
             {pending.questions.map((question, i) => (
               <div key={question.id}>
-                <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
+                <p className="text-xs uppercase tracking-wide text-muted">
                   {CATEGORY_KEYS[question.category] ? t(CATEGORY_KEYS[question.category]) : question.category}
                 </p>
                 <p className="mt-1 font-medium">
@@ -94,7 +94,7 @@ export default async function PressPage() {
                         name={`answer_${question.id}`}
                         value={option.id}
                         required
-                        className="accent-black dark:accent-white"
+                        className="accent-[var(--accent)]"
                       />
                       {option.label}
                     </label>
@@ -104,7 +104,7 @@ export default async function PressPage() {
             ))}
             <button
               type="submit"
-              className="rounded-full bg-black px-4 py-1.5 text-sm font-medium text-white transition hover:bg-black/80 dark:bg-white dark:text-black dark:hover:bg-white/80"
+              className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-fg transition hover:bg-accent-hover"
             >
               {t("pressPage.answer")}
             </button>
@@ -112,23 +112,23 @@ export default async function PressPage() {
         )}
       </div>
 
-      <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+      <div className="mt-6 card p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           {t("pressPage.historyHeading")}
         </h2>
         {history.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">{t("pressPage.noHistory")}</p>
+          <p className="text-sm text-muted">{t("pressPage.noHistory")}</p>
         ) : (
           <div className="space-y-4">
             {history.map((conference) => (
-              <div key={conference.id} className="border-b border-black/5 pb-3 last:border-0 dark:border-white/5">
-                <p className="text-xs text-black/40 dark:text-white/40">{conference.gameDate}</p>
+              <div key={conference.id} className="border-b border-line-soft pb-3 last:border-0">
+                <p className="text-xs text-faint">{conference.gameDate}</p>
                 <ul className="mt-1 space-y-1 text-sm">
                   {conference.questions.map((question) => {
                     const chosen = question.options.find((o) => o.id === question.chosenOptionId);
                     return (
                       <li key={question.id}>
-                        <span className="text-black/60 dark:text-white/60">{question.prompt}</span>
+                        <span className="text-soft">{question.prompt}</span>
                         {chosen && <span className="ml-1 font-medium">— {chosen.label}</span>}
                       </li>
                     );

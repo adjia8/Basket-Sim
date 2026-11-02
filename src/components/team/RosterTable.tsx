@@ -104,9 +104,9 @@ export function RosterTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[860px] text-left text-sm">
+      <table className="data-table w-full min-w-[860px] text-left text-sm">
         <thead>
-          <tr className="border-b border-black/10 text-black/50 dark:border-white/10 dark:text-white/50">
+          <tr className="border-b border-line text-muted">
             <th className="py-2 pr-4" />
             <th className="py-2 pr-4">{labels.player}</th>
             <th className="py-2 pr-4">{labels.position}</th>
@@ -116,7 +116,7 @@ export function RosterTable({
                 <button
                   type="button"
                   onClick={() => toggleSort(col.key)}
-                  className="font-medium hover:text-black dark:hover:text-white"
+                  className="font-medium hover:text-fg"
                 >
                   {col.label}
                   {sortKey === col.key ? (descending ? " ↓" : " ↑") : ""}
@@ -127,7 +127,7 @@ export function RosterTable({
         </thead>
         <tbody>
           {sorted.map((player) => (
-            <tr key={player.id} className="border-b border-black/5 dark:border-white/5">
+            <tr key={player.id} className="border-b border-line-soft">
               <td className="py-2 pr-4">
                 <PlayerAvatar playerId={player.id} firstName={player.firstName} lastName={player.lastName} />
               </td>
@@ -139,12 +139,12 @@ export function RosterTable({
                   #{player.jerseyNumber} {player.firstName} {player.lastName}
                 </Link>
                 {player.contractType !== "standard" && (
-                  <span className="ml-2 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs font-normal text-blue-600 dark:text-blue-400">
+                  <span className="ml-2 rounded-full bg-info/10 px-2 py-0.5 text-xs font-normal text-info">
                     {labels.contractType[player.contractType]}
                   </span>
                 )}
                 {player.injured && (
-                  <span className="ml-2 rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-normal text-red-500">
+                  <span className="ml-2 rounded-full bg-bad/10 px-2 py-0.5 text-xs font-normal text-bad">
                     {labels.unavailable}{" "}
                     {player.injurySeverity ? `(${labels.severity[player.injurySeverity]}, ` : "("}
                     {player.injuryGamesRemaining} {labels.games})
@@ -160,7 +160,7 @@ export function RosterTable({
                     />
                     <button
                       type="submit"
-                      className="rounded-full border border-black/10 px-2 py-0.5 text-xs font-normal hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+                      className="rounded-full border border-line px-2 py-0.5 text-xs font-normal hover:bg-surface-2"
                     >
                       {player.playingThroughInjury ? labels.rest : labels.playThroughInjury}
                     </button>
@@ -169,7 +169,7 @@ export function RosterTable({
                 {player.wantsTrade && (
                   <span
                     title={player.tradeReasons.map((r) => labels.tradeReason[r]).join(" · ")}
-                    className="ml-2 rounded-full bg-orange-500/10 px-2 py-0.5 text-xs font-normal text-orange-500"
+                    className="ml-2 rounded-full bg-warn/10 px-2 py-0.5 text-xs font-normal text-warn"
                   >
                     {labels.wantsTrade}
                   </span>
@@ -185,7 +185,7 @@ export function RosterTable({
               <td className="py-2 pr-4">
                 {formatSalary(player.salary, locale)}
                 {!player.guaranteed && (
-                  <span className="ml-1 text-xs text-black/40 dark:text-white/40">
+                  <span className="ml-1 text-xs text-faint">
                     {labels.notGuaranteed}
                   </span>
                 )}

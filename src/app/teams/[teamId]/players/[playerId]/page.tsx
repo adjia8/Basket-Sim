@@ -139,10 +139,10 @@ export default async function PlayerDetailPage({
       <div className="flex items-center gap-4">
         <PlayerAvatar playerId={player.id} firstName={player.firstName} lastName={player.lastName} size="lg" />
         <div>
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-2xl font-bold tracking-tight">
             #{player.jerseyNumber} {player.firstName} {player.lastName}
           </h1>
-          <p className="text-sm text-black/50 dark:text-white/50">
+          <p className="text-sm text-muted">
             <Link href={`/teams/${team.id}`} className="hover:underline">
               {teamFullName(team)}
             </Link>{" "}
@@ -153,7 +153,7 @@ export default async function PlayerDetailPage({
       </div>
 
       {reasons.length > 0 && (
-        <div className="mt-4 rounded-lg border border-orange-500/30 bg-orange-500/5 p-3 text-sm text-orange-600 dark:text-orange-400">
+        <div className="mt-4 rounded-lg border border-warn/30 bg-warn/5 p-3 text-sm text-warn">
           <p className="font-medium">{t("player.wantsTradeHeading")}</p>
           <ul className="mt-1 list-inside list-disc">
             {reasons.map((reason) => (
@@ -162,9 +162,9 @@ export default async function PlayerDetailPage({
           </ul>
 
           {isMyTeam && demandState?.wantsTrade && (
-            <div className="mt-3 border-t border-orange-500/20 pt-3">
+            <div className="mt-3 border-t border-warn/20 pt-3">
               {demandState.activePromiseType ? (
-                <p className="text-orange-600 dark:text-orange-400">
+                <p className="text-warn">
                   {t("promise.pendingPrefix")}{" "}
                   {t(`domain.promiseType.${demandState.activePromiseType}` as const)}
                   {demandState.activePromiseSeason ? ` — ${demandState.activePromiseSeason}` : ""}
@@ -193,8 +193,8 @@ export default async function PlayerDetailPage({
         </div>
       )}
 
-      <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+      <div className="mt-6 card p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           {t("player.seasonStats")}
         </h2>
         <div className="flex flex-wrap gap-6">
@@ -205,8 +205,8 @@ export default async function PlayerDetailPage({
         </div>
       </div>
 
-      <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+      <div className="mt-6 card p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           {t("player.attributes")}
         </h2>
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
@@ -229,19 +229,19 @@ export default async function PlayerDetailPage({
         </div>
       </div>
 
-      <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+      <div className="mt-6 card p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           {t("player.contract")}
         </h2>
         <p className="text-xl font-semibold">
           {formatSalary(contract.salary, locale)}
-          <span className="ml-2 text-sm font-normal text-black/50 dark:text-white/50">
+          <span className="ml-2 text-sm font-normal text-muted">
             {t(contract.yearsRemaining > 1 ? "player.yearsRemainingMany" : "player.yearRemainingOne", {
               count: contract.yearsRemaining,
             })}
           </span>
         </p>
-        <p className="mt-1 text-sm text-black/50 dark:text-white/50">
+        <p className="mt-1 text-sm text-muted">
           {contractTypeLabels[contract.contractType]}
           {!contract.guaranteed && t("player.notGuaranteedSuffix")}
           {contract.contractType === "development" && (
@@ -255,11 +255,11 @@ export default async function PlayerDetailPage({
           )}
         </p>
         {activationLimitReached && (
-          <p className="mt-1 text-sm text-red-500">{t("player.activationLimitReached")}</p>
+          <p className="mt-1 text-sm text-bad">{t("player.activationLimitReached")}</p>
         )}
 
         {canExtend && (
-          <div className="mt-4 rounded-lg border border-black/10 p-3 dark:border-white/10">
+          <div className="mt-4 card p-3">
             <p className="text-sm font-medium">{t("player.proposeExtension")}</p>
             <ExtendContractForm
               playerId={player.id}
@@ -286,7 +286,7 @@ export default async function PlayerDetailPage({
                 <input type="hidden" name="playerId" value={player.id} />
                 <button
                   type="submit"
-                  className="rounded-full border border-red-500/30 px-4 py-1.5 text-sm font-medium text-red-500 hover:bg-red-500/10"
+                  className="rounded-md border border-bad/30 px-4 py-1.5 text-sm font-medium text-bad hover:bg-bad/10"
                 >
                   {t("player.cut")}
                 </button>
@@ -297,7 +297,7 @@ export default async function PlayerDetailPage({
                 <input type="hidden" name="playerId" value={player.id} />
                 <button
                   type="submit"
-                  className="rounded-full border border-black/10 px-4 py-1.5 text-sm font-medium hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+                  className="rounded-md border border-line px-4 py-1.5 text-sm font-medium hover:bg-surface-2"
                 >
                   {t("player.proposeAltContract", { type: altTypeLabel })}
                 </button>
@@ -313,12 +313,12 @@ export default async function PlayerDetailPage({
         )}
       </div>
 
-      <div className="mt-6 rounded-xl border border-black/10 p-4 dark:border-white/10">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-black/50 dark:text-white/50">
+      <div className="mt-6 card p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           {t("player.formerClubs")}
         </h2>
         {stints.length === 0 ? (
-          <p className="text-sm text-black/50 dark:text-white/50">{t("player.noHistory")}</p>
+          <p className="text-sm text-muted">{t("player.noHistory")}</p>
         ) : (
           <ul className="space-y-1 text-sm">
             {stints.map((stint) => (
@@ -326,7 +326,7 @@ export default async function PlayerDetailPage({
                 <Link href={`/teams/${stint.teamId}`} className="hover:underline">
                   {stint.teamCity} {stint.teamName} ({stint.teamAbbreviation})
                 </Link>
-                <span className="text-black/50 dark:text-white/50">
+                <span className="text-muted">
                   {stint.season} · {stintReasonLabels[stint.reason] ?? stint.reason}
                 </span>
               </li>
@@ -351,7 +351,7 @@ function Stat({
 }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-black/50 dark:text-white/50">{label}</p>
+      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
       <p className={`mt-0.5 ${bold ? "text-lg font-semibold" : ""} ${tone ? toneClass(tone) : ""}`}>{value}</p>
     </div>
   );
