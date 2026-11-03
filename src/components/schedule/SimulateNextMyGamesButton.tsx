@@ -14,6 +14,7 @@ export interface SimulateNextMyGamesButtonLabels {
   button: string; // "Simuler"
   runningPrefix: string; // "Simulation en cours — matchs simulés :"
   remainingSuffix: string; // "restants"
+  leaguePrefix: string; // "· matchs de la ligue :" — rattrapage avant chacun de mes matchs
   done: string;
   error: string;
   waiting: string; // le prochain match implique un autre manager
@@ -32,6 +33,7 @@ export function SimulateNextMyGamesButton({
   const [count, setCount] = useState(Math.min(5, maxCount));
   const [remaining, setRemaining] = useState(initialRemaining);
   const [totalSimulated, setTotalSimulated] = useState(0);
+  const [leagueSimulated, setLeagueSimulated] = useState(0);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [waiting, setWaiting] = useState(false);
@@ -42,6 +44,7 @@ export function SimulateNextMyGamesButton({
     setError(null);
     setWaiting(false);
     setFinished(false);
+    setLeagueSimulated(0);
     let done = 0;
     while (done < count) {
       let res;
@@ -56,6 +59,10 @@ export function SimulateNextMyGamesButton({
         break;
       }
       setRemaining(res.remaining);
+      setLeagueSimulated((prev) => prev + res.leagueGamesSimulated);
+      // Rattrapage de la ligue en cours avant mon prochain match : on
+      // rappelle sans compter de match à moi.
+      if (res.catchingUp) continue;
       if (res.simulated === 0) {
         if (res.blockedByOtherManager) setWaiting(true);
         break;
@@ -91,7 +98,8 @@ export function SimulateNextMyGamesButton({
       </div>
       {running && (
         <p className="text-xs text-muted">
-          {labels.runningPrefix} {totalSimulated} · {remaining} {labels.remainingSuffix}
+          {labels.runningPrefix} {totalSimulated} · {remaining} {labels.remainingSuffix} {labels.leaguePrefix}{" "}
+          {leagueSimulated}
         </p>
       )}
       {!running && finished && <p className="text-xs text-good">{labels.done}</p>}

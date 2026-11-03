@@ -139,6 +139,7 @@ export default async function GamePage({
                   otherManagerFallback: t("game.otherManagerFallback"),
                   timedOut: t("game.timedOut"),
                   simulatingHint: t("game.simulatingHint"),
+                  catchingUp: t("game.catchingUp"),
                 }}
               />
             ) : (

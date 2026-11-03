@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/prisma";
+import type { PlayerStatePatches } from "./player-state-patches";
 import type { BoxScoreEntry, Player } from "@/lib/types";
 import { BENCHED_RENOWN_DECAY_CHANCE, renownDeltaForGame } from "@/lib/careers/renown-rules";
 
@@ -13,7 +13,7 @@ import { BENCHED_RENOWN_DECAY_CHANCE, renownDeltaForGame } from "@/lib/careers/r
 // sert à retrouver l'overall/renommé courant (état de Career, pas le
 // catalogue figé) de chaque joueur.
 export async function advancePlayerRenown(
-  careerId: string,
+  patches: PlayerStatePatches,
   boxScore: BoxScoreEntry[],
   eligibleRoster: Player[]
 ): Promise<void> {
@@ -28,9 +28,6 @@ export async function advancePlayerRenown(
         : 0;
     if (delta === 0) continue;
     const newRenown = Math.max(0, Math.min(99, Math.round(player.renown + delta)));
-    await prisma.playerState.updateMany({
-      where: { careerId, playerId: player.id },
-      data: { renown: newRenown },
-    });
+    patches.set(player.id, { renown: newRenown });
   }
 }

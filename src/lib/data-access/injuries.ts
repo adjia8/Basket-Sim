@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/prisma";
+import type { PlayerStatePatches } from "./player-state-patches";
 import type { BoxScoreEntry, Player } from "@/lib/types";
 import {
   escalateSeverity,
@@ -32,8 +32,10 @@ export interface NewInjury {
 // les blessures VRAIMENT nouvelles ce match (pas les aggravations/rechutes
 // d'une blessure déjà en cours) — l'appelant (simulate.ts) s'en sert pour
 // notifier la boîte de réception, gaté aux équipes gérées par un humain.
+// Les modifications sont déposées dans `patches` (écrites en une fois par
+// l'appelant, voir player-state-patches.ts).
 export async function advanceRosterInjuries(
-  careerId: string,
+  patches: PlayerStatePatches,
   roster: Player[],
   boxScore: BoxScoreEntry[],
   facilitiesLevel = 50
@@ -55,30 +57,24 @@ export async function advanceRosterInjuries(
           // nouvelle blessure de cette gravité).
           const extra = rollInjuryDurationGames();
           const newSeverity = escalateSeverity(severity);
-          await prisma.playerState.updateMany({
-            where: { careerId, playerId: player.id },
-            data: {
-              injuryGamesRemaining: player.injuryGamesRemaining + extra,
-              injurySeverity: newSeverity,
-              playingThroughInjury: newSeverity === "minor" ? player.playingThroughInjury : false,
-              conditioning: clampConditioning(
-                player.conditioning - conditioningLossOnInjury(newSeverity) / 2
-              ),
-            },
+          patches.set(player.id, {
+            injuryGamesRemaining: player.injuryGamesRemaining + extra,
+            injurySeverity: newSeverity,
+            playingThroughInjury: newSeverity === "minor" ? player.playingThroughInjury : false,
+            conditioning: clampConditioning(
+              player.conditioning - conditioningLossOnInjury(newSeverity) / 2
+            ),
           });
         } else if (outcome === "reinjury") {
           // Une nouvelle blessure distincte, contractée en compensant,
           // remplace le décompte en cours.
           const duration = rollInjuryDurationGames();
           const newSeverity = severityForDuration(duration);
-          await prisma.playerState.updateMany({
-            where: { careerId, playerId: player.id },
-            data: {
-              injuryGamesRemaining: duration,
-              injurySeverity: newSeverity,
-              playingThroughInjury: false,
-              conditioning: clampConditioning(player.conditioning - conditioningLossOnInjury(newSeverity)),
-            },
+          patches.set(player.id, {
+            injuryGamesRemaining: duration,
+            injurySeverity: newSeverity,
+            playingThroughInjury: false,
+            conditioning: clampConditioning(player.conditioning - conditioningLossOnInjury(newSeverity)),
           });
         } else {
           // Aucun incident ce match : décompte normal, récupération de
@@ -88,19 +84,18 @@ export async function advanceRosterInjuries(
           const recovered = clampConditioning(
             player.conditioning + CONDITIONING_RECOVERY_WHILE_PLAYING_HURT
           );
-          await prisma.playerState.updateMany({
-            where: { careerId, playerId: player.id },
-            data:
-              remaining > 0
-                ? { injuryGamesRemaining: remaining, conditioning: recovered }
-                : {
-                    injured: false,
-                    injuryGamesRemaining: 0,
-                    injurySeverity: null,
-                    playingThroughInjury: false,
-                    conditioning: recovered,
-                  },
-          });
+          patches.set(
+            player.id,
+            remaining > 0
+              ? { injuryGamesRemaining: remaining, conditioning: recovered }
+              : {
+                  injured: false,
+                  injuryGamesRemaining: 0,
+                  injurySeverity: null,
+                  playingThroughInjury: false,
+                  conditioning: recovered,
+                }
+          );
         }
       } else {
         // Repos complet (n'a pas joué ce match) : décompte normal, légère
@@ -109,39 +104,32 @@ export async function advanceRosterInjuries(
         const decayed = clampConditioning(
           player.conditioning - conditioningDecayPerMissedGame(severity)
         );
-        await prisma.playerState.updateMany({
-          where: { careerId, playerId: player.id },
-          data:
-            remaining > 0
-              ? { injuryGamesRemaining: remaining, conditioning: decayed }
-              : {
-                  injured: false,
-                  injuryGamesRemaining: 0,
-                  injurySeverity: null,
-                  playingThroughInjury: false,
-                  conditioning: decayed,
-                },
-        });
+        patches.set(
+          player.id,
+          remaining > 0
+            ? { injuryGamesRemaining: remaining, conditioning: decayed }
+            : {
+                injured: false,
+                injuryGamesRemaining: 0,
+                injurySeverity: null,
+                playingThroughInjury: false,
+                conditioning: decayed,
+              }
+        );
       }
     } else if (rollsInjury(player.injuryRisk, facilitiesLevel)) {
       const duration = rollInjuryDurationGames();
       const severity = severityForDuration(duration);
-      await prisma.playerState.updateMany({
-        where: { careerId, playerId: player.id },
-        data: {
-          injured: true,
-          injuryGamesRemaining: duration,
-          injurySeverity: severity,
-          conditioning: clampConditioning(player.conditioning - conditioningLossOnInjury(severity)),
-        },
+      patches.set(player.id, {
+        injured: true,
+        injuryGamesRemaining: duration,
+        injurySeverity: severity,
+        conditioning: clampConditioning(player.conditioning - conditioningLossOnInjury(severity)),
       });
       newInjuries.push({ playerId: player.id, severity, durationGames: duration });
     } else if (player.conditioning < 100) {
-      await prisma.playerState.updateMany({
-        where: { careerId, playerId: player.id },
-        data: {
-          conditioning: clampConditioning(player.conditioning + CONDITIONING_RECOVERY_PER_GAME),
-        },
+      patches.set(player.id, {
+        conditioning: clampConditioning(player.conditioning + CONDITIONING_RECOVERY_PER_GAME),
       });
     }
   }

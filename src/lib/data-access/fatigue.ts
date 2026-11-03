@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import type { PlayerStatePatches } from "./player-state-patches";
 import type { BoxScoreEntry, Player } from "@/lib/types";
 import { fatigueGainForGame, fatigueRecoveryForRestDays } from "@/lib/careers/fatigue-rules";
 
@@ -33,7 +34,7 @@ export async function getRestDays(
 // le gain de fatigue pour ceux qui ont effectivement joué (présents au box
 // score — un banc qui ne rentre jamais en rotation ne se fatigue pas).
 export async function advanceRosterFatigue(
-  careerId: string,
+  patches: PlayerStatePatches,
   roster: Player[],
   boxScore: BoxScoreEntry[],
   restDays: number,
@@ -53,9 +54,6 @@ export async function advanceRosterFatigue(
     newFatigue += trainingFatigueDelta;
     newFatigue = Math.max(0, Math.min(99, newFatigue));
 
-    await prisma.playerState.updateMany({
-      where: { careerId, playerId: player.id },
-      data: { fatigue: newFatigue },
-    });
+    patches.set(player.id, { fatigue: newFatigue });
   }
 }

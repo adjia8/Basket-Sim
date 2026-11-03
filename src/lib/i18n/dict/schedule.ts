@@ -15,6 +15,7 @@ export const keys = [
   "schedule.simulateNextMyButton",
   "schedule.simulateNextMyRunningPrefix",
   "schedule.simulateNextMyRemainingSuffix",
+  "schedule.simulateNextMyLeaguePrefix",
   "schedule.simulateNextMyDone",
   "schedule.simulateNextMyError",
   "schedule.simulateNextMyWaiting",
@@ -41,6 +42,7 @@ export const fr: Record<ScheduleKey, string> = {
   "schedule.simulateNextMyButton": "Simuler",
   "schedule.simulateNextMyRunningPrefix": "Simulation en cours — matchs simulés :",
   "schedule.simulateNextMyRemainingSuffix": "matchs restants pour ta franchise",
+  "schedule.simulateNextMyLeaguePrefix": "· matchs de la ligue :",
   "schedule.simulateNextMyDone": "Les matchs demandés ont été simulés.",
   "schedule.simulateNextMyError": "La simulation a échoué — réessaie.",
   "schedule.simulateNextMyWaiting":
@@ -66,6 +68,7 @@ export const en: Record<ScheduleKey, string> = {
   "schedule.simulateNextMyButton": "Simulate",
   "schedule.simulateNextMyRunningPrefix": "Simulating — games simulated:",
   "schedule.simulateNextMyRemainingSuffix": "games remaining for your franchise",
+  "schedule.simulateNextMyLeaguePrefix": "· league games:",
   "schedule.simulateNextMyDone": "The requested games have been simulated.",
   "schedule.simulateNextMyError": "Simulation failed — try again.",
   "schedule.simulateNextMyWaiting": "The next game involves another manager — it can't be auto-simulated.",

@@ -12,6 +12,7 @@ import { advancePlayerRenown } from "@/lib/data-access/renown";
 import { advanceRosterFatigue, getRestDays } from "@/lib/data-access/fatigue";
 import { advanceAttendance, advanceTeamChemistry, getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { advanceRosterTraining } from "@/lib/data-access/training";
+import { PlayerStatePatches } from "@/lib/data-access/player-state-patches";
 import { getGmBonusForTeam } from "@/lib/data-access/gm";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { maybeCreatePressConference } from "@/lib/data-access/press";
@@ -225,16 +226,20 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   // diffèrent d'une équipe à l'autre) : décompte les indisponibilités en
   // cours, ajuste le conditionnement physique, et tire de nouvelles
   // blessures parmi les joueurs valides.
+  // Blessures, renommée, entraînement et fatigue écrivent toutes dans
+  // `patches`, appliqué en une seule requête à la fin (voir
+  // player-state-patches.ts) plutôt qu'une écriture par joueur et par étape.
+  const patches = new PlayerStatePatches();
   const [homeNewInjuries, awayNewInjuries] = await Promise.all([
-    advanceRosterInjuries(careerId, homeRoster, result.boxScore, homeTeamState.facilitiesLevel),
-    advanceRosterInjuries(careerId, awayRoster, result.boxScore, awayTeamState.facilitiesLevel),
+    advanceRosterInjuries(patches, homeRoster, result.boxScore, homeTeamState.facilitiesLevel),
+    advanceRosterInjuries(patches, awayRoster, result.boxScore, awayTeamState.facilitiesLevel),
   ]);
 
   // Ajuste le renommé de chaque joueur éligible : performance s'il a joué,
   // légère érosion sinon (voir data-access/renown.ts) — les blessés et les
   // joueuses en développement bloquées (hors homeEligibleRoster/
   // awayEligibleRoster) ne sont volontairement pas concernés.
-  await advancePlayerRenown(careerId, result.boxScore, [...homeEligibleRoster, ...awayEligibleRoster]);
+  await advancePlayerRenown(patches, result.boxScore, [...homeEligibleRoster, ...awayEligibleRoster]);
 
   // Programme d'entraînement : fait dériver le bonus temporaire de chaque
   // joueur vers le plafond de l'intensité choisie (ou vers 0 si aucun focus
@@ -244,8 +249,8 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   const homeIntensity = homeTeamState.trainingIntensity as TrainingIntensity;
   const awayIntensity = awayTeamState.trainingIntensity as TrainingIntensity;
   await Promise.all([
-    advanceRosterTraining(careerId, homeRoster, homeFocus, homeIntensity),
-    advanceRosterTraining(careerId, awayRoster, awayFocus, awayIntensity),
+    advanceRosterTraining(patches, homeRoster, homeFocus, homeIntensity),
+    advanceRosterTraining(patches, awayRoster, awayFocus, awayIntensity),
   ]);
 
   // Fatigue : récupération selon les jours de repos réels (accélérée par de
@@ -253,7 +258,7 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   // (ou le gain, pour un focus "repos") de l'entraînement en cours.
   await Promise.all([
     advanceRosterFatigue(
-      careerId,
+      patches,
       homeRoster,
       result.boxScore,
       homeRestDays,
@@ -261,7 +266,7 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
       trainingFatigueDelta(homeFocus, homeIntensity)
     ),
     advanceRosterFatigue(
-      careerId,
+      patches,
       awayRoster,
       result.boxScore,
       awayRestDays,
@@ -269,6 +274,7 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
       trainingFatigueDelta(awayFocus, awayIntensity)
     ),
   ]);
+  await patches.apply(careerId);
 
   // Chimie d'équipe : dérive vers sa cible (bilan à jour + QI basket moyen du
   // roster), plus le bonus si un focus "cohésion d'équipe" est actif.

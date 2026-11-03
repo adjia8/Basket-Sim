@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/prisma";
+import type { PlayerStatePatches } from "./player-state-patches";
 import type { Player } from "@/lib/types";
 import {
   TRAINING_FOCUS_ATTRIBUTES,
@@ -14,7 +14,7 @@ import {
 // sinon (focus changé, ou "chemistry"/"rest" qui ne ciblent aucun attribut
 // individuel) — même pattern que advanceTeamChemistry.
 export async function advanceRosterTraining(
-  careerId: string,
+  patches: PlayerStatePatches,
   roster: Player[],
   teamFocus: TrainingFocus | null,
   teamIntensity: TrainingIntensity
@@ -22,13 +22,9 @@ export async function advanceRosterTraining(
   const focusTargetsAttributes = teamFocus !== null && TRAINING_FOCUS_ATTRIBUTES[teamFocus].length > 0;
 
   for (const player of roster) {
-    const newBoost = nextTrainingBoost(player.trainingBoost, focusTargetsAttributes, teamIntensity);
-    await prisma.playerState.updateMany({
-      where: { careerId, playerId: player.id },
-      data: {
-        trainingBoost: newBoost,
-        trainingBoostFocus: focusTargetsAttributes ? teamFocus : null,
-      },
+    patches.set(player.id, {
+      trainingBoost: nextTrainingBoost(player.trainingBoost, focusTargetsAttributes, teamIntensity),
+      trainingBoostFocus: focusTargetsAttributes ? teamFocus : null,
     });
   }
 }

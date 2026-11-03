@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { withClientTimeout, ClientTimeoutError } from "@/lib/client-timeout";
+import { catchUpLeagueBefore } from "@/app/actions/simulate-bulk";
 
 // Composant client : tout le texte arrive déjà traduit en props depuis le
 // Server Component appelant (voir game/[gameId]/page.tsx).
@@ -15,6 +16,7 @@ export interface SimulateButtonLabels {
   otherManagerFallback: string;
   timedOut: string; // appel anormalement long (voir client-timeout.ts)
   simulatingHint: string; // "Ça peut prendre jusqu'à une minute…" — évite l'impression que rien ne se passe
+  catchingUp: string; // "… {count} joué(s)" — rattrapage des autres matchs de la ligue avant celui-ci
 }
 
 export function SimulateButton({
@@ -31,6 +33,8 @@ export function SimulateButton({
   const [error, setError] = useState<string | null>(null);
   const [waitingFor, setWaitingFor] = useState<string | null>(initialWaitingFor ?? null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  // null = pas (ou plus) en rattrapage de la ligue ; sinon matchs IA joués.
+  const [leagueGamesPlayed, setLeagueGamesPlayed] = useState<number | null>(null);
   const router = useRouter();
   // router.refresh() ne bloque pas : il lance juste la mise à jour en
   // arrière-plan (nouvelle requête RSC + re-rendu), qui peut elle-même
@@ -58,6 +62,19 @@ export function SimulateButton({
     setError(null);
     setElapsedSeconds(0);
     try {
+      // Le reste de la ligue joue d'abord jusqu'au jour de ce match inclus
+      // (lots successifs, voir catchUpLeagueBefore) — puis ce match.
+      let played = 0;
+      setLeagueGamesPlayed(0);
+      for (;;) {
+        const catchUp = await withClientTimeout(catchUpLeagueBefore(gameId));
+        if (catchUp.error) throw new Error(labels.simulationFailed);
+        played += catchUp.simulated;
+        setLeagueGamesPlayed(played);
+        if (catchUp.remaining === 0 || catchUp.simulated === 0) break;
+      }
+      setLeagueGamesPlayed(null);
+
       const res = await withClientTimeout(
         fetch("/api/simulate-game", {
           method: "POST",
@@ -92,6 +109,7 @@ export function SimulateButton({
       }
     } finally {
       setIsFetching(false);
+      setLeagueGamesPlayed(null);
     }
   }
 
@@ -113,7 +131,13 @@ export function SimulateButton({
       >
         {isPending ? `${labels.simulating} (${elapsedSeconds}s)` : labels.simulate}
       </button>
-      {isPending && <p className="text-xs text-muted">{labels.simulatingHint}</p>}
+      {isPending && (
+        <p className="text-xs text-muted">
+          {leagueGamesPlayed !== null
+            ? labels.catchingUp.replace("{count}", String(leagueGamesPlayed))
+            : labels.simulatingHint}
+        </p>
+      )}
       {error && <p className="text-sm text-bad">{error}</p>}
     </div>
   );

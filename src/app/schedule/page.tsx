@@ -76,6 +76,7 @@ export default async function SchedulePage({
                 button: t("schedule.simulateNextMyButton"),
                 runningPrefix: t("schedule.simulateNextMyRunningPrefix"),
                 remainingSuffix: t("schedule.simulateNextMyRemainingSuffix"),
+                leaguePrefix: t("schedule.simulateNextMyLeaguePrefix"),
                 done: t("schedule.simulateNextMyDone"),
                 error: t("schedule.simulateNextMyError"),
                 waiting: t("schedule.simulateNextMyWaiting"),

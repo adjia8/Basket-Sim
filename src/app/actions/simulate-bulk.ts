@@ -7,9 +7,11 @@ import { toDomainGame } from "@/lib/data-access/mappers";
 import { simulateAndResolveGame } from "@/lib/data-access/simulate";
 import { getTranslator } from "@/lib/i18n/translate";
 
-// Aucun match IA-vs-IA ne se simule tout seul dans ce jeu — seulement les
-// matchs qu'un manager humain déclenche explicitement (voir
-// /api/simulate-game). Sans ça, le reste de la ligue reste figé à 0-0 pour
+// Les matchs IA-vs-IA se jouent quand le manager avance : avant chacun de
+// ses matchs, le reste de la ligue est rattrapé jusqu'au même jour (voir
+// simulateAiGamesUpTo, appelé par "Simuler le match", "Simuler les
+// prochains matchs" et "Avancer"). Le bouton ci-dessous joue en plus tout
+// le reste de la saison d'un coup. Sans ça, le reste de la ligue resterait figé à 0-0 pour
 // toujours (aucun bilan, aucune stat), et ça bloque même advanceSeason (voir
 // actions/season.ts), qui exige que TOUS les matchs de la saison soient
 // "final" avant de pouvoir enchaîner. Ce lot rejoue les matchs opposant deux
@@ -28,6 +30,77 @@ import { getTranslator } from "@/lib/i18n/translate";
 // qu'une fois tous les dix. Le client relance l'action tant que
 // `remaining > 0`, avec un indicateur de progression entre chaque lot.
 const BATCH_SIZE = 1;
+
+// Rattrapage de la ligue avant un match de mon équipe : autant de matchs IA
+// que possible par appel dans ce budget (sous le maxDuration de 60 s des
+// pages/routes, avec la marge d'un match en cours), plutôt qu'un seul — un
+// match coûte ~4 s, et la page n'est revalidée qu'à la fin du rattrapage
+// (un rendu complet du tableau de bord à chaque match doublait le coût).
+const CATCH_UP_TIME_BUDGET_MS = 15_000;
+
+// Fin de la journée calendaire (UTC) d'un match : tous les matchs du même
+// jour sont joués avec lui, comme le "Continuer" de Football Manager.
+function endOfGameDay(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59));
+}
+
+// Simule, dans l'ordre chronologique, les matchs IA-vs-IA non joués datés
+// au plus tard `upTo` — jamais un match impliquant un manager humain (voir
+// l'en-tête de ce fichier).
+async function simulateAiGamesUpTo(
+  careerId: string,
+  locale: Awaited<ReturnType<typeof getTranslator>>["locale"],
+  upTo: Date | null
+): Promise<{ simulated: number; remaining: number }> {
+  const humanTeamIds = (
+    await prisma.membership.findMany({ where: { careerId }, select: { teamId: true } })
+  ).map((m) => m.teamId);
+  const where = {
+    careerId,
+    status: { not: "final" },
+    homeTeamId: { notIn: humanTeamIds },
+    awayTeamId: { notIn: humanTeamIds },
+    ...(upTo ? { gameDate: { lte: upTo } } : {}),
+  };
+
+  const startedAt = Date.now();
+  let simulated = 0;
+  while (Date.now() - startedAt < CATCH_UP_TIME_BUDGET_MS) {
+    const row = await prisma.game.findFirst({ where, orderBy: { gameDate: "asc" } });
+    if (!row) break;
+    try {
+      await simulateAndResolveGame(careerId, toDomainGame(row), locale);
+      simulated++;
+    } catch {
+      // Match à données incohérentes : on s'arrête là (il restera
+      // "scheduled" et sera retenté) plutôt que de boucler dessus.
+      break;
+    }
+  }
+  const remaining = await prisma.game.count({ where });
+  return { simulated, remaining };
+}
+
+export interface CatchUpResult {
+  simulated: number;
+  remaining: number;
+  error?: string;
+}
+
+// Appelé en boucle par le bouton "Simuler le match" AVANT de simuler un
+// match de mon équipe : joue d'abord tous les autres matchs de la ligue
+// jusqu'au jour de ce match inclus.
+export async function catchUpLeagueBefore(gameId: string): Promise<CatchUpResult> {
+  const { userId } = await verifySession();
+  const { locale } = await getTranslator();
+  const membership = await prisma.membership.findUnique({ where: { userId } });
+  if (!membership) return { simulated: 0, remaining: 0, error: "No career" };
+
+  const target = await prisma.game.findFirst({ where: { id: gameId, careerId: membership.careerId } });
+  if (!target) return { simulated: 0, remaining: 0, error: "Game not found" };
+
+  return simulateAiGamesUpTo(membership.careerId, locale, endOfGameDay(target.gameDate));
+}
 
 export interface SimulateAllAiGamesResult {
   simulated: number;
@@ -93,6 +166,9 @@ export async function simulateAllAiGames(): Promise<SimulateAllAiGamesResult> {
 export interface SimulateNextMyGamesResult {
   simulated: number; // 0 ou 1
   remaining: number; // total de matchs non "final" de mon équipe
+  leagueGamesSimulated: number; // matchs IA joués avant le mien à cet appel
+  catchingUp?: boolean; // rattrapage de la ligue pas fini : rappeler sans compter de match
+
   blockedByOtherManager?: boolean; // le prochain match oppose deux humains, doit rester manuel
   error?: string;
 }
@@ -116,7 +192,7 @@ export async function simulateNextMyGames(): Promise<SimulateNextMyGamesResult> 
 
   const membership = await prisma.membership.findUnique({ where: { userId } });
   if (!membership) {
-    return { simulated: 0, remaining: 0, error: "No career" };
+    return { simulated: 0, remaining: 0, leagueGamesSimulated: 0, error: "No career" };
   }
 
   const careerId = membership.careerId;
@@ -134,12 +210,18 @@ export async function simulateNextMyGames(): Promise<SimulateNextMyGamesResult> 
   const remaining = await prisma.game.count({ where: myPendingWhere });
   const nextGame = await prisma.game.findFirst({ where: myPendingWhere, orderBy: { gameDate: "asc" } });
   if (!nextGame) {
-    return { simulated: 0, remaining: 0 };
+    return { simulated: 0, remaining: 0, leagueGamesSimulated: 0 };
+  }
+
+  // Le reste de la ligue joue d'abord jusqu'au jour de mon match inclus.
+  const catchUp = await simulateAiGamesUpTo(careerId, locale, endOfGameDay(nextGame.gameDate));
+  if (catchUp.remaining > 0) {
+    return { simulated: 0, remaining, leagueGamesSimulated: catchUp.simulated, catchingUp: true };
   }
 
   const opponentTeamId = nextGame.homeTeamId === myTeamId ? nextGame.awayTeamId : nextGame.homeTeamId;
   if (otherHumanTeamIds.includes(opponentTeamId)) {
-    return { simulated: 0, remaining, blockedByOtherManager: true };
+    return { simulated: 0, remaining, leagueGamesSimulated: catchUp.simulated, blockedByOtherManager: true };
   }
 
   const game = toDomainGame(nextGame);
@@ -155,11 +237,15 @@ export async function simulateNextMyGames(): Promise<SimulateNextMyGamesResult> 
   revalidatePath("/standings");
   revalidatePath("/", "layout");
 
-  return { simulated: simulatedCount, remaining: remaining - simulatedCount };
+  return {
+    simulated: simulatedCount,
+    remaining: remaining - simulatedCount,
+    leagueGamesSimulated: catchUp.simulated,
+  };
 }
 
 export interface AdvanceCalendarResult {
-  simulated: number; // 0 ou 1 — un match IA simulé à cet appel
+  simulated: number; // matchs IA simulés à cet appel (0 = plus rien avant mon match)
   arrivedAtMyGame: boolean; // plus aucun match IA avant mon prochain match
   myGameId?: string;
   myGameDate?: string; // ISO, pour affichage
@@ -167,8 +253,8 @@ export interface AdvanceCalendarResult {
   error?: string;
 }
 
-// "Continuer" façon Football Manager : simule un match IA à la fois (même
-// contrainte de coût que les deux actions ci-dessus), mais borné par mon
+// "Continuer" façon Football Manager : simule un lot de matchs IA par appel
+// (voir simulateAiGamesUpTo), mais borné par mon
 // propre prochain match — jamais simulé à ma place. Dès qu'il ne reste plus
 // aucun match IA daté avant (ou le même jour que) mon prochain match, on
 // s'arrête et on le signale au lieu de continuer : c'est là que le joueur
@@ -190,33 +276,21 @@ export async function advanceCalendar(): Promise<AdvanceCalendarResult> {
     orderBy: { gameDate: "asc" },
   });
 
-  const humanTeamIds = (
-    await prisma.membership.findMany({ where: { careerId }, select: { teamId: true } })
-  ).map((m) => m.teamId);
-
-  const nextAiGame = await prisma.game.findFirst({
-    where: {
-      careerId,
-      status: { not: "final" },
-      homeTeamId: { notIn: humanTeamIds },
-      awayTeamId: { notIn: humanTeamIds },
-      ...(nextMyGame ? { gameDate: { lte: nextMyGame.gameDate } } : {}),
-    },
-    orderBy: { gameDate: "asc" },
-  });
-
-  if (nextAiGame) {
-    const game = toDomainGame(nextAiGame);
-    try {
-      await simulateAndResolveGame(careerId, game, locale);
-    } catch {
-      // Laisse le match "scheduled" ; le prochain appel retentera.
-    }
-    revalidatePath("/");
-    revalidatePath("/schedule");
-    revalidatePath("/standings");
-    return { simulated: 1, arrivedAtMyGame: false, seasonComplete: false };
+  // Lot de matchs IA (budget de temps, voir simulateAiGamesUpTo) jusqu'au
+  // jour de mon prochain match inclus — ou toute la saison s'il ne m'en
+  // reste plus. Revalidation seulement quand il n'y a plus rien à jouer.
+  const { simulated } = await simulateAiGamesUpTo(
+    careerId,
+    locale,
+    nextMyGame ? endOfGameDay(nextMyGame.gameDate) : null
+  );
+  if (simulated > 0) {
+    return { simulated, arrivedAtMyGame: false, seasonComplete: false };
   }
+
+  revalidatePath("/");
+  revalidatePath("/schedule");
+  revalidatePath("/standings");
 
   if (nextMyGame) {
     return {
