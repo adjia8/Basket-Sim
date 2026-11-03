@@ -15,6 +15,9 @@ import { TradeProposalForm, type TradePick } from "@/components/team/TradePropos
 import { TrainingPlanForm } from "@/components/team/TrainingPlanForm";
 import { RotationOrderForm } from "@/components/team/RotationOrderForm";
 import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
+import { TeamTabs } from "@/components/team/TeamTabs";
+import { ContractsPanel } from "@/components/team/ContractsPanel";
+import { NBA_INITIAL_DEAD_CAP } from "@/lib/mock-data/nba-dead-cap";
 import { MAX_ROSTER_SIZE, MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import { NBA_SECOND_APRON, NBA_TAX_LINE, payrollWarningLine } from "@/lib/careers/cap-rules";
 import { getPlayerDemandStates, type PlayerDemandState } from "@/lib/data-access/trade-requests";
@@ -54,11 +57,14 @@ async function getPendingPicksForTeam(t: Translator, careerId: string, teamId: s
 
 export default async function TeamRosterPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ teamId: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const membership = await getCurrentMembership();
   const { teamId } = await params;
+  const { tab: requestedTab } = await searchParams;
   const team = await getTeamById(teamId);
   if (!team) notFound();
   const { t, locale } = await getTranslator();
@@ -118,6 +124,17 @@ export default async function TeamRosterPage({
     : [];
 
   const deadCapTotal = deadCap.reduce((sum, d) => sum + d.salary, 0);
+  // Argent mort : DeadCap ne référence pas Player (un joueur coupé peut ne
+  // pas être au catalogue) — nom depuis le catalogue, sinon depuis la liste
+  // d'argent mort de départ, sinon l'identifiant brut.
+  const deadCapPlayers = await prisma.player.findMany({
+    where: { id: { in: deadCap.map((d) => d.playerId) } },
+    select: { id: true, firstName: true, lastName: true },
+  });
+  const deadCapNameById = new Map([
+    ...NBA_INITIAL_DEAD_CAP.map((d) => [d.playerId, d.playerName] as const),
+    ...deadCapPlayers.map((p) => [p.id, `${p.firstName} ${p.lastName}`] as const),
+  ]);
   const salaryCap = league?.salaryCap ?? 0;
   const overCap = totalPayroll > salaryCap;
   // NBA (plafond souple) : dépasser le plafond est normal, seuls la taxe de
@@ -179,6 +196,21 @@ export default async function TeamRosterPage({
     myPicks = myPendingPicks;
   }
 
+  // Onglets : mon équipe (gestion) ou équipe adverse (consultation +
+  // échange), le premier étant l'onglet par défaut.
+  const tabs = [
+    { id: "roster", label: t("team.tab.roster") },
+    ...(isMyTeam
+      ? [
+          { id: "rotation", label: t("team.tab.rotation") },
+          { id: "training", label: t("team.tab.training") },
+        ]
+      : []),
+    { id: "contracts", label: t("team.tab.contracts") },
+    ...(isOpponentInMyLeague ? [{ id: "trade", label: t("team.tab.trade") }] : []),
+  ];
+  const activeTab = tabs.some((tab) => tab.id === requestedTab) ? requestedTab! : tabs[0].id;
+
   return (
     <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
       <div className="flex items-center gap-3">
@@ -222,7 +254,9 @@ export default async function TeamRosterPage({
         </div>
       </div>
 
-      {isMyTeam && (
+      <TeamTabs baseHref={`/teams/${team.id}`} active={activeTab} tabs={tabs} />
+
+      {activeTab === "training" && (
         <div className="mt-6">
           <TrainingPlanForm
             focus={teamState.trainingFocus}
@@ -231,55 +265,57 @@ export default async function TeamRosterPage({
         </div>
       )}
 
-      {isMyTeam && (
+      {activeTab === "rotation" && (
         <div className="mt-6">
           <RotationOrderForm initialOrder={rotationOrder} />
         </div>
       )}
 
-      <div className="mt-6">
-        <RosterTable
-          teamId={team.id}
-          roster={rosterWithContracts}
-          canRelease={isMyTeam && standardRosterSize > minRosterSize}
-          locale={locale}
-          labels={{
-            player: t("roster.column.player"),
-            position: t("roster.column.position"),
-            nationality: t("roster.column.nationality"),
-            overall: t("roster.column.overall"),
-            height: t("roster.column.height"),
-            age: t("roster.column.age"),
-            salary: t("roster.column.salary"),
-            yearsRemaining: t("roster.column.yearsRemaining"),
-            ppg: t("roster.column.ppg"),
-            rpg: t("roster.column.rpg"),
-            apg: t("roster.column.apg"),
-            unavailable: t("roster.unavailable"),
-            games: t("roster.games"),
-            rest: t("roster.rest"),
-            playThroughInjury: t("roster.playThroughInjury"),
-            wantsTrade: t("roster.wantsTrade"),
-            notGuaranteed: t("roster.notGuaranteed"),
-            severity: {
-              minor: t("domain.injurySeverity.minor"),
-              moderate: t("domain.injurySeverity.moderate"),
-              severe: t("domain.injurySeverity.severe"),
-            },
-            tradeReason: {
-              competitiveness: t("domain.tradeReason.competitiveness"),
-              market: t("domain.tradeReason.market"),
-              facilities: t("domain.tradeReason.facilities"),
-            },
-            contractType: {
-              development: t("roster.contractType.development"),
-              two_way: t("roster.contractType.two_way"),
-            },
-          }}
-        />
-      </div>
+      {activeTab === "roster" && (
+        <div className="mt-6">
+          <RosterTable
+            teamId={team.id}
+            roster={rosterWithContracts}
+            canRelease={isMyTeam && standardRosterSize > minRosterSize}
+            locale={locale}
+            labels={{
+              player: t("roster.column.player"),
+              position: t("roster.column.position"),
+              nationality: t("roster.column.nationality"),
+              overall: t("roster.column.overall"),
+              height: t("roster.column.height"),
+              age: t("roster.column.age"),
+              salary: t("roster.column.salary"),
+              yearsRemaining: t("roster.column.yearsRemaining"),
+              ppg: t("roster.column.ppg"),
+              rpg: t("roster.column.rpg"),
+              apg: t("roster.column.apg"),
+              unavailable: t("roster.unavailable"),
+              games: t("roster.games"),
+              rest: t("roster.rest"),
+              playThroughInjury: t("roster.playThroughInjury"),
+              wantsTrade: t("roster.wantsTrade"),
+              notGuaranteed: t("roster.notGuaranteed"),
+              severity: {
+                minor: t("domain.injurySeverity.minor"),
+                moderate: t("domain.injurySeverity.moderate"),
+                severe: t("domain.injurySeverity.severe"),
+              },
+              tradeReason: {
+                competitiveness: t("domain.tradeReason.competitiveness"),
+                market: t("domain.tradeReason.market"),
+                facilities: t("domain.tradeReason.facilities"),
+              },
+              contractType: {
+                development: t("roster.contractType.development"),
+                two_way: t("roster.contractType.two_way"),
+              },
+            }}
+          />
+        </div>
+      )}
 
-      {picks.length > 0 && (
+      {activeTab === "roster" && picks.length > 0 && (
         <div className="mt-6">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">
             {t("team.draftPicks")}
@@ -297,17 +333,42 @@ export default async function TeamRosterPage({
         </div>
       )}
 
-      {isOpponentInMyLeague && tradeDeadlinePassed && (
+      {activeTab === "contracts" && (
+        <ContractsPanel
+          teamId={team.id}
+          leagueId={team.leagueId}
+          salaryCap={salaryCap}
+          payroll={totalPayroll}
+          contracts={rosterWithContracts.map((p) => ({
+            playerId: p.id,
+            name: `${p.firstName} ${p.lastName}`,
+            position: p.position,
+            contractType: p.contractType,
+            salary: p.salary,
+            yearsRemaining: p.yearsRemaining,
+            guaranteed: p.guaranteed,
+          }))}
+          deadCap={deadCap.map((d) => ({
+            name: deadCapNameById.get(d.playerId) ?? d.playerId,
+            salary: d.salary,
+            yearsRemaining: d.yearsRemaining,
+          }))}
+          t={t}
+          locale={locale}
+        />
+      )}
+
+      {activeTab === "trade" && isOpponentInMyLeague && tradeDeadlinePassed && (
         <p className="mt-8 card p-4 text-sm text-bad">
           {t("team.tradeDeadlinePassed")}
         </p>
       )}
 
-      {isOpponentInMyLeague && (
+      {activeTab === "trade" && isOpponentInMyLeague && (
         <TradeDeadlineNotice info={deadlineInfo} t={t} locale={locale} className="mt-8" />
       )}
 
-      {isOpponentInMyLeague && !tradeDeadlinePassed && (
+      {activeTab === "trade" && isOpponentInMyLeague && !tradeDeadlinePassed && (
         <TradeProposalForm
           myRoster={myRosterWithContracts}
           theirRoster={rosterWithContracts}

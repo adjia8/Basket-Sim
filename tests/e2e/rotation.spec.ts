@@ -19,7 +19,7 @@ import { registerAndOnboardWnbaTeam } from "./helpers";
 test("promoting a player to the active rotation persists after reload", async ({ page }) => {
   const { teamHref } = await registerAndOnboardWnbaTeam(page, "rotation");
 
-  await page.goto(teamHref);
+  await page.goto(`${teamHref}?tab=rotation`);
   await expect(page.getByRole("heading", { name: "Rotation", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: /Hors rotation/ })).toBeVisible();
 
