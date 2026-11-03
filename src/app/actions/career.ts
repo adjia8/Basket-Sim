@@ -16,7 +16,8 @@ import {
 } from "@/lib/careers/generate-draft-picks";
 import { toDomainLeague, toDomainPlayer } from "@/lib/data-access/mappers";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
-import { GM_POINT_POOL, expectationForRoster } from "@/lib/careers/gm-rules";
+import { GM_POINT_POOL, expectationsByStrength, teamStrengthScore } from "@/lib/careers/gm-rules";
+import { getCareerExpectations } from "@/lib/data-access/expectations";
 import { INITIAL_DEVELOPMENT_CONTRACT_IDS } from "@/lib/mock-data/players-wnba";
 import { initialFreeAgentIds } from "@/lib/mock-data/initial-free-agents";
 import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
@@ -162,10 +163,22 @@ export async function createCareer(
 
   const playersUnderContract = domainPlayers.filter((p) => !initiallyFreeAgentIds.has(p.id));
 
-  const teamCatalogRoster = playersUnderContract.filter((p) => p.teamId === teamId);
-  const teamAverageOverall = teamCatalogRoster.length
-    ? teamCatalogRoster.reduce((sum, p) => sum + p.overallRating, 0) / teamCatalogRoster.length
-    : 50;
+  // Objectif : rang de force parmi toutes les équipes de la ligue, sur les
+  // effectifs exacts avec lesquels la Career démarre (voir
+  // expectationsByStrength).
+  const leagueTeams = await getTeamsByLeague(leagueId);
+  const expectations = expectationsByStrength(
+    new Map(
+      leagueTeams.map((t) => [
+        t.id,
+        teamStrengthScore(
+          playersUnderContract.filter((p) => p.teamId === t.id).map((p) => p.overallRating),
+          t.marketAppeal
+        ),
+      ])
+    ),
+    leagueId
+  );
   await prisma.gmProfile.create({
     data: {
       membershipId: career.memberships[0].id,
@@ -179,7 +192,7 @@ export async function createCareer(
       tacticalPoints: gm.tacticalPoints,
       chemistryPoints: gm.chemistryPoints,
       hiredSeason: league.season,
-      currentExpectationTier: expectationForRoster(teamAverageOverall, team.marketAppeal),
+      currentExpectationTier: expectations.get(teamId) ?? "playoffs",
     },
   });
 
@@ -205,7 +218,6 @@ export async function createCareer(
 
   // Chaque équipe possède déjà ses picks des prochaines saisons, échangeables
   // avant même que ces saisons n'existent (comme en vraie NBA).
-  const leagueTeams = await getTeamsByLeague(leagueId);
   const leagueTeamIds = leagueTeams.map((t) => t.id);
   for (const futureSeason of futureSeasonsAfter(league.season, FUTURE_PICK_WINDOW)) {
     await createUnresolvedPicksForSeason(career.id, futureSeason, leagueTeamIds);
@@ -264,13 +276,7 @@ export async function joinCareer(
     throw err;
   }
 
-  const roster = await prisma.contract.findMany({
-    where: { careerId: career.id, teamId },
-    include: { player: { select: { overallRating: true } } },
-  });
-  const teamAverageOverall = roster.length
-    ? roster.reduce((sum, c) => sum + c.player.overallRating, 0) / roster.length
-    : 50;
+  const expectations = await getCareerExpectations(career.id, career.leagueId);
   await prisma.gmProfile.create({
     data: {
       membershipId: membership.id,
@@ -284,7 +290,7 @@ export async function joinCareer(
       tacticalPoints: gm.tacticalPoints,
       chemistryPoints: gm.chemistryPoints,
       hiredSeason: career.season,
-      currentExpectationTier: expectationForRoster(teamAverageOverall, team.marketAppeal),
+      currentExpectationTier: expectations.get(teamId) ?? "playoffs",
     },
   });
 

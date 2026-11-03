@@ -22,7 +22,8 @@ import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { applySeasonFinancials, getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { winPctForStandings } from "@/lib/careers/player-demands";
 import { getPlayoffResultTier } from "@/lib/data-access/playoffs";
-import { evaluateGmSeason, expectationForRoster, type ExpectationTier } from "@/lib/careers/gm-rules";
+import { evaluateGmSeason, type ExpectationTier } from "@/lib/careers/gm-rules";
+import { getCareerExpectations } from "@/lib/data-access/expectations";
 import { evaluatePendingPromises } from "@/lib/data-access/trade-requests";
 import { createInboxMessage } from "@/lib/data-access/inbox";
 import { poachOfferMessageText } from "@/lib/careers/inbox-rules";
@@ -30,20 +31,6 @@ import { getTranslator } from "@/lib/i18n/translate";
 import { teamFullName } from "@/lib/utils";
 
 const POACH_OFFER_CHANCE = 0.25;
-
-async function averageOverallForTeam(careerId: string, teamId: string): Promise<number> {
-  const contracts = await prisma.contract.findMany({
-    where: { careerId, teamId },
-    select: { playerId: true },
-  });
-  if (contracts.length === 0) return 50;
-  const states = await prisma.playerState.findMany({
-    where: { careerId, playerId: { in: contracts.map((c) => c.playerId) } },
-    select: { overallRating: true },
-  });
-  if (states.length === 0) return 50;
-  return states.reduce((sum, s) => sum + s.overallRating, 0) / states.length;
-}
 
 export async function advanceSeason(): Promise<void> {
   const { userId } = await verifySession();
@@ -230,16 +217,16 @@ export async function advanceSeason(): Promise<void> {
       }
     }
 
-    // Objectif de la saison à venir : basé sur le roster tel qu'il sera
-    // (contrats/vieillissement déjà appliqués aux étapes 1-2 ci-dessus).
-    const nextAverageOverall = await averageOverallForTeam(career.id, member.teamId);
-    const nextTeam = teams.find((t) => t.id === member.teamId);
+    // Objectif de la saison à venir : rang de force du roster tel qu'il
+    // sera (contrats/vieillissement déjà appliqués aux étapes 1-2 ci-dessus)
+    // parmi toutes les équipes de la ligue.
+    const nextExpectations = await getCareerExpectations(career.id, career.leagueId);
     await prisma.gmProfile.update({
       where: { id: gmProfile.id },
       data: {
         warningsAtCurrentTeam: nextWarnings,
         pendingOfferTeamId,
-        currentExpectationTier: expectationForRoster(nextAverageOverall, nextTeam?.marketAppeal ?? 50),
+        currentExpectationTier: nextExpectations.get(member.teamId) ?? "playoffs",
       },
     });
   }

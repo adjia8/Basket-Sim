@@ -4,23 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
-import { expectationForRoster } from "@/lib/careers/gm-rules";
-
-async function averageOverallForTeam(careerId: string, teamId: string): Promise<number> {
-  const roster = await prisma.contract.findMany({
-    where: { careerId, teamId },
-    include: { player: { select: { overallRating: true } } },
-  });
-  if (roster.length === 0) return 50;
-  return roster.reduce((sum, c) => sum + c.player.overallRating, 0) / roster.length;
-}
+import { getCareerExpectations } from "@/lib/data-access/expectations";
 
 async function switchTeam(membershipId: string, careerId: string, newTeamId: string): Promise<void> {
-  const [team, averageOverall] = await Promise.all([
-    prisma.team.findUnique({ where: { id: newTeamId } }),
-    averageOverallForTeam(careerId, newTeamId),
-  ]);
+  const team = await prisma.team.findUnique({ where: { id: newTeamId } });
   if (!team) return;
+  const expectations = await getCareerExpectations(careerId, team.leagueId);
 
   const career = await prisma.career.findUnique({ where: { id: careerId } });
   if (!career) return;
@@ -34,7 +23,7 @@ async function switchTeam(membershipId: string, careerId: string, newTeamId: str
         pendingOfferTeamId: null,
         warningsAtCurrentTeam: 0,
         hiredSeason: career.season,
-        currentExpectationTier: expectationForRoster(averageOverall, team.marketAppeal),
+        currentExpectationTier: expectations.get(newTeamId) ?? "playoffs",
       },
     }),
   ]);

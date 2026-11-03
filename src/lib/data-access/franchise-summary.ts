@@ -4,7 +4,8 @@ import type { Team } from "@/lib/types";
 import { toDomainTeam } from "./mappers";
 import { initialFreeAgentIds } from "@/lib/mock-data/initial-free-agents";
 import { initialFacilityLevel, initialFinances, initialTrainingStaffLevel } from "@/lib/careers/finance-rules";
-import { expectationForRoster, type ExpectationTier } from "@/lib/careers/gm-rules";
+import { type ExpectationTier } from "@/lib/careers/gm-rules";
+import { getCareerExpectations, getCatalogExpectations } from "./expectations";
 
 export interface FranchiseTopPlayer {
   firstName: string;
@@ -50,9 +51,10 @@ function averageOverallOf(players: { overallRating: number }[]): number {
 // du catalogue Player (roster réel de la ligue) + Team.marketAppeal. Pas de
 // picks de draft à afficher (rien n'est encore généré pour cette Career).
 export async function getFranchiseSummariesForNewCareer(leagueId: string): Promise<FranchiseSummary[]> {
-  const [teamRows, playerRows] = await Promise.all([
+  const [teamRows, playerRows, expectations] = await Promise.all([
     prisma.team.findMany({ where: { leagueId } }),
     prisma.player.findMany({ where: { leagueId } }),
+    getCatalogExpectations(leagueId),
   ]);
   // Les agents libres de départ gardent leur dernière équipe connue dans
   // teamId : sans ce filtre, ils compteraient dans l'effectif affiché.
@@ -78,7 +80,7 @@ export async function getFranchiseSummariesForNewCareer(leagueId: string): Promi
       averageOverall,
       topPlayers: topPlayersOf(players),
       draftPicks: [],
-      expectationTier: expectationForRoster(averageOverall, row.marketAppeal),
+      expectationTier: expectations.get(row.id) ?? "playoffs",
     };
   });
 }
@@ -90,7 +92,7 @@ export async function getFranchiseSummariesForCareer(
   leagueId: string,
   onlyAvailable: boolean
 ): Promise<FranchiseSummary[]> {
-  const [teamRows, memberships, teamStates, draftPicks] = await Promise.all([
+  const [teamRows, memberships, teamStates, draftPicks, expectations] = await Promise.all([
     prisma.team.findMany({ where: { leagueId } }),
     prisma.membership.findMany({
       where: { careerId },
@@ -101,6 +103,7 @@ export async function getFranchiseSummariesForCareer(
       where: { careerId, status: "pending" },
       orderBy: [{ season: "asc" }, { round: "asc" }],
     }),
+    getCareerExpectations(careerId, leagueId),
   ]);
 
   const membershipByTeam = new Map(memberships.map((m) => [m.teamId, m]));
@@ -142,7 +145,7 @@ export async function getFranchiseSummariesForCareer(
       averageOverall,
       topPlayers: topPlayersOf(roster),
       draftPicks: picksByTeam.get(row.id) ?? [],
-      expectationTier: expectationForRoster(averageOverall, row.marketAppeal),
+      expectationTier: expectations.get(row.id) ?? "playoffs",
       managedByEmail: membership?.user.email,
     };
   });

@@ -27,18 +27,62 @@ export function tierIndex(tier: ExpectationTier): number {
   return TIER_ORDER.indexOf(tier);
 }
 
-// Objectif attendu à partir de la force du roster (moyenne overall pondérée
-// avec l'attractivité du marché) — fonctionne même sans historique de saison
-// (nouvelle Career : roster catalogue, pas encore de TeamState).
-export function expectationForRoster(averageOverall: number, marketAppeal: number): ExpectationTier {
-  const score = averageOverall * 0.8 + marketAppeal * 0.2;
-  if (score >= 88) return "champion";
-  if (score >= 84) return "nba_finals";
-  if (score >= 80) return "conf_finals";
-  if (score >= 76) return "conf_semis";
-  if (score >= 71) return "playoffs";
-  if (score >= 65) return "play_in";
-  return "rebuild";
+// Force d'un effectif pour fixer l'objectif : ses 8 meilleurs joueurs
+// (ceux qui portent vraiment l'équipe), pondérés en faveur des stars —
+// une moyenne sur tout l'effectif récompenserait la profondeur de banc
+// (two-way, fins de rotation) plus que le talent réel. L'attractivité du
+// marché ajoute une petite pression (±2 points au maximum) : un grand
+// marché attend un peu plus, sans jamais passer devant un vrai écart de
+// niveau.
+const STRENGTH_WEIGHTS = [1.6, 1.4, 1.2, 1.0, 1.0, 0.8, 0.6, 0.4];
+
+export function teamStrengthScore(ratings: number[], marketAppeal: number): number {
+  const top = [...ratings].sort((a, b) => b - a).slice(0, STRENGTH_WEIGHTS.length);
+  if (top.length === 0) return 0;
+  const weights = STRENGTH_WEIGHTS.slice(0, top.length);
+  const weighted = top.reduce((sum, r, i) => sum + r * weights[i], 0);
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+  return weighted / totalWeight + (marketAppeal - 50) * 0.04;
+}
+
+// Nombre d'équipes qui atteignent chaque tour dans le vrai format de
+// chaque ligue (voir data-access/playoffs.ts) — NBA : 20 au play-in, 16 en
+// playoffs, puis 8/4/2/1 ; WNBA : 8 en playoffs (pas de play-in ni de
+// demi-finales de conférence), puis 4/2/1.
+const ROUND_CAPACITY: Record<string, [number, ExpectationTier][]> = {
+  nba: [
+    [1, "champion"],
+    [2, "nba_finals"],
+    [4, "conf_finals"],
+    [8, "conf_semis"],
+    [16, "playoffs"],
+    [20, "play_in"],
+  ],
+  wnba: [
+    [1, "champion"],
+    [2, "nba_finals"],
+    [4, "conf_finals"],
+    [8, "playoffs"],
+  ],
+};
+
+// Objectif de chaque équipe = le tour qu'elle atteindrait si la hiérarchie
+// de force de la ligue était respectée (la plus forte vise le titre, la
+// 2e la finale, etc.) — un objectif relatif plutôt qu'un seuil absolu, qui
+// dérivait dès que l'échelle des notes ou la taille des effectifs
+// changeait. Fonctionne sans historique (nouvelle Career : catalogue).
+export function expectationsByStrength(
+  scores: Map<string, number>,
+  leagueId: string
+): Map<string, ExpectationTier> {
+  const capacities = ROUND_CAPACITY[leagueId] ?? ROUND_CAPACITY.nba;
+  const ranked = [...scores.entries()].sort((a, b) => b[1] - a[1]);
+  const result = new Map<string, ExpectationTier>();
+  ranked.forEach(([teamId], index) => {
+    const tier = capacities.find(([capacity]) => index < capacity)?.[1] ?? "rebuild";
+    result.set(teamId, tier);
+  });
+  return result;
 }
 
 // Pool de points répartis à la création du GM entre offensif/défensif/
