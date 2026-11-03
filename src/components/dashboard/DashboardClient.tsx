@@ -3,6 +3,7 @@ import { advanceSeason } from "@/app/actions/season";
 import type { Locale } from "@/lib/i18n/locale";
 import { formatGameDate, formatSalary, teamFullName } from "@/lib/utils";
 import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
+import { payrollWarningLine } from "@/lib/careers/cap-rules";
 import { DeleteCareerButton } from "@/components/dashboard/DeleteCareerButton";
 import { AdvanceCalendarButton } from "@/components/dashboard/AdvanceCalendarButton";
 import type { Game, Player, StandingsRow, Team } from "@/lib/types";
@@ -180,7 +181,7 @@ export function DashboardClient({
         <StatCard
           label={labels.payroll}
           value={formatSalary(payroll, locale)}
-          warning={payroll > salaryCap}
+          warning={payroll > payrollWarningLine(myTeam.leagueId, salaryCap)}
         />
       </div>
 

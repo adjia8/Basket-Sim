@@ -8,6 +8,7 @@ import { isFreeAgencyOpen } from "@/lib/data-access/season-windows";
 import { prisma } from "@/lib/prisma";
 import { signFreeAgent } from "@/app/actions/roster";
 import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import { checkSalaryMove, NBA_MINIMUM_EXCEPTION, payrollWarningLine } from "@/lib/careers/cap-rules";
 import {
   minAcceptableSalary,
   teamMeetsPlayerDemands,
@@ -36,11 +37,13 @@ export default async function FreeAgentsPage() {
   const maxRosterSize = MAX_ROSTER_SIZE[membership.leagueId] ?? MAX_ROSTER_SIZE.nba;
   const rosterFull = rosterSize >= maxRosterSize;
   const salaryCap = league?.salaryCap ?? Infinity;
-  // Un contrat a toujours un salaire strictement positif : si la masse
-  // salariale actuelle atteint déjà le plafond, aucune signature ne peut plus
-  // passer, quel que soit le montant (aléatoire) qui serait proposé.
+  // Au-dessus du plafond : plus aucune signature en WNBA (plafond strict) ;
+  // en NBA, seulement les joueurs qui acceptent le minimum (voir
+  // cap-rules.ts) — vérifié joueur par joueur plus bas.
   const capReached = payroll >= salaryCap;
-  const canSign = !rosterFull && !capReached && faOpen;
+  const softCap = membership.leagueId === "nba";
+  const canSign = !rosterFull && faOpen && (softCap || !capReached);
+  const payrollInRed = payroll > payrollWarningLine(membership.leagueId, salaryCap);
 
   const myStandingsRow = standings.find((row) => row.teamId === membership.teamId);
   const teamWinPct = winPctForStandings(myStandingsRow?.wins ?? 0, myStandingsRow?.losses ?? 0);
@@ -53,7 +56,7 @@ export default async function FreeAgentsPage() {
 
       <p className="mt-4 text-sm text-soft">
         {t("freeAgents.payrollPrefix")}{" "}
-        <span className={capReached ? "font-semibold text-bad" : "font-semibold"}>
+        <span className={payrollInRed ? "font-semibold text-bad" : "font-semibold"}>
           {formatSalary(payroll, locale)} / {formatSalary(salaryCap, locale)}
         </span>
       </p>
@@ -64,7 +67,13 @@ export default async function FreeAgentsPage() {
           {t("freeAgents.rosterFull", { size: rosterSize, max: maxRosterSize })}
         </p>
       )}
-      {capReached && <p className="mt-2 text-sm text-bad">{t("freeAgents.capReached")}</p>}
+      {capReached && (
+        <p className="mt-2 text-sm text-bad">
+          {softCap
+            ? t("freeAgents.overCapMinimumOnly", { limit: formatSalary(NBA_MINIMUM_EXCEPTION, locale) })
+            : t("freeAgents.capReached")}
+        </p>
+      )}
 
       <div className="mt-6 overflow-x-auto">
         <table className="data-table w-full min-w-[560px] text-left text-sm">
@@ -93,6 +102,13 @@ export default async function FreeAgentsPage() {
                 player.overallRating,
                 membership.leagueId
               );
+              const affordable = checkSalaryMove(
+                membership.leagueId,
+                salaryCap,
+                "sign",
+                payroll + expectedSalary,
+                expectedSalary
+              ).ok;
 
               return (
                 <tr key={player.id} className="border-b border-line-soft">
@@ -114,7 +130,9 @@ export default async function FreeAgentsPage() {
                   <td className="py-2 pr-4">{formatSalary(expectedSalary, locale)}</td>
                   {canSign && (
                     <td className="py-2">
-                      {meetsDemands ? (
+                      {!affordable ? (
+                        <span className="text-xs text-muted">{t("freeAgents.overBudget")}</span>
+                      ) : meetsDemands ? (
                         <form action={signFreeAgent}>
                           <input type="hidden" name="playerId" value={player.id} />
                           <button

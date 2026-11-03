@@ -20,6 +20,7 @@ import { GM_POINT_POOL, expectationsByStrength, teamStrengthScore } from "@/lib/
 import { getCareerExpectations } from "@/lib/data-access/expectations";
 import { INITIAL_DEVELOPMENT_CONTRACT_IDS } from "@/lib/mock-data/players-wnba";
 import { initialFreeAgentIds } from "@/lib/mock-data/initial-free-agents";
+import { NBA_INITIAL_DEAD_CAP } from "@/lib/mock-data/nba-dead-cap";
 import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import { ALT_CONTRACT_SLOTS_PER_TEAM } from "@/lib/careers/contract-type-rules";
 
@@ -147,14 +148,33 @@ export async function createCareer(
     list.push(player);
     rosterByTeam.set(player.teamId, list);
   }
+  const altSlots = ALT_CONTRACT_SLOTS_PER_TEAM[leagueId] ?? 0;
+  // NBA : le catalogue porte le vrai contrat de chaque joueur sous contrat
+  // garanti (realSalary) — ceux qui n'en ont pas sont les two-way et
+  // non-garantis réels du bas d'effectif. Ils prennent les places two-way
+  // en priorité (les mieux notés d'abord), avant toute autre règle.
+  const nonGuaranteedFirst = leagueId === "nba";
+  const hasRealContract = (p: (typeof domainPlayers)[number]) => (p.realSalary != null ? 1 : 0);
   for (const roster of rosterByTeam.values()) {
+    if (nonGuaranteedFirst) {
+      roster
+        .filter((p) => p.realSalary == null)
+        .sort((a, b) => b.overallRating - a.overallRating)
+        .slice(0, altSlots)
+        .forEach((p) => developmentPlayerIds.add(p.id));
+    }
+
     const standardRoster = roster.filter((p) => !developmentPlayerIds.has(p.id));
     if (standardRoster.length <= maxRosterSize) continue;
 
     const devSlotsUsed = roster.length - standardRoster.length;
-    const devSlotsAvailable = Math.max(0, (ALT_CONTRACT_SLOTS_PER_TEAM[leagueId] ?? 0) - devSlotsUsed);
+    const devSlotsAvailable = Math.max(0, altSlots - devSlotsUsed);
     const overflow = [...standardRoster]
-      .sort((a, b) => a.overallRating - b.overallRating) // pire d'abord
+      .sort(
+        (a, b) =>
+          (nonGuaranteedFirst ? hasRealContract(a) - hasRealContract(b) : 0) ||
+          a.overallRating - b.overallRating
+      ) // non garantis puis pires d'abord
       .slice(0, standardRoster.length - maxRosterSize);
 
     overflow.slice(0, devSlotsAvailable).forEach((p) => developmentPlayerIds.add(p.id));
@@ -201,6 +221,19 @@ export async function createCareer(
   // contrats sont filtrés (playersUnderContract, calculé plus haut).
   await generateCareerContracts(career.id, leagueId, playersUnderContract, developmentPlayerIds);
   await generateCareerPlayerStates(career.id, domainPlayers);
+  // Argent mort réel de départ (NBA) : sans lui, les masses salariales de
+  // départ seraient sous-estimées (ex. Milwaukee paie encore Lillard).
+  if (leagueId === "nba") {
+    await prisma.deadCap.createMany({
+      data: NBA_INITIAL_DEAD_CAP.map(({ teamId: deadTeamId, playerId, salary, yearsRemaining }) => ({
+        careerId: career.id,
+        teamId: deadTeamId,
+        playerId,
+        salary,
+        yearsRemaining,
+      })),
+    });
+  }
 
   // La partie démarre dans l'entre-saison, juste après le draft : quelques
   // matchs de pré-saison à jouer (voir generateCareerPreseasonSchedule),

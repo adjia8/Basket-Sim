@@ -8,6 +8,7 @@ import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getPayrollForTeam } from "@/lib/data-access/contracts";
 import { isTradeDeadlinePassed } from "@/lib/data-access/season-windows";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
+import { checkTradeSide, type CapVerdict } from "@/lib/careers/cap-rules";
 import {
   MAX_ROSTER_SIZE,
   MIN_ROSTER_SIZE,
@@ -130,10 +131,16 @@ export async function proposeTrade(
   const salaryCap = league?.salaryCap ?? Infinity;
   const mySalaryOut = myContracts.reduce((sum, c) => sum + c.salary, 0);
   const theirSalaryOut = theirContracts.reduce((sum, c) => sum + c.salary, 0);
-  const myNewPayroll = myCurrentPayroll - mySalaryOut + theirSalaryOut;
-  const theirNewPayroll = theirCurrentPayroll - theirSalaryOut + mySalaryOut;
-  if (myNewPayroll > salaryCap || theirNewPayroll > salaryCap) {
-    return { error: t("tradeAction.exceedsCap", { cap: formatSalary(salaryCap, locale) }) };
+  const leagueId = membership.career.leagueId;
+  const capVerdict = [
+    checkTradeSide(leagueId, salaryCap, myCurrentPayroll, mySalaryOut, theirSalaryOut),
+    checkTradeSide(leagueId, salaryCap, theirCurrentPayroll, theirSalaryOut, mySalaryOut),
+  ].find((v): v is Exclude<CapVerdict, { ok: true }> => !v.ok);
+  if (capVerdict) {
+    const limit = formatSalary(capVerdict.limit, locale);
+    if (capVerdict.reason === "salary_matching") return { error: t("tradeAction.salaryMatching", { limit }) };
+    if (capVerdict.reason === "apron") return { error: t("tradeAction.exceedsApron", { limit }) };
+    return { error: t("tradeAction.exceedsCap", { cap: limit }) };
   }
 
   const opponentManager = await getMembershipForTeam(membership.careerId, opponentTeamId);
@@ -299,8 +306,9 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
   const salaryCap = league?.salaryCap ?? Infinity;
   const fromSalaryOut = fromContracts.reduce((sum, c) => sum + c.salary, 0);
   const toSalaryOut = toContracts.reduce((sum, c) => sum + c.salary, 0);
-  const fromNewPayroll = fromCurrentPayroll - fromSalaryOut + toSalaryOut;
-  const toNewPayroll = toCurrentPayroll - toSalaryOut + fromSalaryOut;
+  const capOk =
+    checkTradeSide(membership.career.leagueId, salaryCap, fromCurrentPayroll, fromSalaryOut, toSalaryOut).ok &&
+    checkTradeSide(membership.career.leagueId, salaryCap, toCurrentPayroll, toSalaryOut, fromSalaryOut).ok;
 
   // Même relaxation qu'à la proposition (voir proposeTrade) : le plafond ne
   // bloque que si l'échange AUGMENTE un effectif déjà trop haut, pas
@@ -318,8 +326,7 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
     !fromExceedsMax &&
     newToSize >= minRosterSize &&
     !toExceedsMax &&
-    fromNewPayroll <= salaryCap &&
-    toNewPayroll <= salaryCap;
+    capOk;
 
   if (!stillValid) {
     await prisma.tradeOffer.update({ where: { id: offer.id }, data: { status: "cancelled" } });

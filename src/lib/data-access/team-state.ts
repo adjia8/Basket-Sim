@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import type { TeamState } from "@prisma/client";
 import type { Player } from "@/lib/types";
 import { chemistryTarget, nextChemistry } from "@/lib/careers/chemistry-rules";
+import { luxuryTax } from "@/lib/careers/cap-rules";
+import { getPayrollForTeam } from "./contracts";
 import { attendanceTarget, nextAttendance } from "@/lib/careers/attendance-rules";
 import {
   ANNUAL_DEGRADATION,
@@ -99,7 +101,7 @@ export async function advanceAttendance(
 
 // Appelé une fois par équipe au rollover de saison (src/app/actions/season.ts) :
 // encaisse le revenu de la saison qui vient de se terminer (bilan + marché),
-// puis dégrade les infrastructures/personnel si non réinvestis.
+// prélève la taxe de luxe éventuelle (NBA), puis dégrade les infrastructures/personnel si non réinvestis.
 export async function applySeasonFinancials(
   careerId: string,
   teamId: string,
@@ -107,13 +109,19 @@ export async function applySeasonFinancials(
   winPct: number,
   marketAppeal: number
 ): Promise<void> {
-  const state = await getOrCreateTeamState(careerId, teamId, leagueId);
+  const [state, payroll] = await Promise.all([
+    getOrCreateTeamState(careerId, teamId, leagueId),
+    getPayrollForTeam(careerId, teamId),
+  ]);
   const revenue = seasonRevenue(leagueId, winPct, marketAppeal, state.publicOpinion);
+  // Taxe de luxe NBA sur la masse salariale de la saison écoulée (0 sous la
+  // ligne de taxe, toujours 0 en WNBA — voir cap-rules.ts).
+  const tax = luxuryTax(leagueId, payroll);
 
   await prisma.teamState.update({
     where: { id: state.id },
     data: {
-      finances: state.finances + revenue,
+      finances: state.finances + revenue - tax,
       facilitiesLevel: clampFacilityLevel(state.facilitiesLevel - ANNUAL_DEGRADATION),
       trainingStaffLevel: clampFacilityLevel(state.trainingStaffLevel - ANNUAL_DEGRADATION),
     },

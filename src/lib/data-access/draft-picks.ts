@@ -3,6 +3,7 @@ import type { DraftPick } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { rookieScaleContract } from "@/lib/careers/rookie-scale";
 import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import { checkSalaryMove } from "@/lib/careers/cap-rules";
 import { getPayrollForTeam } from "./contracts";
 
 // Le pick "sur l'horloge" a toujours un pickNumber résolu (jamais un pick
@@ -39,7 +40,8 @@ export async function getCurrentDraftPick(
     ]);
     const { salary } = rookieScaleContract(pick.pickNumber, picksPerRound, leagueId);
     const maxRosterSize = MAX_ROSTER_SIZE[leagueId] ?? MAX_ROSTER_SIZE.nba;
-    const canDraft = rosterSize < maxRosterSize && payroll + salary <= salaryCap;
+    const canDraft =
+      rosterSize < maxRosterSize && checkSalaryMove(leagueId, salaryCap, "draft", payroll + salary, salary).ok;
     if (canDraft) return pick as ResolvedDraftPick;
 
     const { count } = await prisma.draftPick.updateMany({

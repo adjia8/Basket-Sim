@@ -15,6 +15,7 @@ import { TrainingPlanForm } from "@/components/team/TrainingPlanForm";
 import { RotationOrderForm } from "@/components/team/RotationOrderForm";
 import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
 import { MAX_ROSTER_SIZE, MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import { NBA_SECOND_APRON, NBA_TAX_LINE, payrollWarningLine } from "@/lib/careers/cap-rules";
 import { getPlayerDemandStates, type PlayerDemandState } from "@/lib/data-access/trade-requests";
 import { mergeRotationOrder, parseRotationOrder } from "@/lib/careers/rotation-rules";
 import { getTranslator, type Translator } from "@/lib/i18n/translate";
@@ -117,6 +118,21 @@ export default async function TeamRosterPage({
   const deadCapTotal = deadCap.reduce((sum, d) => sum + d.salary, 0);
   const salaryCap = league?.salaryCap ?? 0;
   const overCap = totalPayroll > salaryCap;
+  // NBA (plafond souple) : dépasser le plafond est normal, seuls la taxe de
+  // luxe et le 2e apron sont des signaux d'alerte — voir cap-rules.ts.
+  const capStatusKey =
+    team.leagueId !== "nba"
+      ? overCap
+        ? "team.overCap"
+        : null
+      : totalPayroll > NBA_SECOND_APRON
+        ? "team.overApron"
+        : totalPayroll > NBA_TAX_LINE
+          ? "team.overTax"
+          : overCap
+            ? "team.overCap"
+            : null;
+  const payrollInRed = totalPayroll > payrollWarningLine(team.leagueId, salaryCap);
   const standardRosterSize = contracts.filter((c) => c.contractType === "standard").length;
   const minRosterSize = MIN_ROSTER_SIZE[team.leagueId] ?? MIN_ROSTER_SIZE.nba;
   const maxRosterSize = MAX_ROSTER_SIZE[team.leagueId] ?? MAX_ROSTER_SIZE.nba;
@@ -176,9 +192,11 @@ export default async function TeamRosterPage({
           <p className="text-xs uppercase tracking-wide text-muted">
             {t("team.payroll")}
           </p>
-          <p className={`mt-1 text-xl font-semibold ${overCap ? "text-bad" : ""}`}>
+          <p className={`mt-1 text-xl font-semibold ${payrollInRed ? "text-bad" : ""}`}>
             {formatSalary(totalPayroll, locale)} / {formatSalary(salaryCap, locale)}
-            {overCap && <span className="ml-2 text-sm font-normal">{t("team.overCap")}</span>}
+            {capStatusKey && (
+              <span className={`ml-2 text-sm font-normal ${payrollInRed ? "" : "text-muted"}`}>{t(capStatusKey)}</span>
+            )}
           </p>
           {deadCapTotal > 0 && (
             <p className="mt-1 text-xs text-muted">

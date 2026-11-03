@@ -12,6 +12,7 @@ import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { isFreeAgencyOpen } from "@/lib/data-access/season-windows";
 import { recordTeamStint } from "@/lib/data-access/player-history";
 import { MAX_ROSTER_SIZE, MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import { checkSalaryMove, type CapVerdict } from "@/lib/careers/cap-rules";
 import { initialRenown } from "@/lib/careers/renown-rules";
 import {
   minAcceptableSalary,
@@ -157,12 +158,17 @@ export async function signFreeAgent(formData: FormData): Promise<void> {
   // vérifié différent du montant réellement facturé. Le renommé impose un
   // plancher salarial en plus de ce que suggérerait le seul overall.
   const terms = generateContractTerms(player.overallRating, membership.career.leagueId);
-  const salary = Math.max(
-    terms.salary,
-    minAcceptableSalary(renown, player.overallRating, membership.career.leagueId)
-  );
+  const floor = minAcceptableSalary(renown, player.overallRating, membership.career.leagueId);
+  let salary = Math.max(terms.salary, floor);
   const salaryCap = league?.salaryCap ?? Infinity;
-  if (currentPayroll + salary > salaryCap) return;
+  const verdict = checkSalaryMove(membership.career.leagueId, salaryCap, "sign", currentPayroll + salary, salary);
+  if (!verdict.ok) {
+    // NBA au-dessus du plafond : signature possible uniquement au minimum,
+    // si le joueur l'accepte (son exigence ne dépasse pas ce montant).
+    if (verdict.reason !== "minimum_only" || floor > verdict.limit) return;
+    salary = Math.min(salary, verdict.limit);
+    if (!checkSalaryMove(membership.career.leagueId, salaryCap, "sign", currentPayroll + salary, salary).ok) return;
+  }
 
   try {
     await prisma.contract.create({
@@ -276,9 +282,14 @@ export async function extendContract(
   const salaryCap = league?.salaryCap ?? Infinity;
   // L'ancien salaire de ce joueur est déjà compté dans currentPayroll (contrat
   // standard) — on le retire avant d'ajouter le nouveau montant proposé.
-  if (currentPayroll - contract.salary + salary > salaryCap) {
-    return { error: t("rosterAction.exceedsCap", { cap: formatSalary(salaryCap, locale) }) };
-  }
+  const extendVerdict = checkSalaryMove(
+    membership.career.leagueId,
+    salaryCap,
+    "extend",
+    currentPayroll - contract.salary + salary,
+    salary
+  );
+  if (!extendVerdict.ok) return { error: capErrorMessage(extendVerdict, t, locale) };
 
   const overallRating = playerState?.overallRating ?? player.overallRating;
   const renown = playerState?.renown ?? initialRenown(player.overallRating);
@@ -438,9 +449,8 @@ export async function promoteToStandardContract(
   // Un contrat alternatif est déjà exclu du plafond (voir getPayrollForTeam) :
   // pas besoin de retirer son ancien salaire de currentPayroll avant d'ajouter
   // le nouveau, contrairement à extendContract sur un contrat standard.
-  if (currentPayroll + salary > salaryCap) {
-    return { error: t("rosterAction.exceedsCap", { cap: formatSalary(salaryCap, locale) }) };
-  }
+  const promoteVerdict = checkSalaryMove(membership.career.leagueId, salaryCap, "promote", currentPayroll + salary, salary);
+  if (!promoteVerdict.ok) return { error: capErrorMessage(promoteVerdict, t, locale) };
 
   await prisma.contract.update({
     where: { id: contract.id },
@@ -460,4 +470,15 @@ export async function promoteToStandardContract(
       amount: formatSalary(salary, locale),
     }),
   };
+}
+
+function capErrorMessage(
+  verdict: Exclude<CapVerdict, { ok: true }>,
+  t: Awaited<ReturnType<typeof getTranslator>>["t"],
+  locale: Awaited<ReturnType<typeof getTranslator>>["locale"]
+): string {
+  const limit = formatSalary(verdict.limit, locale);
+  if (verdict.reason === "minimum_only") return t("rosterAction.minimumOnly", { limit });
+  if (verdict.reason === "apron") return t("rosterAction.exceedsApron", { limit });
+  return t("rosterAction.exceedsCap", { cap: limit });
 }

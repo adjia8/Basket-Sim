@@ -15,6 +15,7 @@ import {
   winPctForStandings,
 } from "@/lib/careers/player-demands";
 import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import { checkSalaryMove } from "@/lib/careers/cap-rules";
 
 export interface FreeAgentReportEntry {
   player: Player;
@@ -70,7 +71,7 @@ export async function getFreeAgentReport(
       .filter(
         (t) =>
           t.rosterSize < maxRosterSize &&
-          t.payroll + desiredContract <= salaryCap &&
+          checkSalaryMove(leagueId, salaryCap, "sign", t.payroll + desiredContract, desiredContract).ok &&
           teamMeetsPlayerDemands({
             renown: player.renown,
             teamWinPct: t.winPct,

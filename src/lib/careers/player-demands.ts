@@ -64,7 +64,9 @@ export function minAcceptableSalary(
   const range = SALARY_RANGES[leagueId] ?? SALARY_RANGES.nba;
   const baseline = baseSalaryFloor(overallRating, range);
   const premium = (Math.max(0, renown - 50) / 49) * 0.6;
-  return Math.round(baseline * (1 + premium));
+  // Jamais au-delà du salaire maximum réel de la ligue, même avec la prime
+  // de renommée (sans ce plafond, une star renommée exigeait ~75 M$ en NBA).
+  return Math.round(Math.min(range.max, baseline * (1 + premium)));
 }
 
 export function wantsCompetitiveTeam(renown: number): boolean {
