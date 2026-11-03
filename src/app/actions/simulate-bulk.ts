@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { toDomainGame } from "@/lib/data-access/mappers";
 import { simulateAndResolveGame } from "@/lib/data-access/simulate";
 import { getTranslator } from "@/lib/i18n/translate";
+import { endOfGameDay } from "@/lib/data-access/game-clock";
+import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
 
 // Les matchs IA-vs-IA se jouent quand le manager avance : avant chacun de
 // ses matchs, le reste de la ligue est rattrapé jusqu'au même jour (voir
@@ -37,12 +39,6 @@ const BATCH_SIZE = 1;
 // match coûte ~4 s, et la page n'est revalidée qu'à la fin du rattrapage
 // (un rendu complet du tableau de bord à chaque match doublait le coût).
 const CATCH_UP_TIME_BUDGET_MS = 15_000;
-
-// Fin de la journée calendaire (UTC) d'un match : tous les matchs du même
-// jour sont joués avec lui, comme le "Continuer" de Football Manager.
-function endOfGameDay(date: Date): Date {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59));
-}
 
 // Simule, dans l'ordre chronologique, les matchs IA-vs-IA non joués datés
 // au plus tard `upTo` — jamais un match impliquant un manager humain (voir
@@ -244,63 +240,40 @@ export async function simulateNextMyGames(): Promise<SimulateNextMyGamesResult> 
   };
 }
 
-export interface AdvanceCalendarResult {
-  simulated: number; // matchs IA simulés à cet appel (0 = plus rien avant mon match)
-  arrivedAtMyGame: boolean; // plus aucun match IA avant mon prochain match
-  myGameId?: string;
-  myGameDate?: string; // ISO, pour affichage
-  seasonComplete: boolean; // plus aucun match du tout (ni IA ni le mien)
-  error?: string;
-}
+export type ContinueResult =
+  | { kind: "advanced"; simulated: number } // lot de matchs IA joué : rappeler
+  | { kind: "matchDay"; gameId: string } // jour de mon prochain match, tout le reste est joué
+  | { kind: "seasonOver" } // plus rien à jouer cette saison
+  | { kind: "error" };
 
-// "Continuer" façon Football Manager : simule un lot de matchs IA par appel
-// (voir simulateAiGamesUpTo), mais borné par mon
-// propre prochain match — jamais simulé à ma place. Dès qu'il ne reste plus
-// aucun match IA daté avant (ou le même jour que) mon prochain match, on
-// s'arrête et on le signale au lieu de continuer : c'est là que le joueur
-// reprend la main, exactement comme le "Continuer" de Football Manager
-// s'arrête au jour de ton propre match.
-export async function advanceCalendar(): Promise<AdvanceCalendarResult> {
+// « Continuer » façon Football Manager (barre du haut, voir
+// GameTopBar.tsx) : avance le calendrier jusqu'au prochain moment qui
+// demande le manager — le jour de son prochain match, une fois tous les
+// autres matchs de ce jour joués. Jamais son match à sa place. À rappeler
+// tant que kind === "advanced" (lots sous budget de temps, voir
+// simulateAiGamesUpTo). Sans match à venir pour mon équipe, joue le reste de
+// la saison, playoffs compris (tour par tour), jusqu'au bout.
+export async function continueGame(): Promise<ContinueResult> {
   const { userId } = await verifySession();
   const { locale } = await getTranslator();
-  const membership = await prisma.membership.findUnique({ where: { userId } });
-  if (!membership) {
-    return { simulated: 0, arrivedAtMyGame: false, seasonComplete: false, error: "No career" };
-  }
+  const membership = await prisma.membership.findUnique({ where: { userId }, include: { career: true } });
+  if (!membership) return { kind: "error" };
 
-  const careerId = membership.careerId;
-  const myTeamId = membership.teamId;
+  const { careerId, teamId, career } = membership;
+  // Saison régulière terminée : crée les matchs de playoffs à venir (match
+  // suivant d'une série, tour suivant) — sans effet avant.
+  await getOrAdvancePlayoffs(careerId, career.season, career.leagueId);
 
   const nextMyGame = await prisma.game.findFirst({
-    where: { careerId, status: { not: "final" }, OR: [{ homeTeamId: myTeamId }, { awayTeamId: myTeamId }] },
+    where: { careerId, status: { not: "final" }, OR: [{ homeTeamId: teamId }, { awayTeamId: teamId }] },
     orderBy: { gameDate: "asc" },
   });
-
-  // Lot de matchs IA (budget de temps, voir simulateAiGamesUpTo) jusqu'au
-  // jour de mon prochain match inclus — ou toute la saison s'il ne m'en
-  // reste plus. Revalidation seulement quand il n'y a plus rien à jouer.
   const { simulated } = await simulateAiGamesUpTo(
     careerId,
     locale,
     nextMyGame ? endOfGameDay(nextMyGame.gameDate) : null
   );
-  if (simulated > 0) {
-    return { simulated, arrivedAtMyGame: false, seasonComplete: false };
-  }
-
-  revalidatePath("/");
-  revalidatePath("/schedule");
-  revalidatePath("/standings");
-
-  if (nextMyGame) {
-    return {
-      simulated: 0,
-      arrivedAtMyGame: true,
-      myGameId: nextMyGame.id,
-      myGameDate: nextMyGame.gameDate.toISOString(),
-      seasonComplete: false,
-    };
-  }
-
-  return { simulated: 0, arrivedAtMyGame: false, seasonComplete: true };
+  if (simulated > 0) return { kind: "advanced", simulated };
+  if (nextMyGame) return { kind: "matchDay", gameId: nextMyGame.id };
+  return { kind: "seasonOver" };
 }

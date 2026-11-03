@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { NavBar } from "@/components/layout/NavBar";
+import { GameTopBar } from "@/components/layout/GameTopBar";
 import { getLocale } from "@/lib/i18n/locale";
 import "./globals.css";
 
@@ -13,6 +14,11 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+// Le bouton « Continuer » de la barre du haut (Server Action continueGame,
+// lots de ~15 s) est présent sur toutes les pages : plafond relevé pour
+// toutes, plutôt que page par page.
+export const maxDuration = 60;
 
 export const metadata: Metadata = {
   title: "Hoops Manager",
@@ -49,7 +55,10 @@ export default async function RootLayout({
       </head>
       <body className="min-h-full">
         <NavBar />
-        <main className="min-w-0 pb-12">{children}</main>
+        <main className="min-w-0 pb-12">
+          <GameTopBar />
+          {children}
+        </main>
       </body>
     </html>
   );
