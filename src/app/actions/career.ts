@@ -4,11 +4,11 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
-import { addDays, generateCareerPreseasonSchedule, generateCareerSchedule } from "@/lib/careers/generate-schedule";
+import { generateCareerPreseasonSchedule, generateCareerSchedule } from "@/lib/careers/generate-schedule";
 import { generateCareerContracts } from "@/lib/careers/generate-contracts";
 import { generateCareerPlayerStates } from "@/lib/careers/generate-player-states";
 import { generateInviteCode } from "@/lib/careers/invite-code";
-import { PRESEASON_SPAN_DAYS, preseasonSeasonLabel } from "@/lib/careers/schedule-rules";
+import { preseasonSeasonLabel, seasonCalendar } from "@/lib/careers/schedule-rules";
 import {
   createUnresolvedPicksForSeason,
   FUTURE_PICK_WINDOW,
@@ -238,15 +238,17 @@ export async function createCareer(
   // La partie démarre dans l'entre-saison, juste après le draft : quelques
   // matchs de pré-saison à jouer (voir generateCareerPreseasonSchedule),
   // puis la saison régulière ouvre strictement après — aucun match n'est
-  // déjà joué au moment où le GM prend ses fonctions.
-  const today = new Date();
+  // déjà joué au moment où le GM prend ses fonctions. Dates : vrai
+  // calendrier NBA (voir seasonCalendar).
+  const calendar = seasonCalendar(leagueId, league.season, new Date());
   await generateCareerPreseasonSchedule(career.id, toDomainLeague(league), {
     seasonLabel: preseasonSeasonLabel(league.season),
-    startDate: today,
+    startDate: calendar.preseasonStart,
   });
   await generateCareerSchedule(career.id, toDomainLeague(league), {
     seasonLabel: league.season,
-    startDate: addDays(today, PRESEASON_SPAN_DAYS),
+    startDate: calendar.regularSeasonStart,
+    seasonDays: calendar.regularSeasonDays,
   });
 
   // Chaque équipe possède déjà ses picks des prochaines saisons, échangeables

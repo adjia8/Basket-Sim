@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getScheduleForCareer } from "@/lib/data-access/schedule";
 import { getStandings } from "@/lib/data-access/standings";
 import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
-import { addDays, generateCareerPreseasonSchedule, generateCareerSchedule } from "@/lib/careers/generate-schedule";
+import { generateCareerPreseasonSchedule, generateCareerSchedule } from "@/lib/careers/generate-schedule";
 import { generateProspectClass } from "@/lib/careers/generate-prospects";
 import {
   createUnresolvedPicksForSeason,
@@ -14,7 +14,7 @@ import {
   futureSeasonsAfter,
 } from "@/lib/careers/generate-draft-picks";
 import { nextSeasonLabel } from "@/lib/careers/season-format";
-import { PRESEASON_SPAN_DAYS, preseasonSeasonLabel } from "@/lib/careers/schedule-rules";
+import { preseasonSeasonLabel, seasonCalendar } from "@/lib/careers/schedule-rules";
 import { ageOneSeason, RETIREMENT_AGE } from "@/lib/careers/aging-rules";
 import { isHallOfFameWorthy } from "@/lib/careers/hall-of-fame-rules";
 import { toDomainLeague } from "@/lib/data-access/mappers";
@@ -281,14 +281,15 @@ export async function advanceSeason(): Promise<void> {
   // 5. Nouvelle pré-saison puis nouvelle saison régulière, toutes deux
   // "scheduled" — même logique qu'à la création de la Career (voir
   // actions/career.ts) : chaque rentrée de saison repasse par une pré-saison.
-  const today = new Date();
+  const calendar = seasonCalendar(career.leagueId, newSeason, new Date());
   await generateCareerPreseasonSchedule(career.id, toDomainLeague(career.league), {
     seasonLabel: preseasonSeasonLabel(newSeason),
-    startDate: today,
+    startDate: calendar.preseasonStart,
   });
   await generateCareerSchedule(career.id, toDomainLeague(career.league), {
     seasonLabel: newSeason,
-    startDate: addDays(today, PRESEASON_SPAN_DAYS),
+    startDate: calendar.regularSeasonStart,
+    seasonDays: calendar.regularSeasonDays,
   });
 
   revalidatePath("/", "layout");

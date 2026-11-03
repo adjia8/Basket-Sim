@@ -38,6 +38,8 @@ export const keys = [
   "common.draftPick.full",
   "common.draftPick.roundOnly",
   "common.draftPick.via",
+  "common.tradeDeadline.upcoming",
+  "common.tradeDeadline.today",
 ] as const;
 
 export type CommonKey = (typeof keys)[number];
@@ -77,6 +79,8 @@ export const fr: Record<CommonKey, string> = {
   "common.draftPick.full": "Pick {number} (Tour {round}, {season})",
   "common.draftPick.roundOnly": "Tour {round} {season}",
   "common.draftPick.via": " (via {abbr})",
+  "common.tradeDeadline.upcoming": "Date limite des échanges : {date} — encore {days} jour(s) dans le calendrier du jeu.",
+  "common.tradeDeadline.today": "Date limite des échanges : aujourd'hui ({date}), dernier jour pour échanger.",
 };
 
 export const en: Record<CommonKey, string> = {
@@ -114,4 +118,6 @@ export const en: Record<CommonKey, string> = {
   "common.draftPick.full": "Pick {number} (Round {round}, {season})",
   "common.draftPick.roundOnly": "Round {round} {season}",
   "common.draftPick.via": " (via {abbr})",
+  "common.tradeDeadline.upcoming": "Trade deadline: {date} — {days} day(s) left on the game calendar.",
+  "common.tradeDeadline.today": "Trade deadline: today ({date}), last day to make trades.",
 };

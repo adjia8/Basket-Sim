@@ -11,6 +11,18 @@ export function formatGameDate(iso: string, locale: Locale): string {
   });
 }
 
+// Date complète ("jeudi 11 février 2027") — échéances importantes (date
+// limite des échanges), là où formatGameDate serait trop elliptique.
+export function formatLongDate(date: Date | string, locale: Locale): string {
+  return new Date(date).toLocaleDateString(INTL_LOCALE[locale], {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 export function teamFullName(team: Team): string {
   return `${team.city} ${team.name}`;
 }

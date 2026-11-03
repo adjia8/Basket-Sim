@@ -3,7 +3,8 @@ import Link from "next/link";
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getTeamById } from "@/lib/data-access/teams";
-import { isTradeDeadlinePassed } from "@/lib/data-access/season-windows";
+import { getTradeDeadlineInfo } from "@/lib/data-access/season-windows";
+import { TradeDeadlineNotice } from "@/components/team/TradeDeadlineNotice";
 import { cancelTradeOffer, respondToTradeOffer } from "@/app/actions/trade";
 import { getTranslator, type Translator } from "@/lib/i18n/translate";
 import { teamFullName } from "@/lib/utils";
@@ -11,9 +12,9 @@ import type { Team } from "@/lib/types";
 
 export default async function TradesPage() {
   const membership = await getCurrentMembership();
-  const { t } = await getTranslator();
+  const { t, locale } = await getTranslator();
 
-  const [received, sent, tradeDeadlinePassed] = await Promise.all([
+  const [received, sent, deadlineInfo] = await Promise.all([
     prisma.tradeOffer.findMany({
       where: { careerId: membership.careerId, toTeamId: membership.teamId, status: "pending" },
       include: { items: true },
@@ -24,8 +25,9 @@ export default async function TradesPage() {
       include: { items: true },
       orderBy: { createdAt: "desc" },
     }),
-    isTradeDeadlinePassed(membership.careerId, membership.season),
+    getTradeDeadlineInfo(membership.careerId, membership.season),
   ]);
+  const tradeDeadlinePassed = deadlineInfo.passed;
 
   const allOffers = [...received, ...sent];
   const playerIds = [
@@ -89,6 +91,7 @@ export default async function TradesPage() {
       {tradeDeadlinePassed && (
         <p className="mt-4 text-sm text-bad">{t("tradeOffers.deadlinePassedNotice")}</p>
       )}
+      <TradeDeadlineNotice info={deadlineInfo} t={t} locale={locale} className="mt-4" />
 
       <section className="mt-8">
         <h2 className="text-lg font-semibold">{t("tradeOffers.received")}</h2>

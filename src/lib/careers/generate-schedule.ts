@@ -92,6 +92,9 @@ export interface GenerateScheduleOptions {
   // correspondante (voir generateCareerPreseasonSchedule), appelée par tous
   // les appelants (création de Career et rollover de saison).
   startDate: Date;
+  // Durée de la saison régulière en jours (voir seasonCalendar) — défaut :
+  // SEASON_LENGTH_DAYS de la ligue.
+  seasonDays?: number;
 }
 
 export async function generateCareerSchedule(
@@ -126,7 +129,7 @@ export async function generateCareerSchedule(
   const roundOfPair = assignRounds(pairs);
   const totalRounds = Math.max(...roundOfPair) + 1;
   const startDate = options.startDate;
-  const seasonDays = SEASON_LENGTH_DAYS[league.id] ?? SEASON_LENGTH_DAYS.nba;
+  const seasonDays = options.seasonDays ?? SEASON_LENGTH_DAYS[league.id] ?? SEASON_LENGTH_DAYS.nba;
 
   // Étale les tours sur toute la durée de la saison (plusieurs équipes jouent
   // le même jour, mais jamais une même équipe deux fois). Strictement

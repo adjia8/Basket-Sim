@@ -5,7 +5,8 @@ import { getLeagueById } from "@/lib/data-access/leagues";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getRosterForTeam } from "@/lib/data-access/players";
 import { getSeasonStatsForPlayers, type SeasonStats } from "@/lib/data-access/season-stats";
-import { isTradeDeadlinePassed } from "@/lib/data-access/season-windows";
+import { getTradeDeadlineInfo } from "@/lib/data-access/season-windows";
+import { TradeDeadlineNotice } from "@/components/team/TradeDeadlineNotice";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getTeamById } from "@/lib/data-access/teams";
 import { prisma } from "@/lib/prisma";
@@ -62,7 +63,7 @@ export default async function TeamRosterPage({
   if (!team) notFound();
   const { t, locale } = await getTranslator();
 
-  const [roster, contracts, league, manager, totalPayroll, deadCap, picks, tradeDeadlinePassed, teamState] =
+  const [roster, contracts, league, manager, totalPayroll, deadCap, picks, deadlineInfo, teamState] =
     await Promise.all([
       getRosterForTeam(membership.careerId, teamId),
       getContractsForTeam(membership.careerId, teamId),
@@ -71,11 +72,12 @@ export default async function TeamRosterPage({
       getPayrollForTeam(membership.careerId, teamId),
       prisma.deadCap.findMany({ where: { careerId: membership.careerId, teamId } }),
       getPendingPicksForTeam(t, membership.careerId, teamId),
-      isTradeDeadlinePassed(membership.careerId, membership.season),
+      getTradeDeadlineInfo(membership.careerId, membership.season),
       getOrCreateTeamState(membership.careerId, teamId, team.leagueId),
     ]);
 
   const isMyTeam = team.id === membership.teamId;
+  const tradeDeadlinePassed = deadlineInfo.passed;
 
   const seasonStats = await getSeasonStatsForPlayers(
     membership.careerId,
@@ -299,6 +301,10 @@ export default async function TeamRosterPage({
         <p className="mt-8 card p-4 text-sm text-bad">
           {t("team.tradeDeadlinePassed")}
         </p>
+      )}
+
+      {isOpponentInMyLeague && (
+        <TradeDeadlineNotice info={deadlineInfo} t={t} locale={locale} className="mt-8" />
       )}
 
       {isOpponentInMyLeague && !tradeDeadlinePassed && (

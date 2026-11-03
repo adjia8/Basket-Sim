@@ -29,6 +29,26 @@ function playoffSeason(regularSeason: string): string {
   return `${regularSeason}-playoffs`;
 }
 
+const PLAYOFF_GAME_SPACING_DAYS = 2;
+
+// Date d'un match de playoffs : dans la continuité du calendrier de la
+// saison (et non la date réelle du jour) — 2 jours après le match
+// précédent de la série, ou, pour le 1er match d'une série, 2 jours après
+// le dernier match déjà joué de la saison (régulière ou playoffs).
+async function nextPlayoffGameDate(series: PlayoffSeriesRow, seriesGames: { gameDate: Date }[]): Promise<Date> {
+  let base = seriesGames.reduce<Date | null>((latest, g) => (!latest || g.gameDate > latest ? g.gameDate : latest), null);
+  if (!base) {
+    const regularSeason = series.season.replace(/-playoffs$/, "");
+    const lastPlayed = await prisma.game.findFirst({
+      where: { careerId: series.careerId, status: "final", season: { in: [regularSeason, series.season] } },
+      orderBy: { gameDate: "desc" },
+      select: { gameDate: true },
+    });
+    base = lastPlayed?.gameDate ?? new Date();
+  }
+  return new Date(base.getTime() + PLAYOFF_GAME_SPACING_DAYS * 86_400_000);
+}
+
 type Seeded = { seed: number; teamId: string };
 
 async function conferenceSeeds(
@@ -97,7 +117,7 @@ async function ensureNextGameForSeries(
       careerId: series.careerId,
       leagueId,
       season: series.season,
-      gameDate: new Date(),
+      gameDate: await nextPlayoffGameDate(series, games),
       homeTeamId,
       awayTeamId,
       status: "scheduled",
