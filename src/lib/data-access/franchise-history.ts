@@ -60,7 +60,7 @@ export interface FranchiseRecords {
   bestSeason: { season: string; wins: number; losses: number } | null;
   longestWinStreak: number;
   highestTeamScore: { points: number; season: string; opponentAbbr: string } | null;
-  highestPlayerGame: { playerName: string; points: number; season: string } | null;
+  highestPlayerGame: { playerId: string; playerName: string; points: number; season: string } | null;
 }
 
 export async function getFranchiseRecords(careerId: string, teamId: string): Promise<FranchiseRecords> {
@@ -134,6 +134,7 @@ export async function getFranchiseRecords(careerId: string, teamId: string): Pro
           select: { firstName: true, lastName: true },
         });
         highestPlayerGame = {
+          playerId: best.playerId,
           playerName: player ? `${player.firstName} ${player.lastName}` : "?",
           points: best.points,
           season: game.season,

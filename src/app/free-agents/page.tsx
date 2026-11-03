@@ -15,7 +15,9 @@ import {
   winPctForStandings,
 } from "@/lib/careers/player-demands";
 import { getTranslator } from "@/lib/i18n/translate";
-import { formatSalary } from "@/lib/utils";
+import Link from "next/link";
+import { formatSalary, playerHref } from "@/lib/utils";
+import { SortableTable } from "@/components/ui/SortableTable";
 
 export default async function FreeAgentsPage() {
   const membership = await getCurrentMembership();
@@ -76,64 +78,69 @@ export default async function FreeAgentsPage() {
       )}
 
       <div className="mt-6 overflow-x-auto">
-        <table className="data-table w-full min-w-[560px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-line text-muted">
-              <th className="py-2 pr-4">{t("freeAgents.colPlayer")}</th>
-              <th className="py-2 pr-4">{t("freeAgents.colPosition")}</th>
-              <th className="py-2 pr-4">{t("freeAgents.colOverall")}</th>
-              <th className="py-2 pr-4">{t("freeAgents.colAge")}</th>
-              <th className="py-2 pr-4">{t("freeAgents.colInjuryRisk")}</th>
-              <th className="py-2 pr-4">{t("freeAgents.colRenown")}</th>
-              <th className="py-2 pr-4">{t("freeAgents.colSalaryDemand")}</th>
-              {canSign && <th className="py-2">{t("freeAgents.colAction")}</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {freeAgents.map((player) => {
-              const meetsDemands = teamMeetsPlayerDemands({
-                renown: player.renown,
-                teamWinPct,
-                teamMarketAppeal,
-                teamFacilitiesLevel: myTeamState.facilitiesLevel,
-              });
-              const expectedSalary = minAcceptableSalary(
-                player.renown,
+        <SortableTable
+          minWidth={560}
+          initialSort={{ column: 2, descending: true }}
+          columns={[
+            { label: t("freeAgents.colPlayer") },
+            { label: t("freeAgents.colPosition") },
+            { label: t("freeAgents.colOverall"), align: "right", descendingFirst: true },
+            { label: t("freeAgents.colAge"), align: "right" },
+            { label: t("freeAgents.colInjuryRisk"), align: "right" },
+            { label: t("freeAgents.colRenown"), align: "right", descendingFirst: true },
+            { label: t("freeAgents.colSalaryDemand"), align: "right", descendingFirst: true },
+            ...(canSign ? [{ label: t("freeAgents.colAction"), sortable: false }] : []),
+          ]}
+          rows={freeAgents.map((player) => {
+            const meetsDemands = teamMeetsPlayerDemands({
+              renown: player.renown,
+              teamWinPct,
+              teamMarketAppeal,
+              teamFacilitiesLevel: myTeamState.facilitiesLevel,
+            });
+            const expectedSalary = minAcceptableSalary(player.renown, player.overallRating, membership.leagueId);
+            const affordable = checkSalaryMove(
+              membership.leagueId,
+              salaryCap,
+              "sign",
+              payroll + expectedSalary,
+              expectedSalary
+            ).ok;
+            return {
+              key: player.id,
+              sortValues: [
+                `${player.lastName} ${player.firstName}`,
+                player.position,
                 player.overallRating,
-                membership.leagueId
-              );
-              const affordable = checkSalaryMove(
-                membership.leagueId,
-                salaryCap,
-                "sign",
-                payroll + expectedSalary,
-                expectedSalary
-              ).ok;
-
-              return (
-                <tr key={player.id} className="border-b border-line-soft">
-                  <td className="py-2 pr-4 font-medium">
-                    {player.firstName} {player.lastName}
-                  </td>
-                  <td className="py-2 pr-4">{player.position}</td>
-                  <td className="py-2 pr-4 font-semibold">{player.overallRating}</td>
-                  <td className="py-2 pr-4">{player.age}</td>
-                  <td className="py-2 pr-4">
-                    {player.injuryRisk}
-                    {player.injured && (
-                      <span className="ml-1 text-xs text-bad">
-                        {t("roster.unavailable")} ({player.injuryGamesRemaining})
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-2 pr-4">{player.renown}</td>
-                  <td className="py-2 pr-4">{formatSalary(expectedSalary, locale)}</td>
-                  {canSign && (
-                    <td className="py-2">
-                      {!affordable ? (
-                        <span className="text-xs text-muted">{t("freeAgents.overBudget")}</span>
+                player.age,
+                player.injuryRisk,
+                player.renown,
+                expectedSalary,
+                null,
+              ],
+              cells: [
+                <Link key="name" href={playerHref(player.id)} className="font-medium hover:underline">
+                  {player.firstName} {player.lastName}
+                </Link>,
+                player.position,
+                <span key="ovr" className="font-semibold">{player.overallRating}</span>,
+                player.age,
+                <span key="risk">
+                  {player.injuryRisk}
+                  {player.injured && (
+                    <span className="ml-1 text-xs text-bad">
+                      {t("roster.unavailable")} ({player.injuryGamesRemaining})
+                    </span>
+                  )}
+                </span>,
+                player.renown,
+                formatSalary(expectedSalary, locale),
+                ...(canSign
+                  ? [
+                      !affordable ? (
+                        <span key="act" className="text-xs text-muted">{t("freeAgents.overBudget")}</span>
                       ) : meetsDemands ? (
-                        <form action={signFreeAgent}>
+                        <form key="act" action={signFreeAgent}>
                           <input type="hidden" name="playerId" value={player.id} />
                           <button
                             type="submit"
@@ -143,15 +150,14 @@ export default async function FreeAgentsPage() {
                           </button>
                         </form>
                       ) : (
-                        <span className="text-xs text-bad">{t("freeAgents.refuses")}</span>
-                      )}
-                    </td>
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                        <span key="act" className="text-xs text-bad">{t("freeAgents.refuses")}</span>
+                      ),
+                    ]
+                  : []),
+              ],
+            };
+          })}
+        />
         {freeAgents.length === 0 && (
           <p className="mt-4 text-sm text-muted">{t("freeAgents.none")}</p>
         )}

@@ -10,7 +10,8 @@ import {
 import { healthyFinancesThreshold, upgradeCost } from "@/lib/careers/finance-rules";
 import { upgradeFacility } from "@/app/actions/franchise";
 import { getTranslator } from "@/lib/i18n/translate";
-import { formatSalary } from "@/lib/utils";
+import Link from "next/link";
+import { formatSalary, playerHref } from "@/lib/utils";
 import { financeTone, ratingTone, toneClass } from "@/lib/color-scale";
 
 export default async function FranchisePage() {
@@ -135,7 +136,10 @@ export default async function FranchisePage() {
               <li>
                 {t("franchisePage.recordPlayerGame")}{" "}
                 <span className="font-medium">
-                  {records.highestPlayerGame.playerName} — {records.highestPlayerGame.points}
+                  <Link href={playerHref(records.highestPlayerGame.playerId)} className="hover:underline">
+                    {records.highestPlayerGame.playerName}
+                  </Link>{" "}
+                  — {records.highestPlayerGame.points}
                 </span>{" "}
                 <span className="text-muted">({records.highestPlayerGame.season})</span>
               </li>
@@ -155,7 +159,9 @@ export default async function FranchisePage() {
                 key={legend.playerId}
                 className="rounded-full border border-line px-3 py-1"
               >
-                {legend.firstName} {legend.lastName}{" "}
+                <Link href={playerHref(legend.playerId)} className="hover:underline">
+                  {legend.firstName} {legend.lastName}
+                </Link>{" "}
                 <span className="text-muted">
                   ({legend.position}, {legend.peakOverallRating}
                   {legend.retiredSeason ? `, ${legend.retiredSeason}` : ""})

@@ -58,27 +58,40 @@ export default async function PlayerDetailPage({
     getPlayerWithState(membership.careerId, playerId),
     getContractForPlayer(membership.careerId, playerId),
   ]);
-  if (!player || !contract) notFound();
+  if (!player) notFound();
 
   // L'équipe actuelle du contrat fait foi, pas le teamId de l'URL — un lien
   // vers cette page (box score, historique, ancien coéquipier...) peut avoir
   // été construit avec l'équipe d'alors ; si la joueuse a été échangée
-  // depuis, on affiche quand même sa fiche à jour plutôt qu'un 404.
-  const teamId = contract.teamId;
-  const team = await getTeamById(teamId);
-  if (!team) notFound();
+  // depuis, on affiche quand même sa fiche à jour plutôt qu'un 404. Sans
+  // contrat (agent libre, ou coupé depuis), la fiche reste consultable.
+  const teamId = contract?.teamId ?? null;
+  const team = teamId ? await getTeamById(teamId) : null;
+  if (contract && !team) notFound();
+  const leagueId = team?.leagueId ?? membership.leagueId;
+  // Sans contrat : retraité ou agent libre (libellé différent, même fiche).
+  const retired = contract
+    ? false
+    : Boolean(
+        (
+          await prisma.playerState.findUnique({
+            where: { careerId_playerId: { careerId: membership.careerId, playerId } },
+            select: { retired: true },
+          })
+        )?.retired
+      );
 
-  const isMyTeam = team.id === membership.teamId;
+  const isMyTeam = team?.id === membership.teamId;
 
   const [seasonStats, stints, standardRosterSize, altSlotsUsed, demandState, tradeDeadlinePassed] = await Promise.all([
     getSeasonStatsForPlayers(membership.careerId, membership.season, [playerId]),
     getStintsForPlayer(membership.careerId, playerId),
-    prisma.contract.count({
-      where: { careerId: membership.careerId, teamId, contractType: "standard" },
-    }),
-    prisma.contract.count({
-      where: { careerId: membership.careerId, teamId, contractType: { not: "standard" } },
-    }),
+    teamId
+      ? prisma.contract.count({ where: { careerId: membership.careerId, teamId, contractType: "standard" } })
+      : Promise.resolve(0),
+    teamId
+      ? prisma.contract.count({ where: { careerId: membership.careerId, teamId, contractType: { not: "standard" } } })
+      : Promise.resolve(0),
     isMyTeam ? getPlayerDemandState(membership.careerId, playerId) : Promise.resolve(null),
     isTradeDeadlinePassed(membership.careerId, membership.season),
   ]);
@@ -98,18 +111,23 @@ export default async function PlayerDetailPage({
   };
 
   const canRelease =
+    !!contract &&
     isMyTeam &&
     (contract.contractType !== "standard" ||
-      standardRosterSize > (MIN_ROSTER_SIZE[team.leagueId] ?? MIN_ROSTER_SIZE.nba));
+      standardRosterSize > (MIN_ROSTER_SIZE[leagueId] ?? MIN_ROSTER_SIZE.nba));
   const canExtend =
-    isMyTeam && contract.contractType === "standard" && contract.yearsRemaining <= EXTENSION_MAX_YEARS_REMAINING;
-  const salaryRange = SALARY_RANGES[team.leagueId] ?? SALARY_RANGES.nba;
+    !!contract &&
+    isMyTeam &&
+    contract.contractType === "standard" &&
+    contract.yearsRemaining <= EXTENSION_MAX_YEARS_REMAINING;
+  const salaryRange = SALARY_RANGES[leagueId] ?? SALARY_RANGES.nba;
   // Suggestion de départ pour l'offre du GM — plancher exigé par le joueur (0
   // pour un rookie encore sous contrat rookie, qui n'a aucune exigence).
-  const suggestedSalary = contract.isRookieScale
+  // Aussi l'exigence affichée pour un agent libre.
+  const suggestedSalary = contract?.isRookieScale
     ? contract.salary
-    : minAcceptableSalary(player.renown, player.overallRating, team.leagueId);
-  const altType = ALT_CONTRACT_TYPE[team.leagueId];
+    : minAcceptableSalary(player.renown, player.overallRating, leagueId);
+  const altType = ALT_CONTRACT_TYPE[leagueId];
   const altTypeLabel = altType ? t(`domain.contractType.${altType}` as const) : "";
   const contractTypeLabels: Record<string, string> = {
     standard: t("domain.contractType.standard"),
@@ -122,14 +140,15 @@ export default async function PlayerDetailPage({
     traded: t("domain.stintReason.traded"),
   };
   const canOfferAlternate =
+    !!contract &&
     isMyTeam &&
     contract.contractType === "standard" &&
     !!altType &&
     isEligibleForAlternateContract(player.age) &&
-    altSlotsUsed < (ALT_CONTRACT_SLOTS_PER_TEAM[team.leagueId] ?? 0);
-  const canPromote = isMyTeam && contract.contractType !== "standard";
+    altSlotsUsed < (ALT_CONTRACT_SLOTS_PER_TEAM[leagueId] ?? 0);
+  const canPromote = !!contract && isMyTeam && contract.contractType !== "standard";
   const activationLimitReached =
-    contract.contractType === "development" &&
+    contract?.contractType === "development" &&
     contract.developmentGamesActivated >= DEVELOPMENT_CONTRACT_GAME_LIMIT;
 
   const ratingLabel = ratingLabels(t);
@@ -143,9 +162,17 @@ export default async function PlayerDetailPage({
             #{player.jerseyNumber} {player.firstName} {player.lastName}
           </h1>
           <p className="text-sm text-muted">
-            <Link href={`/teams/${team.id}`} className="hover:underline">
-              {teamFullName(team)}
-            </Link>{" "}
+            {team ? (
+              <Link href={`/teams/${team.id}`} className="hover:underline">
+                {teamFullName(team)}
+              </Link>
+            ) : retired ? (
+              <span>{t("player.retired")}</span>
+            ) : (
+              <Link href="/free-agents" className="text-accent-text hover:underline">
+                {t("player.freeAgent")}
+              </Link>
+            )}{" "}
             · {player.position} · {player.heightCm} cm ·{" "}
             {t("player.ageLabel", { age: player.age })} · {player.nationality}
           </p>
@@ -229,89 +256,106 @@ export default async function PlayerDetailPage({
         </div>
       </div>
 
-      <div className="mt-6 card p-4">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
-          {t("player.contract")}
-        </h2>
-        <p className="text-xl font-semibold">
-          {formatSalary(contract.salary, locale)}
-          <span className="ml-2 text-sm font-normal text-muted">
-            {t(contract.yearsRemaining > 1 ? "player.yearsRemainingMany" : "player.yearRemainingOne", {
-              count: contract.yearsRemaining,
-            })}
-          </span>
-        </p>
-        <p className="mt-1 text-sm text-muted">
-          {contractTypeLabels[contract.contractType]}
-          {!contract.guaranteed && t("player.notGuaranteedSuffix")}
-          {contract.contractType === "development" && (
-            <>
-              {" · "}
-              {t("player.activationCount", {
-                count: contract.developmentGamesActivated,
-                limit: DEVELOPMENT_CONTRACT_GAME_LIMIT,
+      {!contract && !retired && (
+        <div className="mt-6 card p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+            {t("player.contract")}
+          </h2>
+          <p className="text-xl font-semibold">{t("player.freeAgent")}</p>
+          <p className="mt-1 text-sm text-muted">
+            {t("player.salaryDemand", { amount: formatSalary(suggestedSalary, locale) })} ·{" "}
+            <Link href="/free-agents" className="text-accent-text hover:underline">
+              {t("player.seeFreeAgents")}
+            </Link>
+          </p>
+        </div>
+      )}
+
+      {contract && (
+        <div className="mt-6 card p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+            {t("player.contract")}
+          </h2>
+          <p className="text-xl font-semibold">
+            {formatSalary(contract.salary, locale)}
+            <span className="ml-2 text-sm font-normal text-muted">
+              {t(contract.yearsRemaining > 1 ? "player.yearsRemainingMany" : "player.yearRemainingOne", {
+                count: contract.yearsRemaining,
               })}
-            </>
+            </span>
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            {contractTypeLabels[contract.contractType]}
+            {!contract.guaranteed && t("player.notGuaranteedSuffix")}
+            {contract.contractType === "development" && (
+              <>
+                {" · "}
+                {t("player.activationCount", {
+                  count: contract.developmentGamesActivated,
+                  limit: DEVELOPMENT_CONTRACT_GAME_LIMIT,
+                })}
+              </>
+            )}
+          </p>
+          {activationLimitReached && (
+            <p className="mt-1 text-sm text-bad">{t("player.activationLimitReached")}</p>
           )}
-        </p>
-        {activationLimitReached && (
-          <p className="mt-1 text-sm text-bad">{t("player.activationLimitReached")}</p>
-        )}
 
-        {canExtend && (
-          <div className="mt-4 card p-3">
-            <p className="text-sm font-medium">{t("player.proposeExtension")}</p>
-            <ExtendContractForm
-              playerId={player.id}
-              minSalary={salaryRange.min}
-              maxSalary={salaryRange.max}
-              suggestedSalary={suggestedSalary}
-              suggestedYears={2}
-              isRookieScale={contract.isRookieScale}
-              labels={{
-                proposedSalary: t("extend.proposedSalary"),
-                duration: t("extend.duration"),
-                proposing: t("common.proposing"),
-                proposeButton: t("extend.proposeButton"),
-                rookieNote: t("extend.rookieNote"),
-              }}
-            />
-          </div>
-        )}
-
-        {isMyTeam && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {canRelease && (
-              <form action={releasePlayer}>
-                <input type="hidden" name="playerId" value={player.id} />
-                <button
-                  type="submit"
-                  className="rounded-md border border-bad/30 px-4 py-1.5 text-sm font-medium text-bad hover:bg-bad/10"
-                >
-                  {t("player.cut")}
-                </button>
-              </form>
-            )}
-            {canOfferAlternate && altType && (
-              <form action={offerAlternateContract}>
-                <input type="hidden" name="playerId" value={player.id} />
-                <button
-                  type="submit"
-                  className="rounded-md border border-line px-4 py-1.5 text-sm font-medium hover:bg-surface-2"
-                >
-                  {t("player.proposeAltContract", { type: altTypeLabel })}
-                </button>
-              </form>
-            )}
-            {canPromote && (
-              <PromoteContractForm
+          {canExtend && (
+            <div className="mt-4 card p-3">
+              <p className="text-sm font-medium">{t("player.proposeExtension")}</p>
+              <ExtendContractForm
                 playerId={player.id}
-                labels={{ button: t("player.promoteToStandard"), proposing: t("common.proposing") }}
+                minSalary={salaryRange.min}
+                maxSalary={salaryRange.max}
+                suggestedSalary={suggestedSalary}
+                suggestedYears={2}
+                isRookieScale={contract.isRookieScale}
+                labels={{
+                  proposedSalary: t("extend.proposedSalary"),
+                  duration: t("extend.duration"),
+                  proposing: t("common.proposing"),
+                  proposeButton: t("extend.proposeButton"),
+                  rookieNote: t("extend.rookieNote"),
+                }}
               />
-            )}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+
+          {isMyTeam && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {canRelease && (
+                <form action={releasePlayer}>
+                  <input type="hidden" name="playerId" value={player.id} />
+                  <button
+                    type="submit"
+                    className="rounded-md border border-bad/30 px-4 py-1.5 text-sm font-medium text-bad hover:bg-bad/10"
+                  >
+                    {t("player.cut")}
+                  </button>
+                </form>
+              )}
+              {canOfferAlternate && altType && (
+                <form action={offerAlternateContract}>
+                  <input type="hidden" name="playerId" value={player.id} />
+                  <button
+                    type="submit"
+                    className="rounded-md border border-line px-4 py-1.5 text-sm font-medium hover:bg-surface-2"
+                  >
+                    {t("player.proposeAltContract", { type: altTypeLabel })}
+                  </button>
+                </form>
+              )}
+              {canPromote && (
+                <PromoteContractForm
+                  playerId={player.id}
+                  labels={{ button: t("player.promoteToStandard"), proposing: t("common.proposing") }}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-6 card p-4">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">

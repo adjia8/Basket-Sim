@@ -2,13 +2,20 @@ import { getTranslator } from "@/lib/i18n/translate";
 import { RotationOrderFormClient } from "./RotationOrderFormClient";
 import type { RotationOrderPlayer } from "@/lib/careers/rotation-rules";
 
-export async function RotationOrderForm({ initialOrder }: { initialOrder: RotationOrderPlayer[] }) {
+export async function RotationOrderForm({
+  teamId,
+  initialOrder,
+}: {
+  teamId: string;
+  initialOrder: RotationOrderPlayer[];
+}) {
   const { t } = await getTranslator();
 
   return (
     <div>
       <h2 className="mb-2 text-lg font-semibold">{t("rotation.title")}</h2>
       <RotationOrderFormClient
+        teamId={teamId}
         initialOrder={initialOrder}
         labels={{
           description: t("rotation.description"),

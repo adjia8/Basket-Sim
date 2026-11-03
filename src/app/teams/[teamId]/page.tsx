@@ -267,7 +267,7 @@ export default async function TeamRosterPage({
 
       {activeTab === "rotation" && (
         <div className="mt-6">
-          <RotationOrderForm initialOrder={rotationOrder} />
+          <RotationOrderForm teamId={team.id} initialOrder={rotationOrder} />
         </div>
       )}
 

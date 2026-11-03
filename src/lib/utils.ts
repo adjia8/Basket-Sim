@@ -23,6 +23,13 @@ export function formatLongDate(date: Date | string, locale: Locale): string {
   });
 }
 
+// Lien vers la fiche d'un joueur. La fiche suit toujours le contrat actuel
+// (voir teams/[teamId]/players/[playerId]/page.tsx) : sans équipe connue
+// (agent libre, retraité), le segment d'équipe n'est qu'un repère d'URL.
+export function playerHref(playerId: string, teamId?: string | null): string {
+  return `/teams/${teamId ?? "free-agents"}/players/${playerId}`;
+}
+
 export function teamFullName(team: Team): string {
   return `${team.city} ${team.name}`;
 }

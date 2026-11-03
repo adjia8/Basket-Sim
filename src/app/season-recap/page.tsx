@@ -4,7 +4,8 @@ import { getProspectsForCareer } from "@/lib/data-access/prospects";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { prisma } from "@/lib/prisma";
 import { getTranslator } from "@/lib/i18n/translate";
-import { formatSalary } from "@/lib/utils";
+import Link from "next/link";
+import { formatSalary, playerHref } from "@/lib/utils";
 
 export default async function SeasonRecapPage() {
   const membership = await getCurrentMembership();
@@ -51,7 +52,9 @@ export default async function SeasonRecapPage() {
                 {freeAgentReport.map(({ player, desiredContract, wantsCompetitiveTeam, wantsAttractiveMarket, wantsGoodFacilities, interestedTeamIds }) => (
                   <tr key={player.id} className="border-b border-line-soft">
                     <td className="py-2 pr-4 font-medium">
-                      {player.firstName} {player.lastName}
+                      <Link href={playerHref(player.id)} className="hover:underline">
+                        {player.firstName} {player.lastName}
+                      </Link>
                     </td>
                     <td className="py-2 pr-4">{player.overallRating}</td>
                     <td className="py-2 pr-4">{player.renown}</td>
@@ -128,7 +131,9 @@ export default async function SeasonRecapPage() {
                 className="flex items-center justify-between card px-4 py-3 text-sm"
               >
                 <span>
-                  {state.player.firstName} {state.player.lastName}
+                  <Link href={playerHref(state.player.id)} className="hover:underline">
+                    {state.player.firstName} {state.player.lastName}
+                  </Link>
                   <span className="ml-2 text-xs text-muted">
                     ({t("seasonRecap.peakOverallPrefix")} {state.peakOverallRating})
                   </span>

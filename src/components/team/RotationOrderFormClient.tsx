@@ -4,6 +4,8 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { setRotationOrder, type RotationOrderFormState } from "@/app/actions/rotation";
 import { ROTATION_SIZE } from "@/lib/simulation/mockEngine";
 import type { RotationOrderPlayer } from "@/lib/careers/rotation-rules";
+import Link from "next/link";
+import { playerHref } from "@/lib/utils";
 import { EnergyRing } from "./EnergyRing";
 
 export interface RotationOrderLabels {
@@ -27,9 +29,11 @@ function roleLabel(index: number, labels: RotationOrderLabels): string {
 }
 
 export function RotationOrderFormClient({
+  teamId,
   initialOrder,
   labels,
 }: {
+  teamId: string;
   initialOrder: RotationOrderPlayer[];
   labels: RotationOrderLabels;
 }) {
@@ -164,7 +168,9 @@ export function RotationOrderFormClient({
         </button>
         <span className="w-6 text-center text-faint">{index + 1}</span>
         <span className="flex-1">
-          #{player.jerseyNumber} {player.firstName} {player.lastName}{" "}
+          <Link href={playerHref(player.id, teamId)} className="hover:underline">
+            #{player.jerseyNumber} {player.firstName} {player.lastName}
+          </Link>{" "}
           <span className="text-faint">
             ({player.position}, {player.overallRating})
           </span>

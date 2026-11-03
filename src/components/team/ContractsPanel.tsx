@@ -3,6 +3,7 @@ import type { Translator } from "@/lib/i18n/translate";
 import type { Locale } from "@/lib/i18n/locale";
 import { NBA_SECOND_APRON, NBA_TAX_LINE } from "@/lib/careers/cap-rules";
 import { formatSalary } from "@/lib/utils";
+import { SortableTable } from "@/components/ui/SortableTable";
 
 export interface ContractRow {
   playerId: string;
@@ -56,34 +57,31 @@ export function ContractsPanel({
 
   const table = (rows: ContractRow[]) => (
     <div className="card overflow-x-auto px-4">
-      <table className="data-table w-full text-left text-sm">
-        <thead>
-          <tr>
-            <th className="py-2 pr-4">{t("roster.column.player")}</th>
-            <th className="py-2 pr-4">{t("roster.column.position")}</th>
-            <th className="py-2 pr-4 text-right">{t("roster.column.salary")}</th>
-            <th className="py-2 pr-4 text-right">{t("team.contracts.colYears")}</th>
-            <th className="py-2">{t("team.contracts.colGuaranteed")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((c) => (
-            <tr key={c.playerId}>
-              <td className="py-2 pr-4 font-medium">
-                <Link href={`/teams/${teamId}/players/${c.playerId}`} className="hover:underline">
-                  {c.name}
-                </Link>
-              </td>
-              <td className="py-2 pr-4 text-muted">{c.position}</td>
-              <td className="py-2 pr-4 text-right">{formatSalary(c.salary, locale)}</td>
-              <td className="py-2 pr-4 text-right">{c.yearsRemaining}</td>
-              <td className={`py-2 ${c.guaranteed ? "" : "text-warn"}`}>
-                {c.guaranteed ? t("team.contracts.yes") : t("team.contracts.no")}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <SortableTable
+        initialSort={{ column: 2, descending: true }}
+        columns={[
+          { label: t("roster.column.player") },
+          { label: t("roster.column.position") },
+          { label: t("roster.column.salary"), align: "right", descendingFirst: true },
+          { label: t("team.contracts.colYears"), align: "right", descendingFirst: true },
+          { label: t("team.contracts.colGuaranteed") },
+        ]}
+        rows={rows.map((c) => ({
+          key: c.playerId,
+          sortValues: [c.name, c.position, c.salary, c.yearsRemaining, c.guaranteed ? 1 : 0],
+          cells: [
+            <Link key="name" href={`/teams/${teamId}/players/${c.playerId}`} className="font-medium hover:underline">
+              {c.name}
+            </Link>,
+            <span key="pos" className="text-muted">{c.position}</span>,
+            formatSalary(c.salary, locale),
+            c.yearsRemaining,
+            <span key="g" className={c.guaranteed ? "" : "text-warn"}>
+              {c.guaranteed ? t("team.contracts.yes") : t("team.contracts.no")}
+            </span>,
+          ],
+        }))}
+      />
     </div>
   );
 

@@ -5,6 +5,16 @@ import { getStandings } from "@/lib/data-access/standings";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { getTranslator } from "@/lib/i18n/translate";
 import { teamFullName } from "@/lib/utils";
+import { SortableTable } from "@/components/ui/SortableTable";
+
+// Série ("V3", "D2", "W3", "L2"...) en valeur triable : victoires
+// positives, défaites négatives.
+function streakValue(streak: string): number | null {
+  const match = /^([A-Za-z])(\d+)$/.exec(streak);
+  if (!match) return null;
+  const n = Number(match[2]);
+  return "VW".includes(match[1].toUpperCase()) ? n : -n;
+}
 
 export default async function StandingsPage() {
   const membership = await getCurrentMembership();
@@ -34,51 +44,46 @@ export default async function StandingsPage() {
                 {conference.name}
               </h2>
               <div className="card overflow-x-auto px-4">
-                <table className="data-table w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-line text-muted">
-                      <th className="py-2 pr-4">{t("standingsPage.colRank")}</th>
-                      <th className="py-2 pr-4">{t("standingsPage.colTeam")}</th>
-                      <th className="py-2 pr-4">{t("standingsPage.colWins")}</th>
-                      <th className="py-2 pr-4">{t("standingsPage.colLosses")}</th>
-                      <th className="py-2 pr-4">{t("standingsPage.colDiff")}</th>
-                      <th className="py-2">{t("standingsPage.colStreak")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row, index) => {
-                      const team = teamById.get(row.teamId);
-                      if (!team) return null;
-                      const diff = row.pointsFor - row.pointsAgainst;
-                      const isMine = team.id === membership.teamId;
-                      return (
-                        <tr
-                          key={row.teamId}
-                          className={`border-b border-line-soft ${isMine ? "bg-accent/10" : ""}`}
-                        >
-                          <td className="py-2 pr-4 text-muted">{index + 1}</td>
-                          <td className="py-2 pr-4 font-medium">
-                            <Link href={`/teams/${team.id}`} className="flex items-center gap-2 hover:underline">
-                              <span
-                                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                                style={{ backgroundColor: team.primaryColor }}
-                                aria-hidden
-                              />
-                              {teamFullName(team)}
-                            </Link>
-                          </td>
-                          <td className="py-2 pr-4">{row.wins}</td>
-                          <td className="py-2 pr-4">{row.losses}</td>
-                          <td className={`py-2 pr-4 ${diff > 0 ? "text-good" : diff < 0 ? "text-bad" : "text-muted"}`}>
+                <SortableTable
+                  columns={[
+                    { label: t("standingsPage.colRank") },
+                    { label: t("standingsPage.colTeam") },
+                    { label: t("standingsPage.colWins"), align: "right", descendingFirst: true },
+                    { label: t("standingsPage.colLosses"), align: "right", descendingFirst: true },
+                    { label: t("standingsPage.colDiff"), align: "right", descendingFirst: true },
+                    { label: t("standingsPage.colStreak"), align: "right", descendingFirst: true },
+                  ]}
+                  rows={rows.flatMap((row, index) => {
+                    const team = teamById.get(row.teamId);
+                    if (!team) return [];
+                    const diff = row.pointsFor - row.pointsAgainst;
+                    return [
+                      {
+                        key: row.teamId,
+                        highlight: team.id === membership.teamId,
+                        sortValues: [index + 1, teamFullName(team), row.wins, row.losses, diff, streakValue(row.streak)],
+                        cells: [
+                          <span key="rank" className="text-muted">{index + 1}</span>,
+                          <Link key="team" href={`/teams/${team.id}`} className="flex items-center gap-2 font-medium hover:underline">
+                            <span
+                              className="h-2.5 w-2.5 shrink-0 rounded-full"
+                              style={{ backgroundColor: team.primaryColor }}
+                              aria-hidden
+                            />
+                            {teamFullName(team)}
+                          </Link>,
+                          row.wins,
+                          row.losses,
+                          <span key="diff" className={diff > 0 ? "text-good" : diff < 0 ? "text-bad" : "text-muted"}>
                             {diff >= 0 ? "+" : ""}
                             {diff}
-                          </td>
-                          <td className="py-2">{row.streak}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                          </span>,
+                          row.streak,
+                        ],
+                      },
+                    ];
+                  })}
+                />
               </div>
             </div>
           );

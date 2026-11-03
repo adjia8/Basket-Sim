@@ -116,7 +116,9 @@ export function RosterTable({
                 <button
                   type="button"
                   onClick={() => toggleSort(col.key)}
-                  className="font-medium hover:text-fg"
+                  className={`uppercase tracking-[inherit] transition hover:text-fg ${
+                    sortKey === col.key ? "text-accent-text" : ""
+                  }`}
                 >
                   {col.label}
                   {sortKey === col.key ? (descending ? " ↓" : " ↑") : ""}

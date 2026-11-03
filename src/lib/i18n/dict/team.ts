@@ -97,6 +97,10 @@ export const keys = [
   "player.activationCount",
   "player.activationLimitReached",
   "player.promoteToStandard",
+  "player.freeAgent",
+  "player.retired",
+  "player.salaryDemand",
+  "player.seeFreeAgents",
 ] as const;
 
 export type TeamKey = (typeof keys)[number];
@@ -203,6 +207,10 @@ export const fr: Record<TeamKey, string> = {
   "player.activationCount": "{count}/{limit} matchs activés",
   "player.activationLimitReached": "🚫 Limite d'activation atteinte — doit repasser en contrat standard pour rejouer.",
   "player.promoteToStandard": "Passer en contrat standard",
+  "player.freeAgent": "Agent libre",
+  "player.retired": "Retraité",
+  "player.salaryDemand": "Exigence salariale : {amount}",
+  "player.seeFreeAgents": "voir les agents libres",
 };
 
 export const en: Record<TeamKey, string> = {
@@ -305,4 +313,8 @@ export const en: Record<TeamKey, string> = {
   "player.activationCount": "{count}/{limit} games activated",
   "player.activationLimitReached": "🚫 Activation limit reached — must move to a standard contract to play again.",
   "player.promoteToStandard": "Move to standard contract",
+  "player.freeAgent": "Free agent",
+  "player.retired": "Retired",
+  "player.salaryDemand": "Salary demand: {amount}",
+  "player.seeFreeAgents": "see free agents",
 };
