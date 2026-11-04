@@ -53,6 +53,7 @@ export const keys = [
   "common.topbar.progress",
   "common.topbar.playing",
   "common.topbar.waitingFor",
+  "common.topbar.newMessages",
   "common.topbar.error",
 ] as const;
 
@@ -108,6 +109,7 @@ export const fr: Record<CommonKey, string> = {
   "common.topbar.progress": "{count} match(s) joué(s)…",
   "common.topbar.playing": "Match en cours…",
   "common.topbar.waitingFor": "En attente de {name}",
+  "common.topbar.newMessages": "{count} message(s) à lire avant de continuer",
   "common.topbar.error": "Impossible d'avancer — réessaie.",
 };
 
@@ -161,5 +163,6 @@ export const en: Record<CommonKey, string> = {
   "common.topbar.progress": "{count} game(s) played…",
   "common.topbar.playing": "Playing…",
   "common.topbar.waitingFor": "Waiting for {name}",
+  "common.topbar.newMessages": "{count} message(s) to read before continuing",
   "common.topbar.error": "Couldn't continue — try again.",
 };

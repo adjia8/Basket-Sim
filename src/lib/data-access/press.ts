@@ -111,7 +111,7 @@ export async function maybeCreatePressConference(
   ]);
 
   const { title, body } = pressMessageText(locale);
-  await createInboxMessage(careerId, teamId, season, "press", title, body, "/press");
+  await createInboxMessage(careerId, teamId, season, "press", title, body, "/press", { gameDate });
 }
 
 export async function getPendingPressConference(

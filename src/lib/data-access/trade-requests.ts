@@ -93,7 +93,16 @@ export async function maybeFlagTradeRequest(
 
     const playerName = `${state.player.firstName} ${state.player.lastName}`;
     const { title, body } = tradeRequestMessageText(locale, playerName);
-    await createInboxMessage(careerId, teamId, season, "trade_request", title, body, `/teams/${teamId}`);
+    await createInboxMessage(
+      careerId,
+      teamId,
+      season,
+      "trade_request",
+      title,
+      body,
+      `/teams/${teamId}/players/${state.playerId}`,
+      { gameDate, playerId: state.playerId }
+    );
     break; // une seule nouvelle demande par appel — garantit l'anti-cluster même si plusieurs joueuses sont éligibles le même match
   }
 }

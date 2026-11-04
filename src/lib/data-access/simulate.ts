@@ -87,7 +87,10 @@ async function notifyHumanTeamNews(
       injury.severity,
       injury.durationGames
     );
-    await createInboxMessage(careerId, teamId, season, "injury", title, body, `/teams/${teamId}/players/${player.id}`);
+    await createInboxMessage(careerId, teamId, season, "injury", title, body, `/teams/${teamId}/players/${player.id}`, {
+      gameDate,
+      playerId: player.id,
+    });
   }
 
   if (conferenceRankChanged(teamState.lastKnownConferenceRank, currentRank)) {
@@ -99,7 +102,7 @@ async function notifyHumanTeamNews(
         teamState.lastKnownConferenceRank!,
         currentRank
       );
-      await createInboxMessage(careerId, teamId, season, "standings", title, body, "/standings");
+      await createInboxMessage(careerId, teamId, season, "standings", title, body, "/standings", { gameDate });
     }
   }
   if (teamState.lastKnownConferenceRank !== currentRank) {
@@ -120,7 +123,10 @@ async function notifyHumanTeamNews(
         notable.position,
         expectedSalary
       );
-      await createInboxMessage(careerId, teamId, season, "free_agent", title, body, "/free-agents");
+      await createInboxMessage(careerId, teamId, season, "free_agent", title, body, "/free-agents", {
+        gameDate,
+        playerId: notable.id,
+      });
       await prisma.teamState.update({ where: { id: teamState.id }, data: { lastFreeAgentNewsDate: gameDate } });
     }
   }

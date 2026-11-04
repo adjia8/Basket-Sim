@@ -8,6 +8,7 @@ import { simulateAndResolveGame } from "@/lib/data-access/simulate";
 import { getTranslator } from "@/lib/i18n/translate";
 import { endOfGameDay } from "@/lib/data-access/game-clock";
 import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
+import { markAllInboxMessagesRead } from "@/lib/data-access/inbox";
 
 // Les matchs IA-vs-IA se jouent quand le manager avance : avant chacun de
 // ses matchs, le reste de la ligue est rattrapé jusqu'au même jour (voir
@@ -240,9 +241,15 @@ export async function simulateNextMyGames(): Promise<SimulateNextMyGamesResult> 
   };
 }
 
+// Messages qui arrêtent « Continuer » (une décision ou une info qui compte) —
+// pas le classement ni la presse (déjà imposée par une redirection, voir
+// getCurrentMembership).
+const CONTINUE_STOPPING_MESSAGE_TYPES = ["injury", "trade_request", "free_agent", "poach_offer"];
+
 export type ContinueResult =
   | { kind: "advanced"; simulated: number } // lot de matchs IA joué : rappeler
   | { kind: "matchDay"; gameId: string } // jour de mon prochain match, tout le reste est joué
+  | { kind: "inbox"; count: number } // messages importants non lus : à lire avant d'avancer
   | { kind: "seasonOver" } // plus rien à jouer cette saison
   | { kind: "error" };
 
@@ -253,13 +260,27 @@ export type ContinueResult =
 // tant que kind === "advanced" (lots sous budget de temps, voir
 // simulateAiGamesUpTo). Sans match à venir pour mon équipe, joue le reste de
 // la saison, playoffs compris (tour par tour), jusqu'au bout.
-export async function continueGame(): Promise<ContinueResult> {
+export async function continueGame(options: { acknowledgeInbox?: boolean } = {}): Promise<ContinueResult> {
   const { userId } = await verifySession();
   const { locale } = await getTranslator();
   const membership = await prisma.membership.findUnique({ where: { userId }, include: { career: true } });
   if (!membership) return { kind: "error" };
 
   const { careerId, teamId, career } = membership;
+
+  // Comme dans Football Manager, on ne passe pas devant un message
+  // important sans l'avoir vu : « Continuer » mène d'abord à la boîte de
+  // réception ; relancé depuis celle-ci (acknowledgeInbox), il vaut lecture.
+  const [unreadImportant, pendingTradeOffers] = await Promise.all([
+    prisma.inboxMessage.count({
+      where: { careerId, teamId, status: "unread", type: { in: CONTINUE_STOPPING_MESSAGE_TYPES } },
+    }),
+    prisma.tradeOffer.count({ where: { careerId, toTeamId: teamId, status: "pending" } }),
+  ]);
+  if (unreadImportant + pendingTradeOffers > 0) {
+    if (!options.acknowledgeInbox) return { kind: "inbox", count: unreadImportant + pendingTradeOffers };
+    await markAllInboxMessagesRead(careerId, teamId);
+  }
   // Saison régulière terminée : crée les matchs de playoffs à venir (match
   // suivant d'une série, tour suivant) — sans effet avant.
   await getOrAdvancePlayoffs(careerId, career.season, career.leagueId);

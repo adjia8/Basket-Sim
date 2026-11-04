@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { continueGame } from "@/app/actions/simulate-bulk";
 import { withClientTimeout } from "@/lib/client-timeout";
 
@@ -11,6 +11,7 @@ export interface ContinueButtonLabels {
   progress: string; // "{count} match(s) joué(s)…"
   playing: string; // "Match en cours…"
   waitingFor: string; // "En attente de {name}"
+  newMessages: string; // "{count} message(s) à lire avant de continuer"
   error: string;
 }
 
@@ -30,6 +31,7 @@ export function ContinueButton({
   labels: ContinueButtonLabels;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [running, setRunning] = useState(false);
   const [isRefreshing, startTransition] = useTransition();
   const [status, setStatus] = useState<string | null>(null);
@@ -66,8 +68,15 @@ export function ContinueButton({
     let count = 0;
     setStatus(labels.progress.replace("{count}", "0"));
     for (;;) {
-      const res = await withClientTimeout(continueGame());
+      // Depuis la boîte de réception, relancer « Continuer » vaut lecture
+      // des messages importants (voir continueGame).
+      const res = await withClientTimeout(continueGame({ acknowledgeInbox: pathname === "/inbox" }));
       if (res.kind === "error") throw new Error();
+      if (res.kind === "inbox") {
+        setStatus(labels.newMessages.replace("{count}", String(res.count)));
+        goTo("/inbox");
+        return;
+      }
       if (res.kind === "advanced") {
         count += res.simulated;
         setStatus(labels.progress.replace("{count}", String(count)));

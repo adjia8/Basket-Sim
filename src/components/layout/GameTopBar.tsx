@@ -59,6 +59,7 @@ export async function GameTopBar() {
             progress: t("common.topbar.progress"),
             playing: t("common.topbar.playing"),
             waitingFor: t("common.topbar.waitingFor"),
+            newMessages: t("common.topbar.newMessages"),
             error: t("common.topbar.error"),
           }}
         />

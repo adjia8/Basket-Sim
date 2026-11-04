@@ -9,6 +9,10 @@ export interface InboxMessageView {
   linkHref: string | null;
   status: string;
   createdAt: string; // ISO
+  // Date du jeu (ISO) — repli sur createdAt pour les messages antérieurs à
+  // ce champ ou créés hors calendrier.
+  gameDate: string | null;
+  playerId: string | null;
 }
 
 function toView(row: {
@@ -19,6 +23,8 @@ function toView(row: {
   linkHref: string | null;
   status: string;
   createdAt: Date;
+  gameDate: Date | null;
+  playerId: string | null;
 }): InboxMessageView {
   return {
     id: row.id,
@@ -28,6 +34,8 @@ function toView(row: {
     linkHref: row.linkHref,
     status: row.status,
     createdAt: row.createdAt.toISOString(),
+    gameDate: row.gameDate?.toISOString() ?? null,
+    playerId: row.playerId,
   };
 }
 
@@ -40,10 +48,21 @@ export async function createInboxMessage(
   type: string,
   title: string,
   body: string,
-  linkHref?: string | null
+  linkHref?: string | null,
+  context: { gameDate?: Date | null; playerId?: string | null } = {}
 ): Promise<void> {
   await prisma.inboxMessage.create({
-    data: { careerId, teamId, season, type, title, body, linkHref: linkHref ?? null },
+    data: {
+      careerId,
+      teamId,
+      season,
+      type,
+      title,
+      body,
+      linkHref: linkHref ?? null,
+      gameDate: context.gameDate ?? null,
+      playerId: context.playerId ?? null,
+    },
   });
 }
 

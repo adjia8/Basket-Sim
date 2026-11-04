@@ -57,6 +57,8 @@ model InboxMessage {
   title     String
   body      String
   linkHref  String? // ex: "/press", "/teams/{id}/players/{id}" — null si purement informatif
+  gameDate  DateTime? // date du jeu à laquelle le message est arrivé (null : intersaison / messages antérieurs)
+  playerId  String? // joueur concerné (blessure, demande de transfert, agent libre) — pas de relation, simple repère
   status    String   @default("unread") // "unread" | "read"
   createdAt DateTime @default(now())
 
