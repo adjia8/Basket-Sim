@@ -117,12 +117,15 @@ export async function proposeTrade(
   // désormais) trop haut — une équipe qui démarre au-dessus du plafond
   // (catalogue de départ trop fourni pour cette franchise, voir
   // actions/career.ts) doit rester capable de faire des échanges à effectif
-  // constant ou décroissant, sinon elle serait bloquée à vie. Le plancher,
-  // lui, reste une limite dure dans tous les cas (jamais descendre sous le
-  // minimum jouable, peu importe le point de départ).
+  // constant ou décroissant, sinon elle serait bloquée à vie. Même logique
+  // pour le plancher : il ne bloque que si l'échange FAIT BAISSER un effectif
+  // déjà (ou désormais) sous le minimum — une équipe IA passée sous le
+  // plancher au fil des saisons peut encore échanger à effectif constant.
   const myExceedsMax = myNewSize > maxRosterSize && myNewSize > myRosterSize;
   const theirExceedsMax = theirNewSize > maxRosterSize && theirNewSize > theirRosterSize;
-  if (myNewSize < minRosterSize || myExceedsMax || theirNewSize < minRosterSize || theirExceedsMax) {
+  const myBelowMin = myNewSize < minRosterSize && myNewSize < myRosterSize;
+  const theirBelowMin = theirNewSize < minRosterSize && theirNewSize < theirRosterSize;
+  if (myBelowMin || myExceedsMax || theirBelowMin || theirExceedsMax) {
     return {
       error: t("tradeAction.rosterSizeOutOfRange", { min: minRosterSize, max: maxRosterSize }),
     };
@@ -315,6 +318,8 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
   // simplement parce qu'il l'était déjà avant l'échange.
   const fromExceedsMax = newFromSize > maxRosterSize && newFromSize > fromRosterSize;
   const toExceedsMax = newToSize > maxRosterSize && newToSize > toRosterSize;
+  const fromBelowMin = newFromSize < minRosterSize && newFromSize < fromRosterSize;
+  const toBelowMin = newToSize < minRosterSize && newToSize < toRosterSize;
 
   const stillValid =
     !deadlinePassed &&
@@ -322,9 +327,9 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
     toPlayersValid &&
     fromPicksValid &&
     toPicksValid &&
-    newFromSize >= minRosterSize &&
+    !fromBelowMin &&
     !fromExceedsMax &&
-    newToSize >= minRosterSize &&
+    !toBelowMin &&
     !toExceedsMax &&
     capOk;
 

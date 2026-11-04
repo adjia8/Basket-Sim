@@ -209,6 +209,10 @@ model Team {
 
 model Player {
   id             String            @id
+  // null = vrai joueur du catalogue (commun à toutes les carrières) ;
+  // renseigné = joueur créé par une draft dans cette Career (simple repère,
+  // pas de relation : supprimé avec elle par deleteCareer).
+  careerId       String?
   teamId         String
   team           Team              @relation(fields: [teamId], references: [id])
   leagueId       String
@@ -245,6 +249,7 @@ model Player {
   teamStints     PlayerTeamStint[]
 
   @@index([teamId])
+  @@index([careerId])
 }
 
 model Game {

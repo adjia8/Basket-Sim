@@ -60,6 +60,7 @@ export async function GameTopBar() {
             playing: t("common.topbar.playing"),
             waitingFor: t("common.topbar.waitingFor"),
             newMessages: t("common.topbar.newMessages"),
+            draftTurn: t("common.topbar.draftTurn"),
             error: t("common.topbar.error"),
           }}
         />

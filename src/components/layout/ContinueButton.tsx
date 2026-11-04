@@ -12,6 +12,7 @@ export interface ContinueButtonLabels {
   playing: string; // "Match en cours…"
   waitingFor: string; // "En attente de {name}"
   newMessages: string; // "{count} message(s) à lire avant de continuer"
+  draftTurn: string; // "Draft : à toi de choisir"
   error: string;
 }
 
@@ -72,6 +73,11 @@ export function ContinueButton({
       // des messages importants (voir continueGame).
       const res = await withClientTimeout(continueGame({ acknowledgeInbox: pathname === "/inbox" }));
       if (res.kind === "error") throw new Error();
+      if (res.kind === "draft") {
+        setStatus(labels.draftTurn);
+        goTo("/draft");
+        return;
+      }
       if (res.kind === "inbox") {
         setStatus(labels.newMessages.replace("{count}", String(res.count)));
         goTo("/inbox");

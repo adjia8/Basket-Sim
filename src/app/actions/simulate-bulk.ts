@@ -8,7 +8,10 @@ import { simulateAndResolveGame } from "@/lib/data-access/simulate";
 import { getTranslator } from "@/lib/i18n/translate";
 import { endOfGameDay } from "@/lib/data-access/game-clock";
 import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
-import { markAllInboxMessagesRead } from "@/lib/data-access/inbox";
+import { createInboxMessage, markAllInboxMessagesRead } from "@/lib/data-access/inbox";
+import { freeAgencyOpenMessageText } from "@/lib/careers/inbox-rules";
+import { aiRosterTarget, runAiDraft, runAiFreeAgency } from "@/lib/data-access/ai-offseason";
+import { isFreeAgencyOpen } from "@/lib/data-access/season-windows";
 
 // Les matchs IA-vs-IA se jouent quand le manager avance : avant chacun de
 // ses matchs, le reste de la ligue est rattrapé jusqu'au même jour (voir
@@ -244,12 +247,13 @@ export async function simulateNextMyGames(): Promise<SimulateNextMyGamesResult> 
 // Messages qui arrêtent « Continuer » (une décision ou une info qui compte) —
 // pas le classement ni la presse (déjà imposée par une redirection, voir
 // getCurrentMembership).
-const CONTINUE_STOPPING_MESSAGE_TYPES = ["injury", "trade_request", "free_agent", "poach_offer"];
+const CONTINUE_STOPPING_MESSAGE_TYPES = ["injury", "trade_request", "free_agent", "poach_offer", "free_agency"];
 
 export type ContinueResult =
   | { kind: "advanced"; simulated: number } // lot de matchs IA joué : rappeler
   | { kind: "matchDay"; gameId: string } // jour de mon prochain match, tout le reste est joué
   | { kind: "inbox"; count: number } // messages importants non lus : à lire avant d'avancer
+  | { kind: "draft" } // à mon tour (ou à celui d'un autre humain) de drafter
   | { kind: "seasonOver" } // plus rien à jouer cette saison
   | { kind: "error" };
 
@@ -281,6 +285,41 @@ export async function continueGame(options: { acknowledgeInbox?: boolean } = {})
     if (!options.acknowledgeInbox) return { kind: "inbox", count: unreadImportant + pendingTradeOffers };
     await markAllInboxMessagesRead(careerId, teamId);
   }
+  // Intersaison : l'IA drafte jusqu'à mon tour (ou la fin de la draft)...
+  const pendingDraftPicks = await prisma.draftPick.count({
+    where: { careerId, season: career.season, status: "pending", pickNumber: { not: null } },
+  });
+  if (pendingDraftPicks > 0) {
+    const draft = await runAiDraft(careerId, career.season, career.leagueId);
+    if (draft.humanTeamOnTheClock) return { kind: "draft" };
+    if (!draft.done && draft.picked > 0) return { kind: "advanced", simulated: 0 };
+  }
+  // ...puis, la draft finie (free agency ouverte), complète ses effectifs
+  // avec des agents libres : plein en intersaison, remplacements en saison.
+  if (await isFreeAgencyOpen(careerId, career.season)) {
+    // Une draft vient d'avoir lieu cette saison (quel que soit l'auteur du
+    // dernier choix) : annoncé une seule fois, et le manager a la main sur
+    // le marché avant que l'IA ne recrute (au prochain « Continuer »).
+    const [draftedThisSeason, announced] = await Promise.all([
+      prisma.draftPick.count({ where: { careerId, season: career.season, status: "completed" } }),
+      prisma.inboxMessage.count({ where: { careerId, teamId, season: career.season, type: "free_agency" } }),
+    ]);
+    if (draftedThisSeason > 0 && announced === 0) {
+      const { title, body } = freeAgencyOpenMessageText(locale);
+      await createInboxMessage(careerId, teamId, career.season, "free_agency", title, body, "/free-agents");
+      return { kind: "inbox", count: 1 };
+    }
+    const regularSeasonStarted = await prisma.game.count({
+      where: { careerId, season: career.season, status: "final" },
+    });
+    await runAiFreeAgency(
+      careerId,
+      career.leagueId,
+      career.season,
+      aiRosterTarget(career.leagueId, regularSeasonStarted > 0)
+    );
+  }
+
   // Saison régulière terminée : crée les matchs de playoffs à venir (match
   // suivant d'une série, tour suivant) — sans effet avant.
   await getOrAdvancePlayoffs(careerId, career.season, career.leagueId);

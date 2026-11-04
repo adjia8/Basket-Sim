@@ -53,7 +53,7 @@ function averageOverallOf(players: { overallRating: number }[]): number {
 export async function getFranchiseSummariesForNewCareer(leagueId: string): Promise<FranchiseSummary[]> {
   const [teamRows, playerRows, expectations] = await Promise.all([
     prisma.team.findMany({ where: { leagueId } }),
-    prisma.player.findMany({ where: { leagueId } }),
+    prisma.player.findMany({ where: { leagueId, careerId: null } }),
     getCatalogExpectations(leagueId),
   ]);
   // Les agents libres de départ gardent leur dernière équipe connue dans

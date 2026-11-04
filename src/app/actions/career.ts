@@ -115,7 +115,9 @@ export async function createCareer(
     }
   }
 
-  const leaguePlayers = await prisma.player.findMany({ where: { leagueId } });
+  // Catalogue réel uniquement (careerId null) : jamais les joueurs draftés
+  // dans d'autres carrières.
+  const leaguePlayers = await prisma.player.findMany({ where: { leagueId, careerId: null } });
   const domainPlayers = leaguePlayers.map(toDomainPlayer);
 
   // Catalogue plein (chaque joueuse WNBA correspond exactement à un effectif
@@ -169,12 +171,17 @@ export async function createCareer(
 
     const devSlotsUsed = roster.length - standardRoster.length;
     const devSlotsAvailable = Math.max(0, altSlots - devSlotsUsed);
+    // Ordre de sortie du roster standard : non garantis d'abord, puis (NBA)
+    // le plus petit vrai salaire — le plus proche d'un vrai two-way, et le
+    // moins faussé quand son contrat est remplacé par un two-way —, puis la
+    // note la plus basse.
     const overflow = [...standardRoster]
       .sort(
         (a, b) =>
-          (nonGuaranteedFirst ? hasRealContract(a) - hasRealContract(b) : 0) ||
-          a.overallRating - b.overallRating
-      ) // non garantis puis pires d'abord
+          (nonGuaranteedFirst
+            ? hasRealContract(a) - hasRealContract(b) || (a.realSalary ?? 0) - (b.realSalary ?? 0)
+            : 0) || a.overallRating - b.overallRating
+      )
       .slice(0, standardRoster.length - maxRosterSize);
 
     overflow.slice(0, devSlotsAvailable).forEach((p) => developmentPlayerIds.add(p.id));
@@ -349,6 +356,9 @@ export async function deleteCareer(): Promise<void> {
   const remaining = await prisma.membership.count({ where: { careerId: membership.careerId } });
   if (remaining === 0) {
     await prisma.career.delete({ where: { id: membership.careerId } });
+    // Joueurs créés par les drafts de cette carrière (voir Player.careerId) :
+    // plus rien ne les référence une fois la carrière supprimée.
+    await prisma.player.deleteMany({ where: { careerId: membership.careerId } });
   }
 
   revalidatePath("/", "layout");

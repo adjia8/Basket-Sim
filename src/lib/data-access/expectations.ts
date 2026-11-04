@@ -18,7 +18,10 @@ function scoresFrom(
 export async function getCatalogExpectations(leagueId: string): Promise<Map<string, ExpectationTier>> {
   const [teams, players] = await Promise.all([
     prisma.team.findMany({ where: { leagueId }, select: { id: true, marketAppeal: true } }),
-    prisma.player.findMany({ where: { leagueId }, select: { id: true, teamId: true, overallRating: true } }),
+    prisma.player.findMany({
+      where: { leagueId, careerId: null },
+      select: { id: true, teamId: true, overallRating: true },
+    }),
   ]);
   const freeAgentIds = initialFreeAgentIds(leagueId);
   const ratingsByTeam = new Map<string, number[]>();

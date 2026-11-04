@@ -141,3 +141,15 @@ export function poachOfferMessageText(locale: Locale, teamName: string): InboxMe
         body: `${teamName} wants to hire you as GM. Respond from the GM page.`,
       };
 }
+
+export function freeAgencyOpenMessageText(locale: Locale): InboxMessageText {
+  return locale === "fr"
+    ? {
+        title: "La free agency est ouverte",
+        body: "La draft est terminée : les agents libres peuvent signer. Les autres équipes commenceront à recruter dès que tu avanceras dans le calendrier.",
+      }
+    : {
+        title: "Free agency is open",
+        body: "The draft is over and free agents can now sign. Other teams will start recruiting as soon as you move the calendar forward.",
+      };
+}

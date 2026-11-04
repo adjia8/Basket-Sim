@@ -14,6 +14,7 @@ const TYPE_TONE: Record<string, string> = {
   trade_request: "bg-warn/15 text-warn",
   poach_offer: "bg-accent/15 text-accent-text",
   free_agent: "bg-info/15 text-info",
+  free_agency: "bg-info/15 text-info",
   press: "bg-surface-3 text-soft",
   standings: "bg-surface-3 text-soft",
 };
@@ -46,6 +47,8 @@ function actionsFor(message: InboxMessageView, teamId: string, t: Translator): M
           : []),
         { label: t("inbox.action.freeAgents"), href: "/free-agents" },
       ];
+    case "free_agency":
+      return [{ label: t("inbox.action.freeAgents"), href: "/free-agents", primary: true }];
     case "press":
       return [{ label: t("inbox.action.answerPress"), href: "/press", primary: true }];
     case "standings":
@@ -148,7 +151,7 @@ function MessageCard({
   actions: MessageAction[];
   poachDecision: boolean;
 }) {
-  const typeLabel = ["press", "injury", "trade_request", "free_agent", "standings", "poach_offer"].includes(message.type)
+  const typeLabel = ["press", "injury", "trade_request", "free_agent", "free_agency", "standings", "poach_offer"].includes(message.type)
     ? t(`inbox.type.${message.type}` as "inbox.type.press")
     : message.type;
   return (

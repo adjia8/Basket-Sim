@@ -25,6 +25,7 @@ export async function cleanupTestUsers(prisma: PrismaClient): Promise<number> {
       await prisma.membership.delete({ where: { userId: user.id } });
       if (remaining === 1) {
         await prisma.career.delete({ where: { id: membership.careerId } }).catch(() => {});
+        await prisma.player.deleteMany({ where: { careerId: membership.careerId } }).catch(() => {});
       }
     }
     await prisma.user.delete({ where: { id: user.id } });

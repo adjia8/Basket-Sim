@@ -64,6 +64,8 @@ export async function getFreeAgents(
     where: {
       leagueId,
       id: { notIn: contracted.map((c) => c.playerId) },
+      // Catalogue réel + joueurs draftés dans CETTE carrière seulement.
+      OR: [{ careerId: null }, { careerId }],
     },
     include: { playerStates: { where: { careerId } } },
   });

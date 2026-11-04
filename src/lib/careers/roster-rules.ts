@@ -7,7 +7,11 @@ export const MAX_ROSTER_SIZE: Record<string, number> = {
   nba: 15,
   wnba: 12,
 };
+// Plancher NBA : 13 (minimum toléré par la vraie convention, 14 en temps
+// normal). L'IA ne signant pas d'agents libres, un effectif peut passer
+// dessous au fil des saisons (fins de contrat, retraites) : le plancher
+// empêche seulement de s'y enfoncer (voir trade.ts / roster.ts).
 export const MIN_ROSTER_SIZE: Record<string, number> = {
-  nba: 5,
+  nba: 13,
   wnba: 6,
 };
