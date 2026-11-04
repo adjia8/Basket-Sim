@@ -66,17 +66,24 @@ export function injuryMessageText(
   locale: Locale,
   playerName: string,
   severity: string,
-  gamesRemaining: number
+  gamesRemaining: number,
+  injuryLabel?: string,
+  returnLabel?: string
 ): InboxMessageText {
   const severityLabel = SEVERITY_LABEL[severity]?.[locale] ?? severity;
+  const what = injuryLabel ?? (locale === "fr" ? `Blessure ${severityLabel}` : `A ${severityLabel} injury`);
   return locale === "fr"
     ? {
         title: `Blessure : ${playerName}`,
-        body: `Blessure ${severityLabel} pour ${playerName} — indisponible pour environ ${gamesRemaining} match(s).`,
+        body: `${what} (${severityLabel}) pour ${playerName} — indisponible pour environ ${gamesRemaining} match(s)${
+          returnLabel ? `, retour estimé le ${returnLabel}` : ""
+        }.`,
       }
     : {
         title: `${playerName} injured`,
-        body: `${playerName} picked up a ${severityLabel} injury — expected to miss about ${gamesRemaining} game(s).`,
+        body: `${what} (${severityLabel}) for ${playerName} — expected to miss about ${gamesRemaining} game(s)${
+          returnLabel ? `, estimated return ${returnLabel}` : ""
+        }.`,
       };
 }
 

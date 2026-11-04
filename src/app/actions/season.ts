@@ -122,6 +122,11 @@ export async function advanceSeason(): Promise<void> {
         retired: retiring,
         peakOverallRating,
         peakRenown,
+        // Coupure estivale : l'usure de la saison s'efface, repos programmé
+        // et progression en cours repartent de zéro.
+        wear: 0,
+        restNextGame: false,
+        developmentProgress: 0,
         ...(retiring
           ? {
               retiredSeason: newSeason,

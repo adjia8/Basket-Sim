@@ -71,6 +71,13 @@ export interface Player {
   conditioning: number; // 0-100, 100 = conditionnement optimal
   trainingBoost: number; // 0-8, bonus temporaire courant sur les attributs de trainingBoostFocus
   trainingBoostFocus?: "offensive" | "defensive" | "tactical" | "physical" | "chemistry" | "rest";
+  // Médical / entraînement (état de Career, absent du catalogue) — voir
+  // wear-rules.ts, injury-rules.ts, development-rules.ts.
+  wear?: number; // 0-99, usure de fond
+  restNextGame?: boolean; // gestion de la charge : ne joue pas le prochain match
+  injuryType?: string; // clé de INJURY_TYPES, blessure en cours
+  individualFocus?: "offensive" | "defensive" | "tactical" | "physical";
+  developmentProgress?: number;
   nationality: string;
   // Salaire/durée de contrat réels connus (source publique) — voir
   // generateCareerContracts, qui les préfère à la génération procédurale

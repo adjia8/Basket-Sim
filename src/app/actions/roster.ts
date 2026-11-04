@@ -482,3 +482,50 @@ function capErrorMessage(
   if (verdict.reason === "apron") return t("rosterAction.exceedsApron", { limit });
   return t("rosterAction.exceedsCap", { cap: limit });
 }
+
+// Gestion de la charge (façon Football Manager) : met un joueur de MON
+// effectif au repos pour le prochain match, ou annule — il récupère alors
+// énergie et usure (voir wear-rules.ts) au lieu de jouer.
+export async function setRestNextGame(formData: FormData): Promise<void> {
+  const { userId } = await verifySession();
+  const playerId = String(formData.get("playerId") ?? "");
+  const value = formData.get("value") === "true";
+
+  const membership = await prisma.membership.findUnique({ where: { userId } });
+  if (!membership) return;
+  const contract = await prisma.contract.findUnique({
+    where: { careerId_playerId: { careerId: membership.careerId, playerId } },
+  });
+  if (!contract || contract.teamId !== membership.teamId) return;
+
+  await prisma.playerState.updateMany({
+    where: { careerId: membership.careerId, playerId },
+    data: { restNextGame: value },
+  });
+  revalidateRosterPaths(membership.teamId);
+}
+
+const INDIVIDUAL_FOCUSES = new Set(["offensive", "defensive", "tactical", "physical"]);
+
+// Entraînement individuel d'un joueur de MON effectif ("" = suit le thème
+// de l'équipe) — oriente sa progression en cours de saison (voir
+// development-rules.ts).
+export async function setIndividualFocus(formData: FormData): Promise<void> {
+  const { userId } = await verifySession();
+  const playerId = String(formData.get("playerId") ?? "");
+  const focusRaw = String(formData.get("focus") ?? "");
+  const focus = INDIVIDUAL_FOCUSES.has(focusRaw) ? focusRaw : null;
+
+  const membership = await prisma.membership.findUnique({ where: { userId } });
+  if (!membership) return;
+  const contract = await prisma.contract.findUnique({
+    where: { careerId_playerId: { careerId: membership.careerId, playerId } },
+  });
+  if (!contract || contract.teamId !== membership.teamId) return;
+
+  await prisma.playerState.updateMany({
+    where: { careerId: membership.careerId, playerId },
+    data: { individualFocus: focus },
+  });
+  revalidateRosterPaths(membership.teamId);
+}

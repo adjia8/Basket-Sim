@@ -17,6 +17,9 @@ import { PromoteContractForm } from "@/components/team/PromoteContractForm";
 import { MakePromiseForm } from "@/components/team/MakePromiseForm";
 import { releasePlayer, offerAlternateContract } from "@/app/actions/roster";
 import { MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import { injuryChance, injuryRiskLevel } from "@/lib/careers/injury-rules";
+import { WEAR_NEEDS_REST } from "@/lib/careers/wear-rules";
+import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import {
   ALT_CONTRACT_SLOTS_PER_TEAM,
   ALT_CONTRACT_TYPE,
@@ -26,7 +29,7 @@ import {
 } from "@/lib/careers/contract-type-rules";
 import { SALARY_RANGES } from "@/lib/careers/salary-rules";
 import { getTranslator, type Translator } from "@/lib/i18n/translate";
-import { formatSalary, teamFullName } from "@/lib/utils";
+import { formatGameDate, formatSalary, teamFullName } from "@/lib/utils";
 import type { PlayerRatings } from "@/lib/types";
 import { inverseRatingTone, ratingTone, toneClass, type ScaleTone } from "@/lib/color-scale";
 
@@ -82,6 +85,32 @@ export default async function PlayerDetailPage({
       );
 
   const isMyTeam = team?.id === membership.teamId;
+
+  // Médical : historique des blessures et risque du prochain match (mêmes
+  // facteurs que la simulation, avec le staff et l'entraînement de son équipe).
+  const [injuryHistory, medicalTeamState] = await Promise.all([
+    prisma.injuryRecord.findMany({
+      where: { careerId: membership.careerId, playerId },
+      orderBy: { gameDate: "desc" },
+      take: 10,
+    }),
+    team ? getOrCreateTeamState(membership.careerId, team.id, team.leagueId) : Promise.resolve(null),
+  ]);
+  const medicalFocus = medicalTeamState?.trainingFocus ?? null;
+  const riskChance = injuryChance({
+    injuryRisk: player.injuryRisk,
+    fatigue: player.fatigue,
+    wear: player.wear ?? 0,
+    age: player.age,
+    facilitiesLevel: medicalTeamState?.facilitiesLevel ?? 50,
+    medicalLevel: medicalTeamState?.trainingStaffLevel ?? 50,
+    intensity:
+      medicalFocus && medicalFocus !== "rest"
+        ? (medicalTeamState!.trainingIntensity as "low" | "medium" | "high")
+        : null,
+    played: true,
+  });
+  const riskLevel = injuryRiskLevel(riskChance);
 
   const [seasonStats, stints, standardRosterSize, altSlotsUsed, demandState, tradeDeadlinePassed] = await Promise.all([
     getSeasonStatsForPlayers(membership.careerId, membership.season, [playerId]),
@@ -254,6 +283,51 @@ export default async function PlayerDetailPage({
             <Stat label={t("player.trainingBonus")} value={`+${player.trainingBoost}`} />
           )}
         </div>
+      </div>
+
+      <div className="mt-6 card p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">{t("team.tab.medical")}</h2>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
+          <Stat
+            label={t("team.medical.energy")}
+            value={100 - Math.min(99, player.fatigue)}
+            tone={ratingTone(100 - Math.min(99, player.fatigue))}
+          />
+          <Stat label={t("team.medical.wear")} value={player.wear ?? 0} tone={inverseRatingTone(player.wear ?? 0)} />
+          <Stat label={t("team.medical.condition")} value={player.conditioning} tone={ratingTone(player.conditioning)} />
+          {!player.injured && (
+            <Stat
+              label={t("team.medical.risk")}
+              value={`${t(riskLevel === "low" ? "team.medical.riskLow" : riskLevel === "medium" ? "team.medical.riskMedium" : "team.medical.riskHigh")} (${(riskChance * 100).toFixed(1)} %)`}
+              tone={riskLevel === "low" ? "good" : riskLevel === "medium" ? "average" : "bad"}
+            />
+          )}
+        </div>
+        {player.injured && player.injuryType && (
+          <p className="mt-3 text-sm text-bad">
+            {t(`domain.injuryType.${player.injuryType}` as "domain.injuryType.illness")} ·{" "}
+            {t("team.medical.games", { count: player.injuryGamesRemaining })}
+          </p>
+        )}
+        {!player.injured && (player.wear ?? 0) >= WEAR_NEEDS_REST && (
+          <p className="mt-3 text-sm text-warn">{t("team.medical.needRest")}</p>
+        )}
+        <h3 className="eyebrow mb-2 mt-4">{t("team.medical.history")}</h3>
+        {injuryHistory.length === 0 ? (
+          <p className="text-sm text-muted">{t("team.medical.noHistory")}</p>
+        ) : (
+          <ul className="space-y-1 text-sm">
+            {injuryHistory.map((h) => (
+              <li key={h.id} className="flex justify-between gap-3">
+                <span>
+                  <span className="text-faint tabular">{formatGameDate(h.gameDate.toISOString(), locale)}</span>{" "}
+                  {t(`domain.injuryType.${h.injuryType}` as "domain.injuryType.illness")}
+                </span>
+                <span className="text-xs text-muted">{t("team.medical.games", { count: h.gamesOut })}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {!contract && !retired && (

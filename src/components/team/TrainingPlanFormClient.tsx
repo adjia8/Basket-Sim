@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import { setTrainingPlan, type TrainingPlanFormState } from "@/app/actions/training";
 import { trainingFatigueDelta, type TrainingFocus, type TrainingIntensity } from "@/lib/careers/training-rules";
 
@@ -47,7 +47,17 @@ export function TrainingPlanFormClient({
     <div className="card p-4">
       <p className="font-medium">{labels.title}</p>
       <p className="mt-1 text-xs text-muted">{labels.description}</p>
-      <form action={action} className="mt-3 flex flex-wrap items-end gap-3">
+      {/* Soumission manuelle plutôt que <form action> : React 19 réinitialise
+          automatiquement un formulaire à action après envoi, ce qui ramenait
+          les menus à « Repos / Moyenne » alors que le plan était enregistré. */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const data = new FormData(e.currentTarget);
+          startTransition(() => action(data));
+        }}
+        className="mt-3 flex flex-wrap items-end gap-3"
+      >
         <label className="flex flex-col gap-1 text-xs text-muted">
           {labels.focusLabel}
           <select

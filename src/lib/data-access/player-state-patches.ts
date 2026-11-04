@@ -3,8 +3,22 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 // Colonnes de PlayerState modifiées par la résolution d'un match
-// (blessures, renommée, entraînement, fatigue — voir simulate.ts).
-export interface PlayerStatePatch {
+// (blessures, renommée, entraînement, fatigue/usure, progression — voir
+// simulate.ts).
+const ATTRIBUTE_COLUMNS = [
+  "scoringInside",
+  "scoringOutside",
+  "playmaking",
+  "defenseInside",
+  "defenseOutside",
+  "rebounding",
+  "athleticism",
+  "basketballIQ",
+  "clutch",
+  "stamina",
+] as const;
+
+export interface PlayerStatePatch extends Partial<Record<(typeof ATTRIBUTE_COLUMNS)[number], number>> {
   injured?: boolean;
   injuryGamesRemaining?: number;
   injurySeverity?: string | null;
@@ -14,6 +28,11 @@ export interface PlayerStatePatch {
   trainingBoost?: number;
   trainingBoostFocus?: string | null;
   fatigue?: number;
+  wear?: number;
+  restNextGame?: boolean;
+  injuryType?: string | null;
+  developmentProgress?: number;
+  overallRating?: number;
 }
 
 type Column = keyof PlayerStatePatch;
@@ -27,6 +46,12 @@ const COLUMNS: { name: Column; sqlType: "boolean" | "int" | "text" }[] = [
   { name: "trainingBoost", sqlType: "int" },
   { name: "trainingBoostFocus", sqlType: "text" },
   { name: "fatigue", sqlType: "int" },
+  { name: "wear", sqlType: "int" },
+  { name: "restNextGame", sqlType: "boolean" },
+  { name: "injuryType", sqlType: "text" },
+  { name: "developmentProgress", sqlType: "int" },
+  { name: "overallRating", sqlType: "int" },
+  ...ATTRIBUTE_COLUMNS.map((name) => ({ name, sqlType: "int" as const })),
 ];
 
 // Regroupe toutes les modifications de PlayerState d'un match (une par

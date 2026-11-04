@@ -39,6 +39,7 @@ model Career {
   playerTeamStints PlayerTeamStint[]
   pressConferences PressConference[]
   inboxMessages    InboxMessage[]
+  injuryRecords    InjuryRecord[]
 }
 
 // Boîte de réception du GM — journal d'événements jamais modifié après
@@ -389,6 +390,13 @@ model PlayerState {
   retiredSeason        String? // saison (label) de la retraite, null si actif
   trainingBoost        Int     @default(0) // 0-8, bonus temporaire courant sur les attributs de trainingBoostFocus
   trainingBoostFocus   String? // catégorie ciblée par le bonus courant, null si aucun
+  // Médical / entraînement façon Football Manager (voir wear-rules.ts,
+  // injury-rules.ts, development-rules.ts).
+  wear                 Int     @default(0) // 0-99, usure de fond (minutes, matchs rapprochés) — se résorbe lentement
+  restNextGame         Boolean @default(false) // gestion de la charge : ne joue pas le prochain match
+  injuryType           String? // blessure en cours (clé, voir INJURY_TYPES), null si sain
+  individualFocus      String? // entraînement individuel (offensive/defensive/tactical/physical), null = suit l'équipe
+  developmentProgress  Int     @default(0) // progrès accumulés vers le prochain point d'overall (jeunes joueurs)
 
   // Demande de trade + promesse du GM — voir src/lib/data-access/trade-requests.ts.
   // wantsTrade est déclenché par un tirage probabiliste sous cooldown (jamais
@@ -535,4 +543,22 @@ model TeamState {
   attendance               Int       @default(50) // 0-99, dérive vers une cible pilotée par le bilan de l'équipe — voir attendance-rules.ts
 
   @@unique([careerId, teamId])
+}
+
+// Historique médical : une ligne par blessure survenue (voir injuries.ts).
+model InjuryRecord {
+  id         String   @id @default(cuid())
+  careerId   String
+  career     Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  playerId   String
+  teamId     String
+  season     String
+  injuryType String
+  severity   String
+  gamesOut   Int
+  gameDate   DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([careerId, playerId])
+  @@index([careerId, teamId])
 }

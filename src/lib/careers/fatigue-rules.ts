@@ -1,5 +1,9 @@
 // Règles pures de fatigue — aucun accès base de données ici, tout est piloté
-// par src/lib/data-access/fatigue.ts.
+// par src/lib/data-access/fatigue.ts. La fatigue est l'énergie du moment
+// (remonte en quelques jours) ; l'usure, fatigue de fond qui ralentit cette
+// récupération, est dans wear-rules.ts.
+
+import { energyRecoveryFactor } from "./wear-rules";
 
 // Gain de fatigue après un match joué, plus faible pour une bonne `stamina`.
 // À stamina 99 : +12. À stamina 0 : +30.
@@ -16,10 +20,11 @@ export function fatigueGainForGame(stamina: number): number {
 export function fatigueRecoveryForRestDays(
   restDays: number,
   stamina: number,
-  facilitiesLevel = 50
+  facilitiesLevel = 50,
+  wear = 0
 ): number {
   const t = Math.max(0, Math.min(99, stamina)) / 99;
   const perDay = 10 + t * 8; // 10 à stamina 0, 18 à stamina 99
   const facilitiesFactor = 1 + ((Math.max(0, Math.min(100, facilitiesLevel)) - 50) / 50) * 0.2;
-  return Math.round(Math.max(0, restDays) * perDay * facilitiesFactor);
+  return Math.round(Math.max(0, restDays) * perDay * facilitiesFactor * energyRecoveryFactor(wear));
 }

@@ -1,13 +1,16 @@
 import "server-only";
+import { prisma } from "@/lib/prisma";
 import type { PlayerStatePatches } from "./player-state-patches";
 import type { BoxScoreEntry, Player } from "@/lib/types";
 import {
   escalateSeverity,
+  injuryChance,
+  rollInjury,
   rollInjuryDurationGames,
-  rollsInjury,
   rollsPlayThroughSetback,
-  severityForDuration,
+  type InjuryType,
 } from "@/lib/careers/injury-rules";
+import type { TrainingIntensity } from "@/lib/careers/training-rules";
 import {
   clampConditioning,
   CONDITIONING_RECOVERY_PER_GAME,
@@ -20,6 +23,7 @@ export interface NewInjury {
   playerId: string;
   severity: string;
   durationGames: number;
+  injuryType: InjuryType;
 }
 
 // Appelé une fois par équipe juste après la résolution d'un match (pas les
@@ -38,7 +42,10 @@ export async function advanceRosterInjuries(
   patches: PlayerStatePatches,
   roster: Player[],
   boxScore: BoxScoreEntry[],
-  facilitiesLevel = 50
+  facilitiesLevel = 50,
+  // Staff médical (TeamState.trainingStaffLevel) et intensité
+  // d'entraînement : modulent le risque du jour (voir injuryChance).
+  context: { medicalLevel: number; intensity: TrainingIntensity | null } = { medicalLevel: 50, intensity: null }
 ): Promise<NewInjury[]> {
   const playedIds = new Set(boxScore.map((e) => e.playerId));
   const newInjuries: NewInjury[] = [];
@@ -68,13 +75,13 @@ export async function advanceRosterInjuries(
         } else if (outcome === "reinjury") {
           // Une nouvelle blessure distincte, contractée en compensant,
           // remplace le décompte en cours.
-          const duration = rollInjuryDurationGames();
-          const newSeverity = severityForDuration(duration);
+          const injury = rollInjury();
           patches.set(player.id, {
-            injuryGamesRemaining: duration,
-            injurySeverity: newSeverity,
+            injuryGamesRemaining: injury.games,
+            injurySeverity: injury.severity,
+            injuryType: injury.type,
             playingThroughInjury: false,
-            conditioning: clampConditioning(player.conditioning - conditioningLossOnInjury(newSeverity)),
+            conditioning: clampConditioning(player.conditioning - conditioningLossOnInjury(injury.severity)),
           });
         } else {
           // Aucun incident ce match : décompte normal, récupération de
@@ -92,6 +99,7 @@ export async function advanceRosterInjuries(
                   injured: false,
                   injuryGamesRemaining: 0,
                   injurySeverity: null,
+                  injuryType: null,
                   playingThroughInjury: false,
                   conditioning: recovered,
                 }
@@ -112,21 +120,41 @@ export async function advanceRosterInjuries(
                 injured: false,
                 injuryGamesRemaining: 0,
                 injurySeverity: null,
+                injuryType: null,
                 playingThroughInjury: false,
                 conditioning: decayed,
               }
         );
       }
-    } else if (rollsInjury(player.injuryRisk, facilitiesLevel)) {
-      const duration = rollInjuryDurationGames();
-      const severity = severityForDuration(duration);
+    } else if (
+      Math.random() <
+      injuryChance({
+        injuryRisk: player.injuryRisk,
+        fatigue: player.fatigue,
+        wear: player.wear ?? 0,
+        age: player.age,
+        facilitiesLevel,
+        medicalLevel: context.medicalLevel,
+        intensity: context.intensity,
+        played: playedIds.has(player.id),
+      })
+    ) {
+      // Risque du jour (prédisposition × fatigue × usure × âge ×
+      // entraînement × staff) : une blessure nommée, de durée réaliste.
+      const injury = rollInjury();
       patches.set(player.id, {
         injured: true,
-        injuryGamesRemaining: duration,
-        injurySeverity: severity,
-        conditioning: clampConditioning(player.conditioning - conditioningLossOnInjury(severity)),
+        injuryGamesRemaining: injury.games,
+        injurySeverity: injury.severity,
+        injuryType: injury.type,
+        conditioning: clampConditioning(player.conditioning - conditioningLossOnInjury(injury.severity)),
       });
-      newInjuries.push({ playerId: player.id, severity, durationGames: duration });
+      newInjuries.push({
+        playerId: player.id,
+        severity: injury.severity,
+        durationGames: injury.games,
+        injuryType: injury.type,
+      });
     } else if (player.conditioning < 100) {
       patches.set(player.id, {
         conditioning: clampConditioning(player.conditioning + CONDITIONING_RECOVERY_PER_GAME),
@@ -135,4 +163,27 @@ export async function advanceRosterInjuries(
   }
 
   return newInjuries;
+}
+
+// Date de retour estimée : le match de l'équipe qui suit les `gamesOut`
+// prochains (toutes compétitions confondues), ou null si la saison se
+// termine avant.
+export async function estimatedReturnDate(
+  careerId: string,
+  teamId: string,
+  after: Date,
+  gamesOut: number
+): Promise<Date | null> {
+  const game = await prisma.game.findFirst({
+    where: {
+      careerId,
+      status: { not: "final" },
+      gameDate: { gt: after },
+      OR: [{ homeTeamId: teamId }, { awayTeamId: teamId }],
+    },
+    orderBy: { gameDate: "asc" },
+    skip: Math.max(0, gamesOut),
+    select: { gameDate: true },
+  });
+  return game?.gameDate ?? null;
 }

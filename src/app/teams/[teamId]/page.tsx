@@ -17,6 +17,9 @@ import { RotationOrderForm } from "@/components/team/RotationOrderForm";
 import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
 import { TeamTabs } from "@/components/team/TeamTabs";
 import { ContractsPanel } from "@/components/team/ContractsPanel";
+import { MedicalPanel } from "@/components/team/MedicalPanel";
+import { IndividualTrainingPanel } from "@/components/team/IndividualTrainingPanel";
+import { getMedicalReport } from "@/lib/data-access/medical";
 import { NBA_INITIAL_DEAD_CAP } from "@/lib/mock-data/nba-dead-cap";
 import { MAX_ROSTER_SIZE, MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import { NBA_SECOND_APRON, NBA_TAX_LINE, payrollWarningLine } from "@/lib/careers/cap-rules";
@@ -206,10 +209,12 @@ export default async function TeamRosterPage({
           { id: "training", label: t("team.tab.training") },
         ]
       : []),
+    { id: "medical", label: t("team.tab.medical") },
     { id: "contracts", label: t("team.tab.contracts") },
     ...(isOpponentInMyLeague ? [{ id: "trade", label: t("team.tab.trade") }] : []),
   ];
   const activeTab = tabs.some((tab) => tab.id === requestedTab) ? requestedTab! : tabs[0].id;
+  const medical = activeTab === "medical" ? await getMedicalReport(membership.careerId, team.id, team.leagueId) : null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
@@ -262,7 +267,19 @@ export default async function TeamRosterPage({
             focus={teamState.trainingFocus}
             intensity={teamState.trainingIntensity}
           />
+          <IndividualTrainingPanel teamId={team.id} roster={roster} t={t} />
         </div>
+      )}
+
+      {activeTab === "medical" && medical && (
+        <MedicalPanel
+          teamId={team.id}
+          isMyTeam={isMyTeam}
+          rows={medical.rows}
+          history={medical.history}
+          t={t}
+          locale={locale}
+        />
       )}
 
       {activeTab === "rotation" && (

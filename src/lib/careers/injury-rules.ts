@@ -62,3 +62,91 @@ export function rollsPlayThroughSetback(conditioning: number): PlayThroughOutcom
   if (r < reinjuryChance + aggravationChance) return "aggravation";
   return "none";
 }
+
+// --- Façon Football Manager : blessures nommées et risque du jour ---
+
+// Types de blessure (libellés dans domain.ts, clé `domain.injuryType.<clé>`)
+// avec leur fourchette réaliste d'indisponibilité, en matchs de l'équipe, et
+// leur fréquence relative au sein de leur gravité.
+export const INJURY_TYPES = {
+  // Légères (1-4 matchs)
+  ankle_sprain: { severity: "minor", minGames: 1, maxGames: 4, weight: 5 },
+  back_spasms: { severity: "minor", minGames: 1, maxGames: 3, weight: 3 },
+  knee_contusion: { severity: "minor", minGames: 1, maxGames: 3, weight: 3 },
+  finger_dislocation: { severity: "minor", minGames: 1, maxGames: 4, weight: 2 },
+  illness: { severity: "minor", minGames: 1, maxGames: 2, weight: 3 },
+  // Modérées (5-14)
+  hamstring_strain: { severity: "moderate", minGames: 5, maxGames: 12, weight: 4 },
+  calf_strain: { severity: "moderate", minGames: 5, maxGames: 10, weight: 3 },
+  groin_strain: { severity: "moderate", minGames: 5, maxGames: 10, weight: 2 },
+  high_ankle_sprain: { severity: "moderate", minGames: 7, maxGames: 14, weight: 2 },
+  mcl_sprain: { severity: "moderate", minGames: 8, maxGames: 14, weight: 2 },
+  // Sévères (15+)
+  stress_fracture: { severity: "severe", minGames: 15, maxGames: 30, weight: 3 },
+  broken_hand: { severity: "severe", minGames: 15, maxGames: 25, weight: 2 },
+  torn_meniscus: { severity: "severe", minGames: 20, maxGames: 40, weight: 2 },
+  torn_acl: { severity: "severe", minGames: 60, maxGames: 82, weight: 1 },
+  ruptured_achilles: { severity: "severe", minGames: 70, maxGames: 82, weight: 1 },
+} as const satisfies Record<string, { severity: InjurySeverity; minGames: number; maxGames: number; weight: number }>;
+
+export type InjuryType = keyof typeof INJURY_TYPES;
+
+function randomInt(min: number, max: number): number {
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
+// Tire une blessure : gravité (60 % légère, 30 % modérée, 10 % sévère, comme
+// rollInjuryDurationGames), puis un type de cette gravité selon sa
+// fréquence, puis une durée dans la fourchette du type.
+export function rollInjury(): { type: InjuryType; games: number; severity: InjurySeverity } {
+  const r = Math.random();
+  const severity: InjurySeverity = r < 0.6 ? "minor" : r < 0.9 ? "moderate" : "severe";
+  const candidates = (Object.entries(INJURY_TYPES) as [InjuryType, (typeof INJURY_TYPES)[InjuryType]][]).filter(
+    ([, spec]) => spec.severity === severity
+  );
+  let pick = Math.random() * candidates.reduce((sum, [, spec]) => sum + spec.weight, 0);
+  for (const [type, spec] of candidates) {
+    pick -= spec.weight;
+    if (pick <= 0) return { type, games: randomInt(spec.minGames, spec.maxGames), severity };
+  }
+  const [type, spec] = candidates[0];
+  return { type, games: randomInt(spec.minGames, spec.maxGames), severity };
+}
+
+export interface InjuryRiskFactors {
+  injuryRisk: number; // 0-99, prédisposition (historique réel)
+  fatigue: number; // 0-99
+  wear: number; // 0-99
+  age: number;
+  facilitiesLevel: number; // 0-100
+  medicalLevel: number; // 0-100, staff (TeamState.trainingStaffLevel)
+  intensity: "low" | "medium" | "high" | null;
+  played: boolean; // false : entraînement seulement
+}
+
+const INTENSITY_RISK = { low: 0.9, medium: 1, high: 1.25 } as const;
+
+// Risque de blessure du jour : la prédisposition du joueur, multipliée par
+// l'état du moment — fatigue (jusqu'à ×1,8), usure (jusqu'à ×2,2), âge,
+// intensité d'entraînement et staff médical (±20 %). Un joueur qui ne joue
+// pas ne court que le risque de l'entraînement (×0,25).
+export function injuryChance(f: InjuryRiskFactors): number {
+  const base = injuryChanceForGame(f.injuryRisk, f.facilitiesLevel);
+  const fatigueFactor = 1 + (Math.max(0, Math.min(99, f.fatigue)) / 99) * 0.8;
+  const wearFactor = 1 + (Math.max(0, Math.min(99, f.wear)) / 99) * 1.2;
+  const ageFactor = f.age >= 35 ? 1.4 : f.age >= 32 ? 1.2 : f.age <= 22 ? 0.9 : 1;
+  const intensityFactor = f.intensity ? INTENSITY_RISK[f.intensity] : 1;
+  const medicalFactor = 1 - ((Math.max(0, Math.min(100, f.medicalLevel)) - 50) / 50) * 0.2;
+  const playFactor = f.played ? 1 : 0.25;
+  return base * fatigueFactor * wearFactor * ageFactor * intensityFactor * medicalFactor * playFactor;
+}
+
+export type InjuryRiskLevel = "low" | "medium" | "high";
+
+// Niveau affiché au manager (seuils par match : ~1 blessure / 2 saisons en
+// dessous de « faible », ~1,5 / saison au-dessus de « élevé »).
+export function injuryRiskLevel(chance: number): InjuryRiskLevel {
+  if (chance < 0.008) return "low";
+  if (chance < 0.018) return "medium";
+  return "high";
+}

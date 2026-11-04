@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import type { PlayerStatePatches } from "./player-state-patches";
 import type { BoxScoreEntry, Player } from "@/lib/types";
 import { fatigueGainForGame, fatigueRecoveryForRestDays } from "@/lib/careers/fatigue-rules";
+import { clampWear, wearGainForGame, wearRecovery } from "@/lib/careers/wear-rules";
+import type { TrainingIntensity } from "@/lib/careers/training-rules";
 
 // Jours de repos réels avant `currentGameDate`, fiables depuis la correction
 // du générateur de calendrier (Phase A — plus de collisions same-day). Pas de
@@ -30,21 +32,33 @@ export async function getRestDays(
 }
 
 // Appelé juste après la résolution d'un match : récupère chaque joueur du
-// roster complet selon les jours de repos réels avant ce match, puis ajoute
-// le gain de fatigue pour ceux qui ont effectivement joué (présents au box
-// score — un banc qui ne rentre jamais en rotation ne se fatigue pas).
+// roster complet selon les jours de repos réels avant ce match (moins vite
+// s'il est usé), puis ajoute le gain de fatigue pour ceux qui ont
+// effectivement joué (présents au box score — un banc qui ne rentre jamais
+// en rotation ne se fatigue pas). Met aussi à jour l'usure : minutes
+// jouées, back-to-back et intensité d'entraînement l'augmentent, le repos
+// (jours sans match, match passé sur le banc ou au repos) la résorbe.
 export async function advanceRosterFatigue(
   patches: PlayerStatePatches,
   roster: Player[],
   boxScore: BoxScoreEntry[],
   restDays: number,
   facilitiesLevel = 50,
-  trainingFatigueDelta = 0
+  trainingFatigueDelta = 0,
+  intensity: TrainingIntensity | null = null
 ): Promise<void> {
   const playedIds = new Set(boxScore.map((e) => e.playerId));
+  const minutesById = new Map(boxScore.map((e) => [e.playerId, e.minutesPlayed]));
 
   for (const player of roster) {
-    const recovered = fatigueRecoveryForRestDays(restDays, player.ratings.stamina, facilitiesLevel);
+    const wear = player.wear ?? 0;
+    const minutes = minutesById.get(player.id) ?? 0;
+    const newWear = clampWear(
+      wear -
+        wearRecovery(restDays, minutes === 0, facilitiesLevel, wear) +
+        wearGainForGame(minutes, restDays, player.ratings.stamina, intensity)
+    );
+    const recovered = fatigueRecoveryForRestDays(restDays, player.ratings.stamina, facilitiesLevel, wear);
     let newFatigue = Math.max(0, player.fatigue - recovered);
     if (playedIds.has(player.id)) {
       newFatigue += fatigueGainForGame(player.ratings.stamina);
@@ -54,6 +68,6 @@ export async function advanceRosterFatigue(
     newFatigue += trainingFatigueDelta;
     newFatigue = Math.max(0, Math.min(99, newFatigue));
 
-    patches.set(player.id, { fatigue: newFatigue });
+    patches.set(player.id, { fatigue: newFatigue, wear: newWear });
   }
 }

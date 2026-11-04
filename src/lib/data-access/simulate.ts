@@ -7,11 +7,13 @@ import { getStandings } from "@/lib/data-access/standings";
 import { getTeamById } from "@/lib/data-access/teams";
 import { simulationEngine } from "@/lib/simulation/mockEngine";
 import { recordPlayoffGameResult } from "@/lib/data-access/playoffs";
-import { advanceRosterInjuries, type NewInjury } from "@/lib/data-access/injuries";
+import { advanceRosterInjuries, estimatedReturnDate, type NewInjury } from "@/lib/data-access/injuries";
+import { translatorFor } from "@/lib/i18n/translate";
 import { advancePlayerRenown } from "@/lib/data-access/renown";
 import { advanceRosterFatigue, getRestDays } from "@/lib/data-access/fatigue";
 import { advanceAttendance, advanceTeamChemistry, getOrCreateTeamState } from "@/lib/data-access/team-state";
-import { advanceRosterTraining } from "@/lib/data-access/training";
+import { advanceRosterDevelopment, advanceRosterTraining } from "@/lib/data-access/training";
+import { AI_MAX_RESTED_PER_GAME, WEAR_AI_AUTO_REST } from "@/lib/careers/wear-rules";
 import { PlayerStatePatches } from "@/lib/data-access/player-state-patches";
 import { getGmBonusForTeam } from "@/lib/data-access/gm";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
@@ -37,7 +39,7 @@ import {
   type TrainingIntensity,
 } from "@/lib/careers/training-rules";
 import { moraleBonus, type PressGameContext } from "@/lib/careers/press-rules";
-import { teamFullName } from "@/lib/utils";
+import { formatLongDate, teamFullName } from "@/lib/utils";
 import type { Locale } from "@/lib/i18n/locale";
 import type { BoxScoreEntry, Game, Player } from "@/lib/types";
 
@@ -81,11 +83,14 @@ async function notifyHumanTeamNews(
   for (const injury of newInjuries) {
     const player = roster.find((p) => p.id === injury.playerId);
     if (!player) continue;
+    const returnDate = await estimatedReturnDate(careerId, teamId, gameDate, injury.durationGames);
     const { title, body } = injuryMessageText(
       locale,
       `${player.firstName} ${player.lastName}`,
       injury.severity,
-      injury.durationGames
+      injury.durationGames,
+      translatorFor(locale)(`domain.injuryType.${injury.injuryType}`),
+      returnDate ? formatLongDate(returnDate, locale) : undefined
     );
     await createInboxMessage(careerId, teamId, season, "injury", title, body, `/teams/${teamId}/players/${player.id}`, {
       gameDate,
@@ -130,6 +135,23 @@ async function notifyHumanTeamNews(
       await prisma.teamState.update({ where: { id: teamState.id }, data: { lastFreeAgentNewsDate: gameDate } });
     }
   }
+}
+
+// Joueurs au repos pour ce match : ceux que leur manager a mis au repos
+// (restNextGame) ; côté IA, en plus, les plus usés (usure ≥
+// WEAR_AI_AUTO_REST), au plus AI_MAX_RESTED_PER_GAME, sans jamais descendre
+// sous 9 joueurs disponibles.
+function restedForGame(roster: Player[], isAi: boolean): string[] {
+  const healthy = roster.filter((p) => !p.injured);
+  const manual = healthy.filter((p) => p.restNextGame).map((p) => p.id);
+  if (!isAi) return manual;
+  const room = Math.max(0, healthy.length - manual.length - 9);
+  const auto = healthy
+    .filter((p) => !p.restNextGame && (p.wear ?? 0) >= WEAR_AI_AUTO_REST)
+    .sort((a, b) => (b.wear ?? 0) - (a.wear ?? 0))
+    .slice(0, Math.min(AI_MAX_RESTED_PER_GAME, room))
+    .map((p) => p.id);
+  return [...manual, ...auto];
 }
 
 // Cœur de la simulation d'un match, partagé entre l'endpoint /api/simulate-
@@ -180,9 +202,16 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   // joueuse en contrat de développement ayant déjà atteint la limite
   // d'activation (WNBA, voir DEVELOPMENT_CONTRACT_GAME_LIMIT) est bloquée
   // jusqu'à repasser en contrat standard (promoteToStandardContract).
+  // Gestion de la charge : joueurs mis au repos par leur manager
+  // (restNextGame) et, côté IA, les plus usés (voir restedForGame).
+  const restingIds = new Set([
+    ...restedForGame(homeRoster, !homeManager),
+    ...restedForGame(awayRoster, !awayManager),
+  ]);
   const makeCanPlay =
     (contractByPlayerId: Map<string, (typeof homeContracts)[number]>) =>
     (p: (typeof homeRoster)[number]) => {
+      if (restingIds.has(p.id)) return false;
       if (p.injured && !(p.playingThroughInjury && p.injurySeverity === "minor")) return false;
       const contract = contractByPlayerId.get(p.id);
       if (
@@ -236,9 +265,23 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   // `patches`, appliqué en une seule requête à la fin (voir
   // player-state-patches.ts) plutôt qu'une écriture par joueur et par étape.
   const patches = new PlayerStatePatches();
+  const homeFocus = homeTeamState.trainingFocus as TrainingFocus | null;
+  const awayFocus = awayTeamState.trainingFocus as TrainingFocus | null;
+  const homeIntensity = homeTeamState.trainingIntensity as TrainingIntensity;
+  const awayIntensity = awayTeamState.trainingIntensity as TrainingIntensity;
+  // Intensité qui pèse vraiment sur les organismes (usure, risque, progrès) :
+  // seulement quand un programme d'entraînement actif est en place.
+  const homeLoad = homeFocus && homeFocus !== "rest" ? homeIntensity : null;
+  const awayLoad = awayFocus && awayFocus !== "rest" ? awayIntensity : null;
   const [homeNewInjuries, awayNewInjuries] = await Promise.all([
-    advanceRosterInjuries(patches, homeRoster, result.boxScore, homeTeamState.facilitiesLevel),
-    advanceRosterInjuries(patches, awayRoster, result.boxScore, awayTeamState.facilitiesLevel),
+    advanceRosterInjuries(patches, homeRoster, result.boxScore, homeTeamState.facilitiesLevel, {
+      medicalLevel: homeTeamState.trainingStaffLevel,
+      intensity: homeLoad,
+    }),
+    advanceRosterInjuries(patches, awayRoster, result.boxScore, awayTeamState.facilitiesLevel, {
+      medicalLevel: awayTeamState.trainingStaffLevel,
+      intensity: awayLoad,
+    }),
   ]);
 
   // Ajuste le renommé de chaque joueur éligible : performance s'il a joué,
@@ -250,13 +293,11 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   // Programme d'entraînement : fait dériver le bonus temporaire de chaque
   // joueur vers le plafond de l'intensité choisie (ou vers 0 si aucun focus
   // ciblant des attributs n'est actif).
-  const homeFocus = homeTeamState.trainingFocus as TrainingFocus | null;
-  const awayFocus = awayTeamState.trainingFocus as TrainingFocus | null;
-  const homeIntensity = homeTeamState.trainingIntensity as TrainingIntensity;
-  const awayIntensity = awayTeamState.trainingIntensity as TrainingIntensity;
   await Promise.all([
     advanceRosterTraining(patches, homeRoster, homeFocus, homeIntensity),
     advanceRosterTraining(patches, awayRoster, awayFocus, awayIntensity),
+    advanceRosterDevelopment(patches, homeRoster, result.boxScore, homeFocus, homeLoad, homeTeamState.trainingStaffLevel),
+    advanceRosterDevelopment(patches, awayRoster, result.boxScore, awayFocus, awayLoad, awayTeamState.trainingStaffLevel),
   ]);
 
   // Fatigue : récupération selon les jours de repos réels (accélérée par de
@@ -269,7 +310,8 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
       result.boxScore,
       homeRestDays,
       homeTeamState.facilitiesLevel,
-      trainingFatigueDelta(homeFocus, homeIntensity)
+      trainingFatigueDelta(homeFocus, homeIntensity),
+      homeLoad
     ),
     advanceRosterFatigue(
       patches,
@@ -277,10 +319,34 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
       result.boxScore,
       awayRestDays,
       awayTeamState.facilitiesLevel,
-      trainingFatigueDelta(awayFocus, awayIntensity)
+      trainingFatigueDelta(awayFocus, awayIntensity),
+      awayLoad
     ),
   ]);
+  // Le repos programmé ne vaut que pour ce match.
+  for (const player of [...homeRoster, ...awayRoster]) {
+    if (player.restNextGame) patches.set(player.id, { restNextGame: false });
+  }
   await patches.apply(careerId);
+  // Historique médical (toutes les équipes, IA comprises).
+  const injuryRecords = [
+    ...homeNewInjuries.map((i) => ({ ...i, teamId: game.homeTeamId })),
+    ...awayNewInjuries.map((i) => ({ ...i, teamId: game.awayTeamId })),
+  ];
+  if (injuryRecords.length > 0) {
+    await prisma.injuryRecord.createMany({
+      data: injuryRecords.map((i) => ({
+        careerId,
+        playerId: i.playerId,
+        teamId: i.teamId,
+        season: game.season,
+        injuryType: i.injuryType,
+        severity: i.severity,
+        gamesOut: i.durationGames,
+        gameDate,
+      })),
+    });
+  }
 
   // Chimie d'équipe : dérive vers sa cible (bilan à jour + QI basket moyen du
   // roster), plus le bonus si un focus "cohésion d'équipe" est actif.
