@@ -29,6 +29,20 @@ import { createInboxMessage } from "@/lib/data-access/inbox";
 import { poachOfferMessageText } from "@/lib/careers/inbox-rules";
 import { getTranslator } from "@/lib/i18n/translate";
 import { teamFullName } from "@/lib/utils";
+import { offseasonRecovery } from "@/lib/careers/injury-rules";
+
+// Patch PlayerState de l'intersaison côté santé : énergie pleine, blessures
+// guéries d'environ 50 matchs, statut de blessure effacé si rétabli.
+function healthAfterSummer(state: { injured: boolean; injuryGamesRemaining: number; conditioning: number }) {
+  const r = offseasonRecovery(state);
+  return {
+    fatigue: r.fatigue,
+    injured: r.injured,
+    injuryGamesRemaining: r.injuryGamesRemaining,
+    conditioning: r.conditioning,
+    ...(r.injured ? {} : { injurySeverity: null, injuryType: null, playingThroughInjury: false }),
+  };
+}
 
 const POACH_OFFER_CHANCE = 0.25;
 
@@ -123,7 +137,9 @@ export async function advanceSeason(): Promise<void> {
         peakOverallRating,
         peakRenown,
         // Coupure estivale : l'usure de la saison s'efface, repos programmé
-        // et progression en cours repartent de zéro.
+        // et progression en cours repartent de zéro, les blessures guérissent
+        // d'environ 50 matchs (voir offseasonRecovery).
+        ...healthAfterSummer(state),
         wear: 0,
         restNextGame: false,
         developmentProgress: 0,

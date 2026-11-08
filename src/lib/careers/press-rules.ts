@@ -177,8 +177,8 @@ const ANSWER_BANK: Record<QuestionCategory, ToneAnswerBank> = {
     diplomatic: (ctx, locale) =>
       locale === "fr"
         ? ctx.won
-          ? `« On reste concentrées sur le travail, cette victoire ${ctx.teamScore}-${ctx.opponentScore} contre ${ctx.opponentName} ne change rien à notre approche. »`
-          : `« On reste concentrées sur le travail, cette défaite contre ${ctx.opponentName} ne change rien à notre approche. »`
+          ? `« Le groupe reste concentré sur le travail, cette victoire ${ctx.teamScore}-${ctx.opponentScore} contre ${ctx.opponentName} ne change rien à notre approche. »`
+          : `« Le groupe reste concentré sur le travail, cette défaite contre ${ctx.opponentName} ne change rien à notre approche. »`
         : ctx.won
           ? `"We stay focused on the work — this ${ctx.teamScore}-${ctx.opponentScore} win over ${ctx.opponentName} doesn't change our approach."`
           : `"We stay focused on the work — this loss to ${ctx.opponentName} doesn't change our approach."`,

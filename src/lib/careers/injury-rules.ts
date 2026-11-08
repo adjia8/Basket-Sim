@@ -150,3 +150,34 @@ export function injuryRiskLevel(chance: number): InjuryRiskLevel {
   if (chance < 0.018) return "medium";
   return "high";
 }
+
+// Coupure estivale (~4 mois, l'équivalent d'environ 50 matchs) : les
+// blessures continuent de guérir pendant l'intersaison, façon Football
+// Manager. Seules les grosses blessures de fin de saison (croisés, Achille)
+// débordent sur la saison suivante. Un joueur rétabli reprend avec énergie
+// et condition au maximum ; un joueur encore blessé garde sa condition.
+export const OFFSEASON_HEALING_GAMES = 50;
+
+export interface OffseasonHealthState {
+  injured: boolean;
+  injuryGamesRemaining: number;
+  conditioning: number;
+}
+
+export function offseasonRecovery(state: OffseasonHealthState): {
+  fatigue: number;
+  injured: boolean;
+  injuryGamesRemaining: number;
+  conditioning: number;
+  healed: boolean;
+} {
+  const remaining = state.injured ? Math.max(0, state.injuryGamesRemaining - OFFSEASON_HEALING_GAMES) : 0;
+  const stillInjured = state.injured && remaining > 0;
+  return {
+    fatigue: 0,
+    injured: stillInjured,
+    injuryGamesRemaining: remaining,
+    conditioning: stillInjured ? state.conditioning : 100,
+    healed: state.injured && !stillInjured,
+  };
+}
