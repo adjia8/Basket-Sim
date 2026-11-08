@@ -1,8 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { getRosterForTeam } from "@/lib/data-access/players";
-import { getContractsForTeam } from "@/lib/data-access/contracts";
-import { updateGameResult } from "@/lib/data-access/schedule";
+import { getRosterAndContracts } from "@/lib/data-access/players";
 import { getStandings } from "@/lib/data-access/standings";
 import { getTeamById } from "@/lib/data-access/teams";
 import { simulationEngine } from "@/lib/simulation/mockEngine";
@@ -11,10 +9,12 @@ import { advanceRosterInjuries, estimatedReturnDate, type NewInjury } from "@/li
 import { translatorFor } from "@/lib/i18n/translate";
 import { advancePlayerRenown } from "@/lib/data-access/renown";
 import { advanceRosterFatigue, getRestDays } from "@/lib/data-access/fatigue";
-import { advanceAttendance, advanceTeamChemistry, getOrCreateTeamState } from "@/lib/data-access/team-state";
+import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { advanceRosterDevelopment, advanceRosterTraining } from "@/lib/data-access/training";
 import { AI_MAX_RESTED_PER_GAME, WEAR_AI_AUTO_REST } from "@/lib/careers/wear-rules";
 import { PlayerStatePatches } from "@/lib/data-access/player-state-patches";
+import { chemistryTarget, nextChemistry } from "@/lib/careers/chemistry-rules";
+import { attendanceTarget, nextAttendance } from "@/lib/careers/attendance-rules";
 import { advanceRosterMorale } from "@/lib/data-access/morale";
 import { ensureCareerStaff, getStaffProfiles } from "@/lib/data-access/staff";
 import { NEUTRAL_STAFF_PROFILE, staffEffects } from "@/lib/careers/staff-rules";
@@ -42,6 +42,17 @@ function topRotation(roster: Player[]): Player[] {
   return [...roster].sort((a, b) => b.overallRating - a.overallRating).slice(0, 10);
 }
 
+// Les équipes (ville, nom, couleurs, marché) ne changent jamais en cours de
+// partie : gardées en mémoire plutôt que relues à chaque match.
+const teamCache = new Map<string, Team>();
+async function cachedTeam(teamId: string): Promise<Team | undefined> {
+  const hit = teamCache.get(teamId);
+  if (hit) return hit;
+  const team = await getTeamById(teamId);
+  if (team) teamCache.set(teamId, team);
+  return team;
+}
+
 // Le staff d'une carrière n'est généré qu'une fois (voir ensureCareerStaff) :
 // on évite de le revérifier en base à chaque match.
 const careersWithStaff = new Set<string>();
@@ -50,8 +61,7 @@ async function ensureStaffOnce(careerId: string, leagueId: string, season: strin
   await ensureCareerStaff(careerId, leagueId, season.replace(/-(playoffs|preseason)$/, ""));
   careersWithStaff.add(careerId);
 }
-import { getGmBonusForTeam } from "@/lib/data-access/gm";
-import { getMembershipForTeam } from "@/lib/data-access/memberships";
+import { gmBonusFromProfile } from "@/lib/data-access/gm";
 import { maybeCreatePressConference } from "@/lib/data-access/press";
 import { maybeFlagTradeRequest } from "@/lib/data-access/trade-requests";
 import { getFreeAgents } from "@/lib/data-access/contracts";
@@ -287,38 +297,66 @@ export async function simulateAndResolveGame(
   locale: Locale,
   talk?: MatchTalkInput
 ): Promise<Game | undefined> {
-  const [homeTeam, awayTeam, homeRoster, awayRoster, homeContracts, awayContracts] = await Promise.all([
-    getTeamById(game.homeTeamId),
-    getTeamById(game.awayTeamId),
-    getRosterForTeam(careerId, game.homeTeamId),
-    getRosterForTeam(careerId, game.awayTeamId),
-    getContractsForTeam(careerId, game.homeTeamId),
-    getContractsForTeam(careerId, game.awayTeamId),
+  // Vitesse : chaque aller-retour vers la base coûte ~100-250 ms (Neon). Tout
+  // ce dont le match a besoin est lu en UNE vague de requêtes parallèles,
+  // et tout ce qu'il écrit part en UNE vague à la fin (voir plus bas).
+  const gameDate = new Date(game.gameDate);
+  await ensureStaffOnce(careerId, game.leagueId, game.season);
+  const teamIds = [game.homeTeamId, game.awayTeamId];
+  const [
+    homeTeam,
+    awayTeam,
+    homeSquad,
+    awaySquad,
+    memberships,
+    homeRestDays,
+    awayRestDays,
+    homeTeamState,
+    awayTeamState,
+    staffProfiles,
+    talkRow,
+    priorGames,
+  ] = await Promise.all([
+    cachedTeam(game.homeTeamId),
+    cachedTeam(game.awayTeamId),
+    getRosterAndContracts(careerId, game.homeTeamId),
+    getRosterAndContracts(careerId, game.awayTeamId),
+    prisma.membership.findMany({ where: { careerId, teamId: { in: teamIds } }, include: { gmProfile: true } }),
+    getRestDays(careerId, game.homeTeamId, game.season, gameDate),
+    getRestDays(careerId, game.awayTeamId, game.season, gameDate),
+    getOrCreateTeamState(careerId, game.homeTeamId, game.leagueId),
+    getOrCreateTeamState(careerId, game.awayTeamId, game.leagueId),
+    getStaffProfiles(careerId, teamIds, game.leagueId),
+    prisma.game.findUnique({ where: { id: game.id }, select: { halftimeJson: true, talksJson: true } }),
+    // Bilans des deux équipes (cohésion, affluence) sans recalculer tout le
+    // classement de la ligue.
+    prisma.game.findMany({
+      where: {
+        careerId,
+        season: game.season,
+        status: "final",
+        id: { not: game.id },
+        OR: [{ homeTeamId: { in: teamIds } }, { awayTeamId: { in: teamIds } }],
+      },
+      select: { homeTeamId: true, awayTeamId: true, homeScore: true, awayScore: true },
+    }),
   ]);
 
   if (!homeTeam || !awayTeam) {
     throw new Error(`simulateAndResolveGame: team not found for game ${game.id}`);
   }
+  const { roster: homeRoster, contracts: homeContracts } = homeSquad;
+  const { roster: awayRoster, contracts: awayContracts } = awaySquad;
 
-  const [homeManager, awayManager] = await Promise.all([
-    getMembershipForTeam(careerId, game.homeTeamId),
-    getMembershipForTeam(careerId, game.awayTeamId),
-  ]);
+  const homeMembership = memberships.find((m) => m.teamId === game.homeTeamId) ?? null;
+  const awayMembership = memberships.find((m) => m.teamId === game.awayTeamId) ?? null;
+  const homeManager = homeMembership;
+  const awayManager = awayMembership;
+  const homeGm = gmBonusFromProfile(homeMembership?.gmProfile);
+  const awayGm = gmBonusFromProfile(awayMembership?.gmProfile);
 
   const homeContractByPlayerId = new Map(homeContracts.map((c) => [c.playerId, c]));
   const awayContractByPlayerId = new Map(awayContracts.map((c) => [c.playerId, c]));
-
-  const gameDate = new Date(game.gameDate);
-  await ensureStaffOnce(careerId, game.leagueId, game.season);
-  const [homeRestDays, awayRestDays, homeTeamState, awayTeamState, homeGm, awayGm, staffProfiles] = await Promise.all([
-    getRestDays(careerId, game.homeTeamId, game.season, gameDate),
-    getRestDays(careerId, game.awayTeamId, game.season, gameDate),
-    getOrCreateTeamState(careerId, game.homeTeamId, game.leagueId),
-    getOrCreateTeamState(careerId, game.awayTeamId, game.leagueId),
-    getGmBonusForTeam(careerId, game.homeTeamId),
-    getGmBonusForTeam(careerId, game.awayTeamId),
-    getStaffProfiles(careerId, [game.homeTeamId, game.awayTeamId], game.leagueId),
-  ]);
   // Staff (voir staff-rules.ts) : force en match, cohésion, moral,
   // progression, usure, fatigue, blessures.
   const homeProfile = staffProfiles.get(game.homeTeamId) ?? NEUTRAL_STAFF_PROFILE;
@@ -364,10 +402,6 @@ export async function simulateAndResolveGame(
     ? parseTactics(awayTeamState.tacticsJson)
     : bestTactics(topRotation(awayEligibleRoster));
   // Causeries : mi-temps éventuellement déjà jouée, réaction des joueurs.
-  const talkRow = await prisma.game.findUnique({
-    where: { id: game.id },
-    select: { halftimeJson: true, talksJson: true },
-  });
   const resumeFrom = talkRow?.halftimeJson ? (JSON.parse(talkRow.halftimeJson) as HalfState) : undefined;
   let talks = parseTalks(talkRow?.talksJson);
   if (talk) {
@@ -421,12 +455,6 @@ export async function simulateAndResolveGame(
       .filter((p) => awayContractByPlayerId.get(p.id)?.contractType === "development")
       .map((p) => awayContractByPlayerId.get(p.id)!.id),
   ];
-  if (developmentPlayerIds.length > 0) {
-    await prisma.contract.updateMany({
-      where: { id: { in: developmentPlayerIds } },
-      data: { developmentGamesActivated: { increment: 1 } },
-    });
-  }
   // Pause de la mi-temps : on enregistre l'état et on s'arrête là (la suite
   // — blessures, fatigue, presse… — ne se joue qu'au coup de sifflet final).
   if (result.halftime) {
@@ -437,17 +465,13 @@ export async function simulateAndResolveGame(
     return game;
   }
 
-  const updated = await updateGameResult(careerId, game.id, result);
-  if (resumeFrom || talks) {
-    await prisma.game.update({
-      where: { id: game.id },
-      data: { halftimeJson: null, talksJson: talks ? JSON.stringify(talks) : null },
-    });
-  }
-
-  if (updated?.playoffSeriesId) {
-    await recordPlayoffGameResult(updated.playoffSeriesId, result.homeScore, result.awayScore);
-  }
+  const updated: Game = {
+    ...game,
+    status: "final",
+    homeScore: result.homeScore,
+    awayScore: result.awayScore,
+    boxScore: result.boxScore,
+  };
 
   // Roster complet (pas filtré), une fois par équipe (les infrastructures
   // diffèrent d'une équipe à l'autre) : décompte les indisponibilités en
@@ -540,57 +564,101 @@ export async function simulateAndResolveGame(
   for (const player of [...homeRoster, ...awayRoster]) {
     if (player.restNextGame) patches.set(player.id, { restNextGame: false });
   }
-  await patches.apply(careerId);
   // Historique médical (toutes les équipes, IA comprises).
   const injuryRecords = [
     ...homeNewInjuries.map((i) => ({ ...i, teamId: game.homeTeamId })),
     ...awayNewInjuries.map((i) => ({ ...i, teamId: game.awayTeamId })),
   ];
-  if (injuryRecords.length > 0) {
-    await prisma.injuryRecord.createMany({
-      data: injuryRecords.map((i) => ({
-        careerId,
-        playerId: i.playerId,
-        teamId: i.teamId,
-        season: game.season,
-        injuryType: i.injuryType,
-        severity: i.severity,
-        gamesOut: i.durationGames,
-        gameDate,
-      })),
-    });
-  }
 
-  // Chimie d'équipe : dérive vers sa cible (bilan à jour + QI basket moyen du
-  // roster), plus le bonus si un focus "cohésion d'équipe" est actif.
-  // Affluence : même principe, dérive vers une cible dominée par le bilan
-  // (voir attendance-rules.ts) — pour les deux équipes, humaines ou IA,
-  // comme la chimie.
+  // Bilans à jour (ce match compris) : cohésion et affluence dérivent vers
+  // leur cible (voir chemistry-rules.ts / attendance-rules.ts).
+  const recordOf = (teamId: string) => {
+    let wins = 0;
+    let losses = 0;
+    for (const g of [
+      ...priorGames,
+      { homeTeamId: game.homeTeamId, awayTeamId: game.awayTeamId, homeScore: result.homeScore, awayScore: result.awayScore },
+    ]) {
+      if (g.homeScore === null || g.awayScore === null) continue;
+      if (g.homeTeamId === teamId) {
+        if (g.homeScore > g.awayScore) wins++;
+        else losses++;
+      } else if (g.awayTeamId === teamId) {
+        if (g.awayScore > g.homeScore) wins++;
+        else losses++;
+      }
+    }
+    return { wins, losses };
+  };
+  const homeRecord = recordOf(game.homeTeamId);
+  const awayRecord = recordOf(game.awayTeamId);
+  const homeWinPct = winPctForStandings(homeRecord.wins, homeRecord.losses);
+  const awayWinPct = winPctForStandings(awayRecord.wins, awayRecord.losses);
+  const teamStateUpdate = (
+    state: typeof homeTeamState,
+    winPct: number,
+    roster: Player[],
+    chemistryBonus: number,
+    marketAppeal: number
+  ) => {
+    const iq = roster.length ? roster.reduce((sum, p) => sum + p.ratings.basketballIQ, 0) / roster.length : 50;
+    return prisma.teamState.update({
+      where: { id: state.id },
+      data: {
+        chemistry: Math.max(0, Math.min(99, nextChemistry(state.chemistry, chemistryTarget(winPct, iq)) + chemistryBonus)),
+        attendance: nextAttendance(state.attendance, attendanceTarget(winPct, marketAppeal, state.facilitiesLevel)),
+      },
+    });
+  };
+
+  // Toutes les écritures du match en une seule vague parallèle.
+  await Promise.all([
+    prisma.game.updateMany({
+      where: { id: game.id, careerId },
+      data: {
+        status: "final",
+        homeScore: result.homeScore,
+        awayScore: result.awayScore,
+        boxScore: JSON.stringify(result.boxScore),
+        halftimeJson: null,
+        ...(talks ? { talksJson: JSON.stringify(talks) } : {}),
+      },
+    }),
+    game.playoffSeriesId
+      ? recordPlayoffGameResult(game.playoffSeriesId, result.homeScore, result.awayScore)
+      : Promise.resolve(),
+    developmentPlayerIds.length > 0
+      ? prisma.contract.updateMany({
+          where: { id: { in: developmentPlayerIds } },
+          data: { developmentGamesActivated: { increment: 1 } },
+        })
+      : Promise.resolve(),
+    patches.apply(careerId),
+    injuryRecords.length > 0
+      ? prisma.injuryRecord.createMany({
+          data: injuryRecords.map((i) => ({
+            careerId,
+            playerId: i.playerId,
+            teamId: i.teamId,
+            season: game.season,
+            injuryType: i.injuryType,
+            severity: i.severity,
+            gamesOut: i.durationGames,
+            gameDate,
+          })),
+        })
+      : Promise.resolve(),
+    teamStateUpdate(homeTeamState, homeWinPct, homeRoster, chemistryTrainingBonus(homeFocus, homeIntensity), homeTeam.marketAppeal),
+    teamStateUpdate(awayTeamState, awayWinPct, awayRoster, chemistryTrainingBonus(awayFocus, awayIntensity), awayTeam.marketAppeal),
+  ]);
+
+  // Match entre deux équipes IA : rien d'autre à faire (presse, demandes de
+  // transfert et boîte de réception ne concernent que les GM humains).
+  if (!homeManager && !awayManager) return updated;
+
   const standings = await getStandings(careerId, game.leagueId, game.season);
   const homeStandingsRow = standings.find((s) => s.teamId === game.homeTeamId);
   const awayStandingsRow = standings.find((s) => s.teamId === game.awayTeamId);
-  const homeWinPct = winPctForStandings(homeStandingsRow?.wins ?? 0, homeStandingsRow?.losses ?? 0);
-  const awayWinPct = winPctForStandings(awayStandingsRow?.wins ?? 0, awayStandingsRow?.losses ?? 0);
-  await Promise.all([
-    advanceTeamChemistry(
-      careerId,
-      game.homeTeamId,
-      game.leagueId,
-      homeWinPct,
-      homeRoster,
-      chemistryTrainingBonus(homeFocus, homeIntensity)
-    ),
-    advanceTeamChemistry(
-      careerId,
-      game.awayTeamId,
-      game.leagueId,
-      awayWinPct,
-      awayRoster,
-      chemistryTrainingBonus(awayFocus, awayIntensity)
-    ),
-    advanceAttendance(careerId, game.homeTeamId, game.leagueId, homeWinPct, homeTeam.marketAppeal),
-    advanceAttendance(careerId, game.awayTeamId, game.leagueId, awayWinPct, awayTeam.marketAppeal),
-  ]);
 
   // Conférence de presse aléatoire (au plus 1/semaine réelle) — seulement
   // pour les équipes gérées par un humain, jamais pour un match IA-vs-IA.

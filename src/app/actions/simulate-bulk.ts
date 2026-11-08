@@ -5,6 +5,7 @@ import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { toDomainGame } from "@/lib/data-access/mappers";
 import { simulateAndResolveGame } from "@/lib/data-access/simulate";
+import { calendarDay } from "@/lib/careers/schedule-rules";
 import { getTranslator } from "@/lib/i18n/translate";
 import { endOfGameDay } from "@/lib/data-access/game-clock";
 import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
@@ -13,29 +14,14 @@ import { freeAgencyOpenMessageText } from "@/lib/careers/inbox-rules";
 import { aiRosterTarget, runAiDraft, runAiFreeAgency } from "@/lib/data-access/ai-offseason";
 import { isFreeAgencyOpen } from "@/lib/data-access/season-windows";
 
-// Les matchs IA-vs-IA se jouent quand le manager avance : avant chacun de
-// ses matchs, le reste de la ligue est rattrapé jusqu'au même jour (voir
-// simulateAiGamesUpTo, appelé par "Simuler le match", "Simuler les
-// prochains matchs" et "Avancer"). Le bouton ci-dessous joue en plus tout
-// le reste de la saison d'un coup. Sans ça, le reste de la ligue resterait figé à 0-0 pour
-// toujours (aucun bilan, aucune stat), et ça bloque même advanceSeason (voir
-// actions/season.ts), qui exige que TOUS les matchs de la saison soient
-// "final" avant de pouvoir enchaîner. Ce lot rejoue les matchs opposant deux
-// équipes IA (aucune Membership des deux côtés) — jamais un match impliquant
-// un manager humain, même IA vs humain, pour ne jamais court-circuiter un
-// match que quelqu'un doit décider de jouer lui-même.
-//
-// Traité par petits lots séquentiels plutôt qu'en un seul appel géant : une
-// saison complète peut compter plusieurs centaines de matchs IA, et chacun
-// enchaîne une bonne quinzaine de requêtes (fatigue, blessures, chimie,
-// renommée...) — en pratique 30-50s par match. Un lot de 15 dépassait de
-// loin le maxDuration de la page (voir schedule/page.tsx) : la fonction
-// serverless se faisait tuer par la plateforme avant de renvoyer quoi que
-// ce soit, ce qui laissait l'UI figée indéfiniment. Un match à la fois tient
-// large sous ce plafond et fait progresser l'affichage à chaque match plutôt
-// qu'une fois tous les dix. Le client relance l'action tant que
+// Lot de matchs IA par appel. Historique : un match coûtait 30-50 s (une
+// quinzaine de requêtes enchaînées) et un lot de 15 dépassait le maxDuration
+// de la page, d'où un seul match par appel. Depuis que la résolution d'un
+// match se fait en deux vagues de requêtes parallèles (~1 s) et que les
+// matchs d'une même journée sont joués en parallèle (simulateInDayGroups),
+// un lot de 8 tient très largement. Le client relance l'action tant que
 // `remaining > 0`, avec un indicateur de progression entre chaque lot.
-const BATCH_SIZE = 1;
+const BATCH_SIZE = 8;
 
 // Rattrapage de la ligue avant un match de mon équipe : autant de matchs IA
 // que possible par appel dans ce budget (sous le maxDuration de 60 s des
@@ -43,6 +29,49 @@ const BATCH_SIZE = 1;
 // match coûte ~4 s, et la page n'est revalidée qu'à la fin du rattrapage
 // (un rendu complet du tableau de bord à chaque match doublait le coût).
 const CATCH_UP_TIME_BUDGET_MS = 15_000;
+
+// Matchs IA joués en même temps (voir simulateInDayGroups).
+const PARALLEL_GAMES = 4;
+
+// Vitesse : les matchs d'une même journée n'ont aucune équipe en commun,
+// donc aucun état partagé (repos, fatigue, chimie, effectifs) — on les joue
+// par groupes parallèles, journée après journée (l'ordre chronologique reste
+// respecté). Garde-fou : jamais deux matchs d'une même équipe dans un groupe.
+// S'arrête à `deadline` (entre deux groupes) ; `stopOnError` reproduit
+// l'ancien comportement du rattrapage (s'arrêter au premier match en échec).
+async function simulateInDayGroups(
+  careerId: string,
+  locale: Awaited<ReturnType<typeof getTranslator>>["locale"],
+  rows: Parameters<typeof toDomainGame>[0][],
+  options: { deadline?: number; stopOnError?: boolean } = {}
+): Promise<{ simulated: number; failed: boolean }> {
+  let simulated = 0;
+  let index = 0;
+  while (index < rows.length) {
+    if (options.deadline && Date.now() > options.deadline) break;
+    const day = calendarDay(rows[index].gameDate);
+    const group: typeof rows = [];
+    const teams = new Set<string>();
+    while (
+      index < rows.length &&
+      group.length < PARALLEL_GAMES &&
+      calendarDay(rows[index].gameDate) === day &&
+      !teams.has(rows[index].homeTeamId) &&
+      !teams.has(rows[index].awayTeamId)
+    ) {
+      teams.add(rows[index].homeTeamId);
+      teams.add(rows[index].awayTeamId);
+      group.push(rows[index]);
+      index++;
+    }
+    const results = await Promise.allSettled(
+      group.map((row) => simulateAndResolveGame(careerId, toDomainGame(row), locale))
+    );
+    simulated += results.filter((r) => r.status === "fulfilled").length;
+    if (options.stopOnError && results.some((r) => r.status === "rejected")) return { simulated, failed: true };
+  }
+  return { simulated, failed: false };
+}
 
 // Simule, dans l'ordre chronologique, les matchs IA-vs-IA non joués datés
 // au plus tard `upTo` — jamais un match impliquant un manager humain (voir
@@ -63,19 +92,17 @@ async function simulateAiGamesUpTo(
     ...(upTo ? { gameDate: { lte: upTo } } : {}),
   };
 
-  const startedAt = Date.now();
+  const deadline = Date.now() + CATCH_UP_TIME_BUDGET_MS;
   let simulated = 0;
-  while (Date.now() - startedAt < CATCH_UP_TIME_BUDGET_MS) {
-    const row = await prisma.game.findFirst({ where, orderBy: { gameDate: "asc" } });
-    if (!row) break;
-    try {
-      await simulateAndResolveGame(careerId, toDomainGame(row), locale);
-      simulated++;
-    } catch {
-      // Match à données incohérentes : on s'arrête là (il restera
-      // "scheduled" et sera retenté) plutôt que de boucler dessus.
-      break;
-    }
+  while (Date.now() < deadline) {
+    // Quelques journées à la fois (au lieu d'une requête par match).
+    const rows = await prisma.game.findMany({ where, orderBy: { gameDate: "asc" }, take: 40 });
+    if (rows.length === 0) break;
+    // Match à données incohérentes : on s'arrête là (il restera "scheduled"
+    // et sera retenté) plutôt que de boucler dessus.
+    const batch = await simulateInDayGroups(careerId, locale, rows, { deadline, stopOnError: true });
+    simulated += batch.simulated;
+    if (batch.failed || batch.simulated === 0) break;
   }
   const remaining = await prisma.game.count({ where });
   return { simulated, remaining };
@@ -138,23 +165,12 @@ export async function simulateAllAiGames(): Promise<SimulateAllAiGamesResult> {
   const totalPending = pendingRows.length;
   const batch = pendingRows.slice(0, BATCH_SIZE);
 
-  // Séquentiel, jamais Promise.all : le repos/la fatigue/la chimie de
-  // chaque match dépendent de l'état laissé par les matchs précédents de la
-  // même équipe (voir simulateAndResolveGame) — les paralléliser produirait
-  // des jours de repos et des classements incohérents.
-  let simulatedCount = 0;
-  for (const row of batch) {
-    const game = toDomainGame(row);
-    try {
-      await simulateAndResolveGame(careerId, game, locale);
-      simulatedCount++;
-    } catch {
-      // Un seul match à données incohérentes (équipe introuvable, ne
-      // devrait jamais arriver) ne doit pas bloquer tout le lot — il
-      // restera "scheduled" et sera retenté au prochain lot.
-      continue;
-    }
-  }
+  // Jamais deux matchs d'une même équipe en même temps : le repos/la
+  // fatigue/la chimie dépendent de l'ordre de ses matchs — d'où des groupes
+  // parallèles par journée (voir simulateInDayGroups). Un match à données
+  // incohérentes ne bloque pas le lot : il restera "scheduled" et sera
+  // retenté au prochain lot.
+  const { simulated: simulatedCount } = await simulateInDayGroups(careerId, locale, batch);
 
   revalidatePath("/schedule");
   revalidatePath("/standings");

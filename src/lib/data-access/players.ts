@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { Player } from "@/lib/types";
-import { toDomainPlayer, toDomainPlayerWithState } from "./mappers";
+import type { Contract } from "@/lib/types";
+import { toDomainContract, toDomainPlayer, toDomainPlayerWithState } from "./mappers";
 
 export async function getAllPlayers(): Promise<Player[]> {
   const rows = await prisma.player.findMany();
@@ -25,6 +26,24 @@ export async function getRosterForTeam(
   return contracts.map((c) =>
     toDomainPlayerWithState(c.player, c.player.playerStates[0])
   );
+}
+
+// Effectif ET contrats d'une équipe en une seule requête (simulation d'un
+// match : évite de relire les mêmes contrats deux fois).
+export async function getRosterAndContracts(
+  careerId: string,
+  teamId: string
+): Promise<{ roster: Player[]; contracts: Contract[] }> {
+  const rows = await prisma.contract.findMany({
+    where: { careerId, teamId },
+    include: {
+      player: { include: { playerStates: { where: { careerId } } } },
+    },
+  });
+  return {
+    roster: rows.map((c) => toDomainPlayerWithState(c.player, c.player.playerStates[0])),
+    contracts: rows.map((c) => toDomainContract(c)),
+  };
 }
 
 export async function getPlayerById(playerId: string): Promise<Player | undefined> {

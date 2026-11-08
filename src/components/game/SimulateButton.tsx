@@ -77,10 +77,12 @@ export function SimulateButton({
     setElapsedSeconds(0);
     try {
       // Le reste de la ligue joue d'abord jusqu'au jour de ce match inclus
-      // (lots successifs, voir catchUpLeagueBefore) — puis ce match.
+      // (lots successifs, voir catchUpLeagueBefore) — puis ce match. Inutile
+      // à la reprise après la mi-temps : la ligue a déjà été rattrapée.
       let played = 0;
       setLeagueGamesPlayed(0);
       for (;;) {
+        if (mode === "resume") break;
         const catchUp = await withClientTimeout(catchUpLeagueBefore(gameId));
         if (catchUp.error) throw new Error(labels.simulationFailed);
         played += catchUp.simulated;

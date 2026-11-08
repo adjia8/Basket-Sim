@@ -9,6 +9,23 @@ export interface GmBonus {
 
 const NO_BONUS: GmBonus = { strength: 0, chemistry: 0 };
 
+// Même calcul que getGmBonusForTeam, à partir d'un GmProfile déjà chargé
+// (évite une requête par équipe et par match dans la simulation).
+export function gmBonusFromProfile(
+  gm: { offensePoints: number; defensePoints: number; physicalPoints: number; tacticalPoints: number; chemistryPoints: number } | null | undefined
+): GmBonus {
+  if (!gm) return NO_BONUS;
+  return {
+    strength: gmStrengthBonus({
+      offense: gm.offensePoints,
+      defense: gm.defensePoints,
+      physical: gm.physicalPoints,
+      tactical: gm.tacticalPoints,
+    }),
+    chemistry: gmChemistryBonus(gm.chemistryPoints),
+  };
+}
+
 // Équipe gérée par l'IA (pas de Membership) → aucun bonus. Sinon, dérivé de
 // la répartition de points du GM à sa création (voir gm-rules.ts) — pas de
 // dérive dans le temps, contrairement au bonus d'entraînement.
