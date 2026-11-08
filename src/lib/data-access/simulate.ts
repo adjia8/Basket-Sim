@@ -15,6 +15,7 @@ import { advanceAttendance, advanceTeamChemistry, getOrCreateTeamState } from "@
 import { advanceRosterDevelopment, advanceRosterTraining } from "@/lib/data-access/training";
 import { AI_MAX_RESTED_PER_GAME, WEAR_AI_AUTO_REST } from "@/lib/careers/wear-rules";
 import { PlayerStatePatches } from "@/lib/data-access/player-state-patches";
+import { advanceRosterMorale } from "@/lib/data-access/morale";
 import { getGmBonusForTeam } from "@/lib/data-access/gm";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { maybeCreatePressConference } from "@/lib/data-access/press";
@@ -41,23 +42,95 @@ import {
 import { moraleBonus, type PressGameContext } from "@/lib/careers/press-rules";
 import { formatLongDate, teamFullName } from "@/lib/utils";
 import type { Locale } from "@/lib/i18n/locale";
-import type { BoxScoreEntry, Game, Player } from "@/lib/types";
+import type { BoxScoreEntry, Game, Player, Team } from "@/lib/types";
 
-// Meilleure marqueuse d'une équipe sur CE match — sert à personnaliser une
-// question de conférence de presse ("X a terminé avec Y points..."),
-// undefined si personne n'a marqué (jamais le cas en pratique, mais évite un
-// crash si un jour l'entrée de box score manque).
-function topScorer(
-  boxScore: BoxScoreEntry[],
-  teamId: string,
-  roster: Player[]
-): { name: string; points: number } | undefined {
-  const entries = boxScore.filter((e) => e.teamId === teamId && e.points > 0);
-  if (entries.length === 0) return undefined;
-  const best = entries.reduce((a, b) => (b.points > a.points ? b : a));
-  const player = roster.find((p) => p.id === best.playerId);
-  if (!player) return undefined;
-  return { name: `${player.firstName} ${player.lastName}`, points: best.points };
+// Contexte de conférence de presse d'UNE équipe sur CE match : résultat,
+// meilleur marqueur, star en difficulté, blessure survenue, jeune qui
+// brille, joueur usé — tout est déjà en mémoire ici (aucune requête).
+// L'actualité hors match (demande de transfert, recrue, playoffs, date
+// limite) est ajoutée par data-access/press.ts.
+function pressContextFor(params: {
+  team: Team;
+  opponent: Team;
+  teamId: string;
+  teamScore: number;
+  opponentScore: number;
+  roster: Player[];
+  boxScore: BoxScoreEntry[];
+  standingsRow: { wins: number; losses: number; streak: string } | undefined;
+  rank: number;
+  leagueSize: number;
+  newInjuries: NewInjury[];
+  locale: Locale;
+}): PressGameContext {
+  const { roster, boxScore, teamId } = params;
+  const byId = new Map(roster.map((p) => [p.id, p]));
+  const name = (p: Player) => `${p.firstName} ${p.lastName}`;
+  const entries = boxScore.filter((e) => e.teamId === teamId && byId.has(e.playerId));
+
+  const best = entries.reduce<BoxScoreEntry | undefined>((a, b) => (!a || b.points > a.points ? b : a), undefined);
+  const topPlayer = best && best.points > 0 ? byId.get(best.playerId) : undefined;
+
+  const struggling = entries
+    .filter((e) => e.minutesPlayed >= 20 && e.points <= 10 && (byId.get(e.playerId)?.renown ?? 0) >= 70)
+    .sort((a, b) => (byId.get(b.playerId)?.renown ?? 0) - (byId.get(a.playerId)?.renown ?? 0))[0];
+
+  const young = entries
+    .filter((e) => e.points >= 15 && (byId.get(e.playerId)?.age ?? 99) <= 22)
+    .sort((a, b) => b.points - a.points)[0];
+
+  const worn = roster
+    .filter((p) => !p.injured && (p.wear ?? 0) >= 60 && p.renown >= 65)
+    .sort((a, b) => (b.wear ?? 0) - (a.wear ?? 0))[0];
+
+  const severityRank = { minor: 0, moderate: 1, severe: 2 } as Record<string, number>;
+  const injury = [...params.newInjuries].sort(
+    (a, b) => (severityRank[b.severity] ?? 0) - (severityRank[a.severity] ?? 0) || b.durationGames - a.durationGames
+  )[0];
+  const injured = injury ? byId.get(injury.playerId) : undefined;
+
+  return {
+    teamName: teamFullName(params.team),
+    teamShortName: params.team.name,
+    teamCity: params.team.city,
+    women: params.team.leagueId === "wnba",
+    opponentName: teamFullName(params.opponent),
+    won: params.teamScore > params.opponentScore,
+    teamScore: params.teamScore,
+    opponentScore: params.opponentScore,
+    wins: params.standingsRow?.wins ?? 0,
+    losses: params.standingsRow?.losses ?? 0,
+    streak: params.standingsRow?.streak ?? "-",
+    rank: params.rank,
+    leagueSize: params.leagueSize,
+    topPerformer:
+      topPlayer && best
+        ? { id: topPlayer.id, name: name(topPlayer), points: best.points, rebounds: best.rebounds, assists: best.assists }
+        : undefined,
+    strugglingStar:
+      struggling && struggling.playerId !== topPlayer?.id
+        ? { id: struggling.playerId, name: name(byId.get(struggling.playerId)!), points: struggling.points }
+        : undefined,
+    injury:
+      injury && injured
+        ? {
+            id: injured.id,
+            name: name(injured),
+            label: translatorFor(params.locale)(`domain.injuryType.${injury.injuryType}`),
+            gamesOut: injury.durationGames,
+            severity: injury.severity as "minor" | "moderate" | "severe",
+          }
+        : undefined,
+    youngPlayer: young
+      ? {
+          id: young.playerId,
+          name: name(byId.get(young.playerId)!),
+          age: byId.get(young.playerId)!.age,
+          points: young.points,
+        }
+      : undefined,
+    wornPlayer: worn ? { id: worn.id, name: name(worn) } : undefined,
+  };
 }
 
 // Génère les messages de boîte de réception "actus de la ligue" pour UNE
@@ -323,6 +396,9 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
       awayLoad
     ),
   ]);
+  // Moral individuel : résultat, temps de jeu, retour vers la normale.
+  advanceRosterMorale(patches, homeRoster, result.boxScore, result.homeScore > result.awayScore, restingIds);
+  advanceRosterMorale(patches, awayRoster, result.boxScore, result.awayScore > result.homeScore, restingIds);
   // Le repos programmé ne vaut que pour ce match.
   for (const player of [...homeRoster, ...awayRoster]) {
     if (player.restNextGame) patches.set(player.id, { restNextGame: false });
@@ -383,42 +459,40 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   // pour les équipes gérées par un humain, jamais pour un match IA-vs-IA.
   const homeRankIndex = standings.findIndex((s) => s.teamId === game.homeTeamId);
   const awayRankIndex = standings.findIndex((s) => s.teamId === game.awayTeamId);
-  const homeTopScorer = topScorer(result.boxScore, game.homeTeamId, homeRoster);
-  const awayTopScorer = topScorer(result.boxScore, game.awayTeamId, awayRoster);
-  const homeGameContext: PressGameContext = {
-    teamName: teamFullName(homeTeam),
-    opponentName: teamFullName(awayTeam),
-    won: result.homeScore > result.awayScore,
+  const homeGameContext = pressContextFor({
+    team: homeTeam,
+    opponent: awayTeam,
+    teamId: game.homeTeamId,
     teamScore: result.homeScore,
     opponentScore: result.awayScore,
-    wins: homeStandingsRow?.wins ?? 0,
-    losses: homeStandingsRow?.losses ?? 0,
-    streak: homeStandingsRow?.streak ?? "-",
+    roster: homeRoster,
+    boxScore: result.boxScore,
+    standingsRow: homeStandingsRow,
     rank: homeRankIndex >= 0 ? homeRankIndex + 1 : standings.length,
     leagueSize: standings.length,
-    topPerformerName: homeTopScorer?.name,
-    topPerformerPoints: homeTopScorer?.points,
-  };
-  const awayGameContext: PressGameContext = {
-    teamName: teamFullName(awayTeam),
-    opponentName: teamFullName(homeTeam),
-    won: result.awayScore > result.homeScore,
+    newInjuries: homeNewInjuries,
+    locale,
+  });
+  const awayGameContext = pressContextFor({
+    team: awayTeam,
+    opponent: homeTeam,
+    teamId: game.awayTeamId,
     teamScore: result.awayScore,
     opponentScore: result.homeScore,
-    wins: awayStandingsRow?.wins ?? 0,
-    losses: awayStandingsRow?.losses ?? 0,
-    streak: awayStandingsRow?.streak ?? "-",
+    roster: awayRoster,
+    boxScore: result.boxScore,
+    standingsRow: awayStandingsRow,
     rank: awayRankIndex >= 0 ? awayRankIndex + 1 : standings.length,
     leagueSize: standings.length,
-    topPerformerName: awayTopScorer?.name,
-    topPerformerPoints: awayTopScorer?.points,
-  };
+    newInjuries: awayNewInjuries,
+    locale,
+  });
   await Promise.all([
     homeManager
-      ? maybeCreatePressConference(careerId, game.homeTeamId, game.leagueId, game.season, gameDate, locale, homeGameContext)
+      ? maybeCreatePressConference(careerId, game.homeTeamId, game.leagueId, game.season, gameDate, locale, homeGameContext, updated?.playoffSeriesId ?? null)
       : Promise.resolve(),
     awayManager
-      ? maybeCreatePressConference(careerId, game.awayTeamId, game.leagueId, game.season, gameDate, locale, awayGameContext)
+      ? maybeCreatePressConference(careerId, game.awayTeamId, game.leagueId, game.season, gameDate, locale, awayGameContext, updated?.playoffSeriesId ?? null)
       : Promise.resolve(),
   ]);
 

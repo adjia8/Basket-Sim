@@ -49,9 +49,9 @@ model Career {
 // disparaissent après réponse. teamId en simple string (pas de relation
 // formelle), même convention que PressConference/DeadCap.
 model InboxMessage {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   careerId  String
-  career    Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  career    Career    @relation(fields: [careerId], references: [id], onDelete: Cascade)
   teamId    String
   season    String
   type      String // "press" | "trade_request" | "injury" | "standings" | "free_agent" | "poach_offer"
@@ -60,8 +60,8 @@ model InboxMessage {
   linkHref  String? // ex: "/press", "/teams/{id}/players/{id}" — null si purement informatif
   gameDate  DateTime? // date du jeu à laquelle le message est arrivé (null : intersaison / messages antérieurs)
   playerId  String? // joueur concerné (blessure, demande de transfert, agent libre) — pas de relation, simple repère
-  status    String   @default("unread") // "unread" | "read"
-  createdAt DateTime @default(now())
+  status    String    @default("unread") // "unread" | "read"
+  createdAt DateTime  @default(now())
 
   @@index([careerId, teamId, status])
 }
@@ -72,14 +72,19 @@ model InboxMessage {
 // Game.boxScore, pas besoin d'une table à part pour un contenu jamais
 // requêté indépendamment de sa question.
 model PressConference {
-  id        String          @id @default(cuid())
-  careerId  String
-  career    Career          @relation(fields: [careerId], references: [id], onDelete: Cascade)
-  teamId    String // pas de relation formelle à TeamState (identifiée par (careerId, teamId), pas par un id propre) — même pattern que Contract/DeadCap, qui référencent juste teamId en champ simple
-  gameDate  DateTime // date du match qui a déclenché la conférence
-  status    String          @default("pending") // "pending" | "answered"
-  createdAt DateTime        @default(now())
-  questions PressQuestion[]
+  id         String          @id @default(cuid())
+  careerId   String
+  career     Career          @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  teamId     String // pas de relation formelle à TeamState (identifiée par (careerId, teamId), pas par un id propre) — même pattern que Contract/DeadCap, qui référencent juste teamId en champ simple
+  gameDate   DateTime // date du match qui a déclenché la conférence
+  status     String          @default("pending") // "pending" | "answered"
+  createdAt  DateTime        @default(now())
+  questions  PressQuestion[]
+  // Refonte façon Football Manager (voir press-rules.ts) :
+  kind       String          @default("postgame") // "postgame" | "playoffs"
+  skipped    Boolean         @default(false) // adjoint envoyé à la place du GM
+  headline   String? // gros titre retenu par la presse après la conférence
+  answeredAt DateTime?
 
   @@index([careerId, teamId])
 }
@@ -91,8 +96,13 @@ model PressQuestion {
   order             Int
   prompt            String
   category          String // "results" | "roster" | "management" | "future"
-  optionsJson       String // JSON: { id: string; label: string; tone: AnswerTone }[]
+  optionsJson       String // JSON: PressOption[] (id, label, tone, effects, reaction, headline)
   chosenOptionId    String?
+  journalist        String? // journaliste (fictif) qui pose la question
+  outlet            String? // média du journaliste
+  topic             String? // sujet précis (voir PressTopic dans press-rules.ts)
+  playerId          String? // joueur visé par la question, s'il y en a un
+  outcomeJson       String? // effets réellement appliqués après réponse (PressOutcome)
 }
 
 // Qui gère quelle équipe dans une Career (ligue) partagée. Un compte n'est
@@ -209,35 +219,35 @@ model Team {
 }
 
 model Player {
-  id             String            @id
+  id                 String            @id
   // null = vrai joueur du catalogue (commun à toutes les carrières) ;
   // renseigné = joueur créé par une draft dans cette Career (simple repère,
   // pas de relation : supprimé avec elle par deleteCareer).
-  careerId       String?
-  teamId         String
-  team           Team              @relation(fields: [teamId], references: [id])
-  leagueId       String
-  firstName      String
-  lastName       String
-  position       String
-  jerseyNumber   Int
-  heightCm       Int
-  age            Int
-  overallRating  Int
+  careerId           String?
+  teamId             String
+  team               Team              @relation(fields: [teamId], references: [id])
+  leagueId           String
+  firstName          String
+  lastName           String
+  position           String
+  jerseyNumber       Int
+  heightCm           Int
+  age                Int
+  overallRating      Int
   // 10 attributs techniques (0-99) — pilotent la simulation (voir mockEngine.ts) ;
   // distincts d'overallRating, qui reste la valeur "front-office" (salaire, trade, draft).
-  scoringInside  Int
-  scoringOutside Int
-  playmaking     Int
-  defenseInside  Int
-  defenseOutside Int
-  rebounding     Int
-  athleticism    Int
-  basketballIQ   Int
-  clutch         Int
-  stamina        Int
-  injuryRisk     Int               @default(30) // 0-99, risque de blessure basé sur l'historique réel connu
-  nationality    String            @default("États-Unis")
+  scoringInside      Int
+  scoringOutside     Int
+  playmaking         Int
+  defenseInside      Int
+  defenseOutside     Int
+  rebounding         Int
+  athleticism        Int
+  basketballIQ       Int
+  clutch             Int
+  stamina            Int
+  injuryRisk         Int               @default(30) // 0-99, risque de blessure basé sur l'historique réel connu
+  nationality        String            @default("États-Unis")
   // Salaire/durée de contrat réels connus (source publique — Spotrac, Her
   // Hoop Stats, rapports officiels de plafond salarial) : si renseignés,
   // priment sur la génération procédurale à la création de carrière (voir
@@ -245,9 +255,9 @@ model Player {
   // fiable, qui reçoit alors un contrat généré comme aujourd'hui.
   realSalary         Int?
   realYearsRemaining Int?
-  contracts      Contract[]
-  playerStates   PlayerState[]
-  teamStints     PlayerTeamStint[]
+  contracts          Contract[]
+  playerStates       PlayerState[]
+  teamStints         PlayerTeamStint[]
 
   @@index([teamId])
   @@index([careerId])
@@ -316,21 +326,21 @@ model PlayoffSeries {
 }
 
 model Contract {
-  id             String   @id @default(cuid())
-  careerId       String
-  career         Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
-  playerId       String
-  player         Player   @relation(fields: [playerId], references: [id])
-  teamId         String
-  team           Team     @relation(fields: [teamId], references: [id])
-  salary         Int
-  yearsRemaining Int
-  guaranteed     Boolean  @default(true)
-  contractType   String   @default("standard") // "standard" | "two_way" | "development" — voir contract-type-rules.ts
-  isRookieScale  Boolean  @default(false) // contrat rookie non renégocié — voir extendContract dans actions/roster.ts
-  developmentGamesActivated Int @default(0) // matchs activés sous CE contrat de développement (WNBA, limite 12) — voir DEVELOPMENT_CONTRACT_GAME_LIMIT dans contract-type-rules.ts
-  lastExtendedSeason String? // saison où extendContract a été utilisé — voir evaluatePendingPromises (promesse "renewal")
-  createdAt      DateTime @default(now())
+  id                        String   @id @default(cuid())
+  careerId                  String
+  career                    Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  playerId                  String
+  player                    Player   @relation(fields: [playerId], references: [id])
+  teamId                    String
+  team                      Team     @relation(fields: [teamId], references: [id])
+  salary                    Int
+  yearsRemaining            Int
+  guaranteed                Boolean  @default(true)
+  contractType              String   @default("standard") // "standard" | "two_way" | "development" — voir contract-type-rules.ts
+  isRookieScale             Boolean  @default(false) // contrat rookie non renégocié — voir extendContract dans actions/roster.ts
+  developmentGamesActivated Int      @default(0) // matchs activés sous CE contrat de développement (WNBA, limite 12) — voir DEVELOPMENT_CONTRACT_GAME_LIMIT dans contract-type-rules.ts
+  lastExtendedSeason        String? // saison où extendContract a été utilisé — voir evaluatePendingPromises (promesse "renewal")
+  createdAt                 DateTime @default(now())
 
   @@unique([careerId, playerId])
   @@index([careerId])
@@ -397,6 +407,7 @@ model PlayerState {
   injuryType           String? // blessure en cours (clé, voir INJURY_TYPES), null si sain
   individualFocus      String? // entraînement individuel (offensive/defensive/tactical/physical), null = suit l'équipe
   developmentProgress  Int     @default(0) // progrès accumulés vers le prochain point d'overall (jeunes joueurs)
+  morale               Int     @default(60) // 0-99, moral individuel (conférences de presse, résultats) — voir morale-rules.ts
 
   // Demande de trade + promesse du GM — voir src/lib/data-access/trade-requests.ts.
   // wantsTrade est déclenché par un tirage probabiliste sous cooldown (jamais
@@ -540,7 +551,8 @@ model TeamState {
   lastKnownConferenceRank Int? // dernier rang conférence connu — détecte les mouvements de classement pour la boîte de réception (voir inbox.ts)
   lastFreeAgentNewsDate   DateTime? // anti-spam pour les messages "agent libre notable disponible" en boîte de réception
   rotationOrderJson       String? // JSON: string[] d'ids joueuses, ordre GM voulu (5 majeures + 6ème femme + banc) — null = tri automatique (voir rotationOf dans mockEngine.ts)
-  attendance               Int       @default(50) // 0-99, dérive vers une cible pilotée par le bilan de l'équipe — voir attendance-rules.ts
+  refereeCriticisms       Int       @default(0) // critiques publiques de l'arbitrage cette saison (amendes de la ligue)
+  attendance              Int       @default(50) // 0-99, dérive vers une cible pilotée par le bilan de l'équipe — voir attendance-rules.ts
 
   @@unique([careerId, teamId])
 }

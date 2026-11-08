@@ -30,6 +30,7 @@ import { poachOfferMessageText } from "@/lib/careers/inbox-rules";
 import { getTranslator } from "@/lib/i18n/translate";
 import { teamFullName } from "@/lib/utils";
 import { offseasonRecovery } from "@/lib/careers/injury-rules";
+import { moraleAfterSummer } from "@/lib/careers/morale-rules";
 
 // Patch PlayerState de l'intersaison côté santé : énergie pleine, blessures
 // guéries d'environ 50 matchs, statut de blessure effacé si rétabli.
@@ -140,6 +141,7 @@ export async function advanceSeason(): Promise<void> {
         // et progression en cours repartent de zéro, les blessures guérissent
         // d'environ 50 matchs (voir offseasonRecovery).
         ...healthAfterSummer(state),
+        morale: moraleAfterSummer(state.morale),
         wear: 0,
         restNextGame: false,
         developmentProgress: 0,
@@ -163,6 +165,9 @@ export async function advanceSeason(): Promise<void> {
       });
     }
   }
+
+  // Compteur de critiques de l'arbitrage (amendes) : remis à zéro chaque saison.
+  await prisma.teamState.updateMany({ where: { careerId: career.id }, data: { refereeCriticisms: 0 } });
 
   // 2bis. Finances de franchise : revenu de la saison qui vient de se
   // terminer (bilan + attractivité du marché) pour chaque équipe de la

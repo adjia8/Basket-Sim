@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { moraleLevel } from "@/lib/careers/morale-rules";
 import Link from "next/link";
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getContractForPlayer } from "@/lib/data-access/contracts";
@@ -136,6 +137,7 @@ export default async function PlayerDetailPage({
   const tradeReasonLabels: Record<(typeof reasons)[number], string> = {
     competitiveness: t("domain.tradeReason.competitiveness"),
     market: t("domain.tradeReason.market"),
+    morale: t("domain.tradeReason.morale"),
     facilities: t("domain.tradeReason.facilities"),
   };
 
@@ -295,6 +297,11 @@ export default async function PlayerDetailPage({
           />
           <Stat label={t("team.medical.wear")} value={player.wear ?? 0} tone={inverseRatingTone(player.wear ?? 0)} />
           <Stat label={t("team.medical.condition")} value={player.conditioning} tone={ratingTone(player.conditioning)} />
+          <Stat
+            label={t("pressPage.playerMorale")}
+            value={`${t(`pressPage.moraleLevel.${moraleLevel(player.morale ?? 60)}` as "pressPage.moraleLevel.good")} · ${player.morale ?? 60}`}
+            tone={ratingTone(player.morale ?? 60)}
+          />
           {!player.injured && (
             <Stat
               label={t("team.medical.risk")}

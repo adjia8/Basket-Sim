@@ -130,6 +130,7 @@ export function toDomainPlayerWithState(
     injuryType: state?.injuryType ?? undefined,
     individualFocus: (state?.individualFocus as Player["individualFocus"]) ?? undefined,
     developmentProgress: state?.developmentProgress ?? 0,
+    morale: state?.morale ?? 60,
     nationality: row.nationality,
   };
 }

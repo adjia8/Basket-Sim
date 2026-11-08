@@ -78,6 +78,7 @@ export interface Player {
   injuryType?: string; // clé de INJURY_TYPES, blessure en cours
   individualFocus?: "offensive" | "defensive" | "tactical" | "physical";
   developmentProgress?: number;
+  morale?: number; // 0-99, moral individuel (voir morale-rules.ts)
   nationality: string;
   // Salaire/durée de contrat réels connus (source publique) — voir
   // generateCareerContracts, qui les préfère à la génération procédurale

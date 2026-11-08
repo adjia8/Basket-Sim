@@ -33,6 +33,7 @@ export interface PlayerStatePatch extends Partial<Record<(typeof ATTRIBUTE_COLUM
   injuryType?: string | null;
   developmentProgress?: number;
   overallRating?: number;
+  morale?: number;
 }
 
 type Column = keyof PlayerStatePatch;
@@ -51,6 +52,7 @@ const COLUMNS: { name: Column; sqlType: "boolean" | "int" | "text" }[] = [
   { name: "injuryType", sqlType: "text" },
   { name: "developmentProgress", sqlType: "int" },
   { name: "overallRating", sqlType: "int" },
+  { name: "morale", sqlType: "int" },
   ...ATTRIBUTE_COLUMNS.map((name) => ({ name, sqlType: "int" as const })),
 ];
 

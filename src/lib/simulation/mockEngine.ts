@@ -1,4 +1,5 @@
 import type { BoxScoreEntry, Player, PlayerRatings, Team } from "@/lib/types";
+import { moraleImpactFactor, MORALE_NEUTRAL } from "@/lib/careers/morale-rules";
 import type { SimulationEngine, SimulationOptions, SimulationResult } from "./engine";
 import {
   FLAGRANT_ONE_EJECTION_LIMIT,
@@ -84,11 +85,13 @@ function baseImpact(player: Player): number {
 
 // Un joueur fatigué ou pas encore remis d'une blessure (conditionnement bas,
 // voir conditioning-rules.ts) rend moins sur le terrain — jusqu'à -30% à
-// fatigue maximale (99), jusqu'à -20% au plancher de conditionnement (20).
+// fatigue maximale (99), jusqu'à -20% au plancher de conditionnement (20),
+// et selon le moral (voir morale-rules.ts).
 function playerImpact(player: Player): number {
   const fatigueFactor = 1 - (Math.max(0, Math.min(99, player.fatigue)) / 99) * 0.3;
   const conditioningFactor = 0.8 + (Math.max(0, Math.min(100, player.conditioning)) / 100) * 0.2;
-  return baseImpact(player) * fatigueFactor * conditioningFactor;
+  // Moral individuel : de -6 % (au fond du trou) à +4 % (au top).
+  return baseImpact(player) * fatigueFactor * conditioningFactor * moraleImpactFactor(player.morale ?? MORALE_NEUTRAL);
 }
 
 // Rotation calculée à chaque quart-temps à partir du roster encore éligible

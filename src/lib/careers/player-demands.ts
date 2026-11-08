@@ -4,6 +4,7 @@
 
 import { SALARY_RANGES, baseSalaryFloor } from "./salary-rules";
 import { ALT_CONTRACT_AGE_LIMIT } from "./contract-type-rules";
+import { MORALE_TRADE_REQUEST_THRESHOLD } from "./morale-rules";
 
 // À partir de ce renommé, un joueur devient "star" : il exige en plus une
 // équipe compétitive et un marché attractif (en dessous, seul le salaire compte).
@@ -106,7 +107,7 @@ export function teamMeetsPlayerDemands(params: {
   );
 }
 
-export type TradeRequestReason = "competitiveness" | "market" | "facilities";
+export type TradeRequestReason = "competitiveness" | "market" | "facilities" | "morale";
 
 // Libellés dans src/lib/i18n/dict/domain.ts (clé `domain.tradeReason.<valeur>`)
 // — pas de texte affichable dans ce fichier de règles pures.
@@ -128,8 +129,12 @@ export function tradeRequestReasons(params: {
   teamWinPct: number;
   teamMarketAppeal: number;
   teamFacilitiesLevel: number;
+  morale?: number;
 }): TradeRequestReason[] {
   const reasons: TradeRequestReason[] = [];
+  // Moral au plus bas (souvent après des critiques publiques du GM, voir
+  // press-rules.ts) : n'importe quel joueur, star ou non, veut partir.
+  if (params.morale !== undefined && params.morale <= MORALE_TRADE_REQUEST_THRESHOLD) reasons.push("morale");
   if (params.renown >= starRenownThresholdForAge(params.age)) {
     if (params.teamWinPct < COMPETITIVE_WIN_PCT_THRESHOLD) reasons.push("competitiveness");
     if (params.teamMarketAppeal < ATTRACTIVE_MARKET_THRESHOLD) reasons.push("market");

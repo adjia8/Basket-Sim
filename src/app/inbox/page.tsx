@@ -17,6 +17,9 @@ const TYPE_TONE: Record<string, string> = {
   free_agency: "bg-info/15 text-info",
   press: "bg-surface-3 text-soft",
   standings: "bg-surface-3 text-soft",
+  press_review: "bg-surface-3 text-soft",
+  player_reaction: "bg-warn/15 text-warn",
+  fine: "bg-bad/15 text-bad",
 };
 
 interface MessageAction {
@@ -51,6 +54,15 @@ function actionsFor(message: InboxMessageView, teamId: string, t: Translator): M
       return [{ label: t("inbox.action.freeAgents"), href: "/free-agents", primary: true }];
     case "press":
       return [{ label: t("inbox.action.answerPress"), href: "/press", primary: true }];
+    case "press_review":
+      return [{ label: t("inbox.action.pressRoom"), href: "/press" }];
+    case "player_reaction":
+      return [
+        ...(message.playerId
+          ? [{ label: t("inbox.action.viewPlayer"), href: playerHref(message.playerId, teamId), primary: true }]
+          : []),
+        { label: t("inbox.action.pressRoom"), href: "/press" },
+      ];
     case "standings":
       return [{ label: t("inbox.action.viewStandings"), href: "/standings" }];
     case "poach_offer":
@@ -151,7 +163,7 @@ function MessageCard({
   actions: MessageAction[];
   poachDecision: boolean;
 }) {
-  const typeLabel = ["press", "injury", "trade_request", "free_agent", "free_agency", "standings", "poach_offer"].includes(message.type)
+  const typeLabel = ["press", "injury", "trade_request", "free_agent", "free_agency", "standings", "poach_offer", "press_review", "player_reaction", "fine"].includes(message.type)
     ? t(`inbox.type.${message.type}` as "inbox.type.press")
     : message.type;
   return (

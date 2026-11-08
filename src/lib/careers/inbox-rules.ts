@@ -44,6 +44,75 @@ export function pressMessageText(locale: Locale): InboxMessageText {
       };
 }
 
+// Revue de presse publiée après une conférence : le gros titre retenu et le
+// bilan des réactions.
+export function pressReviewMessageText(
+  locale: Locale,
+  headline: string,
+  totals: { morale: number; publicOpinion: number; frontOfficeApproval: number },
+  skipped: boolean
+): InboxMessageText {
+  const sign = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `${n}` : "±0");
+  if (locale === "fr") {
+    return {
+      title: `Revue de presse — ${headline}`,
+      body: skipped
+        ? `Ton adjoint a répondu aux journalistes à ta place. Opinion publique ${sign(totals.publicOpinion)}.`
+        : `Tes déclarations font les gros titres. Moral de l'équipe ${sign(totals.morale)}, opinion publique ${sign(totals.publicOpinion)}, relation avec la direction ${sign(totals.frontOfficeApproval)}.`,
+    };
+  }
+  return {
+    title: `Press review — ${headline}`,
+    body: skipped
+      ? `Your assistant answered the reporters for you. Public opinion ${sign(totals.publicOpinion)}.`
+      : `Your comments are making headlines. Team morale ${sign(totals.morale)}, public opinion ${sign(totals.publicOpinion)}, front office relationship ${sign(totals.frontOfficeApproval)}.`,
+  };
+}
+
+// Réaction d'un joueur à ce que le GM a dit de lui en conférence de presse.
+export function playerReactionMessageText(
+  locale: Locale,
+  playerName: string,
+  positive: boolean,
+  women = false
+): InboxMessageText {
+  if (locale === "fr") {
+    return positive
+      ? {
+          title: `${playerName} apprécie ton soutien public`,
+          body: `${playerName} a été ${women ? "touchée" : "touché"} par tes mots en conférence de presse. Son moral est en hausse.`,
+        }
+      : {
+          title: `${playerName} n'a pas apprécié tes propos`,
+          body: `${playerName} a mal vécu tes déclarations en conférence de presse. Son moral est en baisse — ${women ? "une joueuse malheureuse" : "un joueur malheureux"} finit par demander à partir.`,
+        };
+  }
+  const his = women ? "Her" : "His";
+  return positive
+    ? {
+        title: `${playerName} appreciates your public support`,
+        body: `${playerName} was touched by what you said at the press conference. ${his} morale is up.`,
+      }
+    : {
+        title: `${playerName} didn't like your comments`,
+        body: `${playerName} took your press conference comments badly. ${his} morale is down — an unhappy player eventually asks to leave.`,
+      };
+}
+
+// Amende de la ligue pour critiques répétées de l'arbitrage.
+export function refereeFineMessageText(locale: Locale, amount: number): InboxMessageText {
+  const money = locale === "fr" ? `${amount.toLocaleString("fr-FR")} $` : `$${amount.toLocaleString("en-US")}`;
+  return locale === "fr"
+    ? {
+        title: `Amende de la ligue : ${money}`,
+        body: `La ligue t'inflige une amende de ${money} pour tes critiques répétées envers l'arbitrage. Elle est prélevée sur la trésorerie de la franchise.`,
+      }
+    : {
+        title: `League fine: ${money}`,
+        body: `The league has fined you ${money} for repeated criticism of the officiating. It's taken out of the franchise's finances.`,
+      };
+}
+
 export function tradeRequestMessageText(locale: Locale, playerName: string): InboxMessageText {
   return locale === "fr"
     ? {

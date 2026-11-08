@@ -72,6 +72,7 @@ export async function maybeFlagTradeRequest(
       teamWinPct,
       teamMarketAppeal: team.marketAppeal,
       teamFacilitiesLevel: teamState.facilitiesLevel,
+      morale: state.morale,
     });
     if (reasons.length === 0 || Math.random() >= TRADE_REQUEST_CHANCE) continue;
 

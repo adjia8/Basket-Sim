@@ -322,6 +322,7 @@ export default async function TeamRosterPage({
                 competitiveness: t("domain.tradeReason.competitiveness"),
                 market: t("domain.tradeReason.market"),
                 facilities: t("domain.tradeReason.facilities"),
+                morale: t("domain.tradeReason.morale"),
               },
               contractType: {
                 development: t("roster.contractType.development"),
