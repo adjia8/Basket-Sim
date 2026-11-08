@@ -69,6 +69,10 @@ export class PlayerStatePatches {
     this.byPlayer.set(playerId, { ...this.byPlayer.get(playerId), ...patch });
   }
 
+  get(playerId: string): PlayerStatePatch | undefined {
+    return this.byPlayer.get(playerId);
+  }
+
   async apply(careerId: string): Promise<void> {
     if (this.byPlayer.size === 0) return;
     // Pour chaque colonne : un drapeau "modifiée ?" + la valeur — permet de

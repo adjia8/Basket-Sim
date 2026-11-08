@@ -20,6 +20,16 @@ import { toDomainGame } from "@/lib/data-access/mappers";
 import { endOfGameDay } from "@/lib/data-access/game-clock";
 import { DayResults, GameLeaders, PreMatchComparison, Scoreboard, type TeamSnapshot } from "@/components/game/MatchCenter";
 import type { Team } from "@/lib/types";
+import type { DictionaryKey } from "@/lib/i18n/dictionary";
+import type { HalfState } from "@/lib/simulation/engine";
+import type { TalkChoice } from "@/components/game/SimulateButton";
+import {
+  HALFTIME_TONES,
+  PREGAME_TONES,
+  halftimeSituation,
+  parseTalks,
+  pregameSituation,
+} from "@/lib/careers/team-talk-rules";
 
 // Ne passe volontairement pas par getCurrentMembership() : celle-ci redirige
 // vers /press dès qu'une conférence de presse est en attente, y compris
@@ -126,6 +136,67 @@ export default async function GamePage({
   // terminer la saison), même s'il ne gère ni l'une ni l'autre équipe.
   const canAct = mySide !== null || (!homeManager && !awayManager);
 
+  // Causeries (voir team-talk-rules.ts) : face à une équipe IA, le match se
+  // joue en deux temps avec une causerie avant le coup d'envoi et une à la
+  // mi-temps.
+  const talkRow = await prisma.game.findUnique({ where: { id: game.id }, select: { halftimeJson: true, talksJson: true } });
+  const halftime = talkRow?.halftimeJson ? (JSON.parse(talkRow.halftimeJson) as HalfState) : null;
+  const talks = parseTalks(talkRow?.talksJson);
+  const opponentIsAi = mySide === "home" ? !awayManager : mySide === "away" ? !homeManager : false;
+  const myRoster = mySide === "home" ? homeRoster : awayRoster;
+  const theirRoster = mySide === "home" ? awayRoster : homeRoster;
+  const level = (roster: typeof homeRoster) => {
+    const top = [...roster].filter((p) => !p.injured).sort((a, b) => b.overallRating - a.overallRating).slice(0, 8);
+    return top.length ? top.reduce((sum, p) => sum + p.overallRating, 0) / top.length : 0;
+  };
+  const talkOptions = (tones: string[]) =>
+    tones.map((v) => ({
+      value: v,
+      label: t(`talks.tone.${v}` as DictionaryKey),
+      quote: t(`talks.quote.${v}` as DictionaryKey),
+    }));
+  const pregameTalk: TalkChoice | undefined =
+    mySide && opponentIsAi && !halftime
+      ? {
+          field: "pregameTalk",
+          heading: `${t("talks.pregameHeading")} · ${t(
+            `talks.situation.${pregameSituation(level(myRoster), level(theirRoster), mySide === "home")}` as DictionaryKey
+          )}`,
+          hint: t("talks.pregameHint"),
+          options: talkOptions(PREGAME_TONES),
+        }
+      : undefined;
+  const myHalfScore = halftime && mySide ? (mySide === "home" ? halftime.homeScore : halftime.awayScore) : 0;
+  const theirHalfScore = halftime && mySide ? (mySide === "home" ? halftime.awayScore : halftime.homeScore) : 0;
+  const halftimeTalk: TalkChoice | undefined =
+    halftime && mySide
+      ? {
+          field: "halftimeTalk",
+          heading: `${t("talks.halftimeHeading")} · ${t(
+            `talks.situation.${halftimeSituation(myHalfScore, theirHalfScore)}` as DictionaryKey
+          )}`,
+          hint: t("talks.halftimeHint"),
+          options: talkOptions(HALFTIME_TONES),
+        }
+      : undefined;
+  const nameOf = new Map([...homeRoster, ...awayRoster].map((p) => [p.id, `${p.firstName} ${p.lastName}`]));
+  const halfLeaders = (teamId: string) =>
+    (halftime?.boxScore ?? [])
+      .filter((e) => e.teamId === teamId)
+      .sort((a, b) => b.points - a.points)
+      .slice(0, 3);
+  const simulateLabels = {
+    simulate: t("game.simulate"),
+    simulating: t("game.simulating"),
+    waitingForPrefix: t("game.waitingForPrefix"),
+    simulationFailed: t("game.simulationFailed"),
+    unknownError: t("game.unknownError"),
+    otherManagerFallback: t("game.otherManagerFallback"),
+    timedOut: t("game.timedOut"),
+    simulatingHint: t("game.simulatingHint"),
+    catchingUp: t("game.catchingUp"),
+  };
+
   // Encart tactique d'avant-match (mon équipe seulement).
   const tacticsReport =
     game.status === "scheduled" && mySide
@@ -177,22 +248,54 @@ export default async function GamePage({
           rankLabel={(rank, size) => `${rank}${ordinalSuffix(rank, locale)}/${size}`}
         />
 
+        {game.status === "scheduled" && halftime && mySide && (
+          <section className="card mt-6 p-4 sm:p-5">
+            <p className="eyebrow">{t("talks.halftimeTitle")}</p>
+            <div className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-1">
+              <p className="text-3xl font-bold tabular">
+                {awayTeam.abbreviation} {halftime.awayScore} – {halftime.homeScore} {homeTeam.abbreviation}
+              </p>
+              <p className="text-xs text-muted">{t("talks.halftimeScore")}</p>
+            </div>
+            {talks?.pregame && (
+              <p className="mt-3 text-sm">
+                <span className="text-muted">{t("talks.pregameReaction")} : </span>
+                <span className={talks.pregame.focus > 0 ? "text-good" : talks.pregame.focus < 0 ? "text-bad" : ""}>
+                  {t(`talks.reaction.${talks.pregame.reaction}` as DictionaryKey)}
+                </span>
+              </p>
+            )}
+            <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+              {[awayTeam, homeTeam].map((team) => (
+                <div key={team.id}>
+                  <p className="text-xs text-muted">
+                    {t("talks.leadersSoFar")} · {team.abbreviation}
+                  </p>
+                  <ul className="mt-1 space-y-0.5">
+                    {halfLeaders(team.id).map((e) => (
+                      <li key={e.playerId} className="flex justify-between gap-2">
+                        <span>{nameOf.get(e.playerId) ?? e.playerId}</span>
+                        <span className="tabular text-muted">{e.points} pts</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {game.status === "scheduled" && (
           <div className="mt-6 flex flex-col items-center gap-2">
             {canAct ? (
               <SimulateButton
                 gameId={game.id}
                 initialWaitingFor={initialWaitingFor}
+                talk={halftime ? halftimeTalk : pregameTalk}
+                mode={halftime ? "resume" : pregameTalk ? "half" : undefined}
                 labels={{
-                  simulate: t("game.simulate"),
-                  simulating: t("game.simulating"),
-                  waitingForPrefix: t("game.waitingForPrefix"),
-                  simulationFailed: t("game.simulationFailed"),
-                  unknownError: t("game.unknownError"),
-                  otherManagerFallback: t("game.otherManagerFallback"),
-                  timedOut: t("game.timedOut"),
-                  simulatingHint: t("game.simulatingHint"),
-                  catchingUp: t("game.catchingUp"),
+                  ...simulateLabels,
+                  simulate: halftime ? t("talks.resume") : pregameTalk ? t("talks.kickoff") : simulateLabels.simulate,
                 }}
               />
             ) : (
@@ -267,6 +370,26 @@ export default async function GamePage({
         </div>
       ) : (
         <div className="mt-6">
+          {talks && mySide && talks.side === mySide && (talks.pregame || talks.halftime) && (
+            <section className="card mb-4 p-4 text-sm">
+              <p className="eyebrow mb-2">{t("talks.summaryHeading")}</p>
+              <ul className="space-y-1">
+                {[
+                  { label: t("talks.pregameReaction"), outcome: talks.pregame },
+                  { label: t("talks.halftimeReaction"), outcome: talks.halftime },
+                ]
+                  .filter((row) => row.outcome)
+                  .map((row) => (
+                    <li key={row.label}>
+                      <span className="text-muted">{row.label} ({t(`talks.tone.${row.outcome!.tone}` as DictionaryKey)}) : </span>
+                      <span className={row.outcome!.focus > 0 ? "text-good" : row.outcome!.focus < 0 ? "text-bad" : ""}>
+                        {t(`talks.reaction.${row.outcome!.reaction}` as DictionaryKey)}
+                      </span>
+                    </li>
+                  ))}
+              </ul>
+            </section>
+          )}
           <div className="grid gap-4 lg:grid-cols-2">
             <GameLeaders
               entries={boxScoreWithNames}

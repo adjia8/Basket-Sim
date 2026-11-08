@@ -5,6 +5,7 @@ import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getGameById, setGameReady } from "@/lib/data-access/schedule";
 import { simulateAndResolveGame } from "@/lib/data-access/simulate";
 import { getTranslator } from "@/lib/i18n/translate";
+import { HALFTIME_TONES, PREGAME_TONES, type TalkTone } from "@/lib/careers/team-talk-rules";
 
 // Plafond relevé pour cette route : simuler un match coûte ~20-50s (voir
 // simulate-bulk.ts pour le détail), largement au-dessus du défaut de la
@@ -89,9 +90,19 @@ export async function POST(request: Request) {
     });
   }
 
+  // Causeries (voir team-talk-rules.ts) : seulement pour mon équipe, face à
+  // une équipe IA (en multijoueur, le match se joue d'une traite).
+  const pregame = PREGAME_TONES.includes(body?.pregameTalk) ? (body.pregameTalk as TalkTone) : undefined;
+  const halftime = HALFTIME_TONES.includes(body?.halftimeTalk) ? (body.halftimeTalk as TalkTone) : undefined;
+  const opponentIsAi = side === "home" ? !awayManager : side === "away" ? !homeManager : false;
+  const talk =
+    side && opponentIsAi
+      ? { side, pregame, halftime, stopAtHalf: body?.mode === "half" }
+      : undefined;
+
   let updated;
   try {
-    updated = await simulateAndResolveGame(membership.careerId, updatedGame, locale);
+    updated = await simulateAndResolveGame(membership.careerId, updatedGame, locale, talk);
   } catch {
     return NextResponse.json({ error: t("simulateAction.teamNotFound") }, { status: 404 });
   }

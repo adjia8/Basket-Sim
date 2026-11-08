@@ -19,15 +19,29 @@ export interface SimulateButtonLabels {
   catchingUp: string; // "… {count} joué(s)" — rattrapage des autres matchs de la ligue avant celui-ci
 }
 
+// Causerie à choisir avant de lancer (avant-match ou mi-temps), voir
+// team-talk-rules.ts.
+export interface TalkChoice {
+  field: "pregameTalk" | "halftimeTalk";
+  heading: string;
+  hint?: string;
+  options: { value: string; label: string; quote: string }[];
+}
+
 export function SimulateButton({
   gameId,
   initialWaitingFor,
   labels,
+  talk,
+  mode,
 }: {
   gameId: string;
   initialWaitingFor?: string | null;
   labels: SimulateButtonLabels;
+  talk?: TalkChoice;
+  mode?: "half" | "resume";
 }) {
+  const [tone, setTone] = useState<string>(talk?.options[0]?.value ?? "");
   const [isFetching, setIsFetching] = useState(false);
   const [isRefreshing, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -79,7 +93,7 @@ export function SimulateButton({
         fetch("/api/simulate-game", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ gameId }),
+          body: JSON.stringify({ gameId, mode, ...(talk ? { [talk.field]: tone } : {}) }),
         })
       );
       const data = await res.json().catch(() => null);
@@ -122,7 +136,35 @@ export function SimulateButton({
   }
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex w-full flex-col items-center gap-2">
+      {talk && (
+        <fieldset className="card mb-2 w-full max-w-2xl p-4 text-left" disabled={isPending}>
+          <legend className="sr-only">{talk.heading}</legend>
+          <p className="eyebrow">{talk.heading}</p>
+          {talk.hint && <p className="mt-1 text-xs text-muted">{talk.hint}</p>}
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {talk.options.map((o) => (
+              <label
+                key={o.value}
+                className="flex cursor-pointer gap-2 rounded-lg border border-line px-3 py-2 text-sm transition hover:bg-surface-2 has-[:checked]:border-accent has-[:checked]:bg-accent/10"
+              >
+                <input
+                  type="radio"
+                  name={talk.field}
+                  value={o.value}
+                  checked={tone === o.value}
+                  onChange={() => setTone(o.value)}
+                  className="mt-1 accent-[var(--accent)]"
+                />
+                <span>
+                  <span className="font-medium">{o.label}</span>
+                  <span className="mt-0.5 block text-xs italic text-muted">{o.quote}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
       <button
         type="button"
         onClick={handleClick}

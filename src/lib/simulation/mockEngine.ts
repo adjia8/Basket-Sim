@@ -1,6 +1,6 @@
 import type { BoxScoreEntry, Player, PlayerRatings, Team } from "@/lib/types";
 import { moraleImpactFactor, MORALE_NEUTRAL } from "@/lib/careers/morale-rules";
-import type { SimulationEngine, SimulationOptions, SimulationResult } from "./engine";
+import type { HalfState, SimulationEngine, SimulationOptions, SimulationResult } from "./engine";
 import {
   FLAGRANT_ONE_EJECTION_LIMIT,
   FOUL_CHECKS_PER_QUARTER,
@@ -470,6 +470,8 @@ interface PeriodTeamsContext {
   disqualified: Set<string>;
   totals: Map<string, BoxScoreEntry>;
   fullGameBase: number; // points de base d'un match complet (pour répartir l'avantage tactique)
+  homeFocusPerQuarter: number; // causeries : points par quart-temps de la mi-temps en cours
+  awayFocusPerQuarter: number;
 }
 
 // Simule une période de jeu (un quart-temps, ou une prolongation avec des
@@ -514,13 +516,21 @@ function simulatePeriod(
   const homeScore = Math.max(
     minScore,
     Math.round(
-      periodBase * pace + (homeStrength - 75) * STRENGTH_COEFFICIENT + homeEdge * periodShare + noise(noiseSpread)
+      periodBase * pace +
+        (homeStrength - 75) * STRENGTH_COEFFICIENT +
+        homeEdge * periodShare +
+        ctx.homeFocusPerQuarter * (periodBase / (ctx.fullGameBase / QUARTERS)) +
+        noise(noiseSpread)
     )
   );
   const awayScore = Math.max(
     minScore,
     Math.round(
-      periodBase * pace + (awayStrength - 75) * STRENGTH_COEFFICIENT + awayEdge * periodShare + noise(noiseSpread)
+      periodBase * pace +
+        (awayStrength - 75) * STRENGTH_COEFFICIENT +
+        awayEdge * periodShare +
+        ctx.awayFocusPerQuarter * (periodBase / (ctx.fullGameBase / QUARTERS)) +
+        noise(noiseSpread)
     )
   );
 
@@ -554,8 +564,12 @@ export class MockSimulationEngine implements SimulationEngine {
     const quarterBase = basePointsForLeague(home.leagueId) / QUARTERS;
     const quarterHomeAdvantage = HOME_ADVANTAGE / QUARTERS;
 
-    const disqualified = new Set<string>();
-    const totals = new Map<string, BoxScoreEntry>();
+    // Reprise à la mi-temps : box score, exclusions et score déjà acquis.
+    const resume = options?.resumeFrom;
+    const disqualified = new Set<string>(resume?.disqualified ?? []);
+    const totals = new Map<string, BoxScoreEntry>((resume?.boxScore ?? []).map((e) => [e.playerId, { ...e }] as const));
+    const homeFocus = options?.homeFocus ?? { first: 0, second: 0 };
+    const awayFocus = options?.awayFocus ?? { first: 0, second: 0 };
     const playersById = new Map(
       [...homeRosterFull, ...awayRosterFull].map((p) => [p.id, p] as const)
     );
@@ -577,14 +591,41 @@ export class MockSimulationEngine implements SimulationEngine {
       disqualified,
       totals,
       fullGameBase: basePointsForLeague(home.leagueId),
+      homeFocusPerQuarter: 0,
+      awayFocusPerQuarter: 0,
     };
-    let homeScore = 0;
-    let awayScore = 0;
+    let homeScore = resume?.homeScore ?? 0;
+    let awayScore = resume?.awayScore ?? 0;
+    const half = QUARTERS / 2;
 
-    for (let q = 0; q < QUARTERS; q++) {
+    for (let q = resume ? half : 0; q < (options?.stopAtHalf ? half : QUARTERS); q++) {
+      // Causeries : la concentration d'une mi-temps est répartie sur ses
+      // deux quart-temps.
+      ctx.homeFocusPerQuarter = (q < half ? homeFocus.first : homeFocus.second) / half;
+      ctx.awayFocusPerQuarter = (q < half ? awayFocus.first : awayFocus.second) / half;
       const period = simulatePeriod(ctx, quarterBase, quarterHomeAdvantage, 4.5, 15, quarterMinutes);
       homeScore += period.homeScore;
       awayScore += period.awayScore;
+    }
+
+    if (options?.stopAtHalf) {
+      const halftime: HalfState = {
+        homeScore,
+        awayScore,
+        boxScore: [...totals.values()].map((e) => ({ ...e })),
+        disqualified: [...disqualified],
+      };
+      // Box score affichable à la pause (tirs reconstitués sur une copie).
+      const display = new Map(halftime.boxScore.map((e) => [e.playerId, { ...e }] as const));
+      applyShotStats(
+        display,
+        playersById,
+        new Map([
+          [home.id, threePointShift(homeTactics.offense)],
+          [away.id, threePointShift(awayTactics.offense)],
+        ])
+      );
+      return { homeScore, awayScore, boxScore: [...display.values()], halftime };
     }
 
     // Le basket ne finit jamais sur une égalité — prolongations successives

@@ -16,6 +16,7 @@ import * as seasonRecap from "./dict/seasonRecap";
 import * as press from "./dict/press";
 import * as staff from "./dict/staff";
 import * as tactics from "./dict/tactics";
+import * as talks from "./dict/talks";
 import * as leaguePages from "./dict/leaguePages";
 import * as promise from "./dict/promise";
 import * as rotation from "./dict/rotation";
@@ -46,6 +47,7 @@ const sources = [
   press,
   staff,
   tactics,
+  talks,
   leaguePages,
   promise,
   rotation,
@@ -72,6 +74,7 @@ export const dictionaries = {
     ...press.fr,
     ...staff.fr,
     ...tactics.fr,
+    ...talks.fr,
     ...leaguePages.fr,
     ...promise.fr,
     ...rotation.fr,
@@ -96,6 +99,7 @@ export const dictionaries = {
     ...press.en,
     ...staff.en,
     ...tactics.en,
+    ...talks.en,
     ...leaguePages.en,
     ...promise.en,
     ...rotation.en,

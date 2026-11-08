@@ -19,6 +19,22 @@ import { advanceRosterMorale } from "@/lib/data-access/morale";
 import { ensureCareerStaff, getStaffProfiles } from "@/lib/data-access/staff";
 import { NEUTRAL_STAFF_PROFILE, staffEffects } from "@/lib/careers/staff-rules";
 import { bestTactics, parseTactics, tacticalLoad } from "@/lib/careers/tactics-rules";
+import {
+  focusByHalf,
+  halftimeSituation,
+  parseTalks,
+  pregameSituation,
+  talkOutcome,
+  type TalkTone,
+} from "@/lib/careers/team-talk-rules";
+import type { HalfState } from "@/lib/simulation/engine";
+import { clampMorale } from "@/lib/careers/morale-rules";
+
+// Niveau d'un effectif pour juger favori / outsider : moyenne des 8 meilleurs.
+function teamLevel(roster: Player[]): number {
+  const top = [...roster].sort((a, b) => b.overallRating - a.overallRating).slice(0, 8);
+  return top.length ? top.reduce((s, p) => s + p.overallRating, 0) / top.length : 0;
+}
 
 // Les 10 meilleurs joueurs disponibles, du plus fort au moins fort : la
 // rotation que l'IA évalue pour choisir sa tactique.
@@ -254,7 +270,23 @@ function restedForGame(roster: Player[], isAi: boolean): string[] {
 // "pas encore joué" par l'appelant ; cette fonction ne fait aucune
 // vérification d'autorisation/de disponibilité (c'est le rôle de l'appelant,
 // différent selon qu'il s'agit d'un match humain ou d'un lot IA).
-export async function simulateAndResolveGame(careerId: string, game: Game, locale: Locale): Promise<Game | undefined> {
+// Causeries du GM qui joue ce match (voir team-talk-rules.ts) : ton
+// d'avant-match, ton de mi-temps, et arrêt à la pause pour choisir ce
+// dernier. Sans `talk` (IA, rattrapage), un match laissé à la pause reprend
+// tel quel, sans causerie de mi-temps.
+export interface MatchTalkInput {
+  side: "home" | "away";
+  pregame?: TalkTone;
+  halftime?: TalkTone;
+  stopAtHalf?: boolean;
+}
+
+export async function simulateAndResolveGame(
+  careerId: string,
+  game: Game,
+  locale: Locale,
+  talk?: MatchTalkInput
+): Promise<Game | undefined> {
   const [homeTeam, awayTeam, homeRoster, awayRoster, homeContracts, awayContracts] = await Promise.all([
     getTeamById(game.homeTeamId),
     getTeamById(game.awayTeamId),
@@ -331,7 +363,38 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   const awayTactics = awayManager
     ? parseTactics(awayTeamState.tacticsJson)
     : bestTactics(topRotation(awayEligibleRoster));
+  // Causeries : mi-temps éventuellement déjà jouée, réaction des joueurs.
+  const talkRow = await prisma.game.findUnique({
+    where: { id: game.id },
+    select: { halftimeJson: true, talksJson: true },
+  });
+  const resumeFrom = talkRow?.halftimeJson ? (JSON.parse(talkRow.halftimeJson) as HalfState) : undefined;
+  let talks = parseTalks(talkRow?.talksJson);
+  if (talk) {
+    const mine = talk.side === "home" ? homeEligibleRoster : awayEligibleRoster;
+    const theirs = talk.side === "home" ? awayEligibleRoster : homeEligibleRoster;
+    const myState = talk.side === "home" ? homeTeamState : awayTeamState;
+    const motivation = (talk.side === "home" ? homeProfile : awayProfile).motivation;
+    if (!resumeFrom && talk.pregame) {
+      const situation = pregameSituation(teamLevel(mine), teamLevel(theirs), talk.side === "home");
+      talks = { side: talk.side, pregame: talkOutcome(talk.pregame, situation, motivation, myState.morale) };
+    }
+    if (resumeFrom && talk.halftime && (!talks || talks.side === talk.side)) {
+      const myScore = talk.side === "home" ? resumeFrom.homeScore : resumeFrom.awayScore;
+      const theirScore = talk.side === "home" ? resumeFrom.awayScore : resumeFrom.homeScore;
+      talks = {
+        ...(talks ?? { side: talk.side }),
+        halftime: talkOutcome(talk.halftime, halftimeSituation(myScore, theirScore), motivation, myState.morale),
+      };
+    }
+  }
+  const focus = focusByHalf(talks);
+
   const result = simulationEngine.simulateGame(homeTeam, homeEligibleRoster, awayTeam, awayEligibleRoster, {
+    homeFocus: talks?.side === "home" ? focus : undefined,
+    awayFocus: talks?.side === "away" ? focus : undefined,
+    stopAtHalf: !!talk?.stopAtHalf && !resumeFrom,
+    resumeFrom,
     homeChemistry:
       homeTeamState.chemistry + homeGm.chemistry + moraleBonus(homeTeamState.morale) + homeStaff.chemistryBonus,
     awayChemistry:
@@ -364,7 +427,23 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
       data: { developmentGamesActivated: { increment: 1 } },
     });
   }
+  // Pause de la mi-temps : on enregistre l'état et on s'arrête là (la suite
+  // — blessures, fatigue, presse… — ne se joue qu'au coup de sifflet final).
+  if (result.halftime) {
+    await prisma.game.update({
+      where: { id: game.id },
+      data: { halftimeJson: JSON.stringify(result.halftime), talksJson: talks ? JSON.stringify(talks) : null },
+    });
+    return game;
+  }
+
   const updated = await updateGameResult(careerId, game.id, result);
+  if (resumeFrom || talks) {
+    await prisma.game.update({
+      where: { id: game.id },
+      data: { halftimeJson: null, talksJson: talks ? JSON.stringify(talks) : null },
+    });
+  }
 
   if (updated?.playoffSeriesId) {
     await recordPlayoffGameResult(updated.playoffSeriesId, result.homeScore, result.awayScore);
@@ -443,6 +522,20 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   // Moral individuel : résultat, temps de jeu, retour vers la normale.
   advanceRosterMorale(patches, homeRoster, result.boxScore, result.homeScore > result.awayScore, restingIds, homeStaff.moraleShift);
   advanceRosterMorale(patches, awayRoster, result.boxScore, result.awayScore > result.homeScore, restingIds, awayStaff.moraleShift);
+  // Causeries : la réaction du vestiaire fait bouger le moral des joueurs
+  // qui ont joué.
+  if (talks) {
+    const delta = (talks.pregame?.moraleDelta ?? 0) + (talks.halftime?.moraleDelta ?? 0);
+    const roster = talks.side === "home" ? homeRoster : awayRoster;
+    const played = new Set(result.boxScore.filter((e) => e.minutesPlayed > 0).map((e) => e.playerId));
+    if (delta !== 0) {
+      for (const player of roster) {
+        if (!played.has(player.id)) continue;
+        const current = patches.get(player.id)?.morale ?? player.morale ?? 60;
+        patches.set(player.id, { morale: clampMorale(current + delta) });
+      }
+    }
+  }
   // Le repos programmé ne vaut que pour ce match.
   for (const player of [...homeRoster, ...awayRoster]) {
     if (player.restNextGame) patches.set(player.id, { restNextGame: false });

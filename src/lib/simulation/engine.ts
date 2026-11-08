@@ -1,10 +1,20 @@
 import type { BoxScoreEntry, Player, Team } from "@/lib/types";
 import type { Tactics } from "@/lib/careers/tactics-rules";
 
+// État d'un match arrêté à la mi-temps (causerie de mi-temps), repris
+// ensuite tel quel pour jouer la 2e mi-temps.
+export interface HalfState {
+  homeScore: number;
+  awayScore: number;
+  boxScore: BoxScoreEntry[];
+  disqualified: string[];
+}
+
 export interface SimulationResult {
   homeScore: number;
   awayScore: number;
   boxScore: BoxScoreEntry[];
+  halftime?: HalfState; // présent seulement si stopAtHalf
 }
 
 // Chimie d'équipe (0-99) — optionnelle : les appelants qui n'ont pas encore
@@ -29,6 +39,13 @@ export interface SimulationOptions {
   awayTactics?: Tactics;
   homeCoachTactics?: number;
   awayCoachTactics?: number;
+  // Causeries (voir team-talk-rules.ts) : concentration en points sur
+  // chaque mi-temps.
+  homeFocus?: { first: number; second: number };
+  awayFocus?: { first: number; second: number };
+  // Arrêt à la mi-temps / reprise depuis la mi-temps.
+  stopAtHalf?: boolean;
+  resumeFrom?: HalfState;
 }
 
 export interface SimulationEngine {

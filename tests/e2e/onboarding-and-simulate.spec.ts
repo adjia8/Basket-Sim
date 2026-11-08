@@ -18,24 +18,38 @@ test("onboarding through a simulated game produces a consistent box score", asyn
   expect(gameHref).toBeTruthy();
 
   await page.goto(gameHref!);
-  await expect(page.locator('button:has-text("Simuler le match")')).toBeVisible({ timeout: 10_000 });
+  // Face à une équipe IA, le match se joue en deux temps avec les causeries
+  // d'équipe (voir team-talk-rules.ts) : coup d'envoi, mi-temps, reprise.
+  await expect(page.locator('button:has-text("Coup d\'envoi")')).toBeVisible({ timeout: 10_000 });
 
   // L'aperçu pré-match doit montrer les deux effectifs (voir
   // GameRosterPreview) avant même de simuler.
   const rosterTables = page.locator("table");
   await expect(rosterTables).toHaveCount(2);
 
-  await page.click('button:has-text("Simuler le match")');
-  // La route simulate-game enchaîne beaucoup de requêtes séquentielles
-  // (rosters, standings, chimie, fatigue, conférence de presse, demandes de
-  // trade...) — sous latence Neon, ça peut dépasser 20s (voir README.md).
-  await expect(page.locator("text=Box score")).toBeVisible({ timeout: 60_000 });
+  await page.click('button:has-text("Coup d\'envoi")');
+  await expect(page.locator('button:has-text("Reprendre le match")')).toBeVisible({ timeout: 60_000 });
 
   const gameId = gameHref!.split("/").pop()!;
   const prisma = new PrismaClient();
   try {
+    // À la pause : match toujours à jouer, état de mi-temps enregistré.
+    const atHalf = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
+    expect(atHalf.status).not.toBe("final");
+    expect(atHalf.halftimeJson).not.toBeNull();
+
+    await page.click('button:has-text("Reprendre le match")');
+    // La route simulate-game enchaîne beaucoup de requêtes séquentielles
+    // (rosters, standings, chimie, fatigue, conférence de presse, demandes de
+    // trade...) — sous latence Neon, ça peut dépasser 20s (voir README.md).
+    await expect(page.locator("text=Box score")).toBeVisible({ timeout: 60_000 });
+
     const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
     expect(game.status).toBe("final");
+    expect(game.halftimeJson).toBeNull();
+    const half = JSON.parse(atHalf.halftimeJson!) as { homeScore: number; awayScore: number };
+    expect(game.homeScore!).toBeGreaterThan(half.homeScore);
+    expect(game.awayScore!).toBeGreaterThan(half.awayScore);
     expect(game.homeScore).not.toBeNull();
     expect(game.awayScore).not.toBeNull();
 

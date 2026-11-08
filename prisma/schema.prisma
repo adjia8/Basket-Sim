@@ -289,23 +289,27 @@ model Player {
 }
 
 model Game {
-  id         String   @id @default(cuid())
-  careerId   String
-  career     Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
-  leagueId   String
-  league     League   @relation(fields: [leagueId], references: [id])
-  season     String
-  gameDate   DateTime
-  homeTeamId String
-  homeTeam   Team     @relation("HomeTeam", fields: [homeTeamId], references: [id])
-  awayTeamId String
-  awayTeam   Team     @relation("AwayTeam", fields: [awayTeamId], references: [id])
-  status     String   @default("scheduled")
-  homeScore  Int?
-  awayScore  Int?
-  boxScore   String?
-  homeReady  Boolean  @default(false)
-  awayReady  Boolean  @default(false)
+  id           String   @id @default(cuid())
+  careerId     String
+  career       Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  leagueId     String
+  league       League   @relation(fields: [leagueId], references: [id])
+  season       String
+  gameDate     DateTime
+  homeTeamId   String
+  homeTeam     Team     @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeamId   String
+  awayTeam     Team     @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  status       String   @default("scheduled")
+  homeScore    Int?
+  awayScore    Int?
+  boxScore     String?
+  // Causeries façon FM (voir team-talk-rules.ts) : état du match arrêté à la
+  // mi-temps (HalfState JSON, null hors pause) et causeries du GM (GameTalks).
+  halftimeJson String?
+  talksJson    String?
+  homeReady    Boolean  @default(false)
+  awayReady    Boolean  @default(false)
 
   playoffSeriesId String?
   playoffSeries   PlayoffSeries? @relation(fields: [playoffSeriesId], references: [id], onDelete: SetNull)
