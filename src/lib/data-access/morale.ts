@@ -11,7 +11,8 @@ export function advanceRosterMorale(
   roster: Player[],
   boxScore: BoxScoreEntry[],
   won: boolean,
-  restingIds: Set<string>
+  restingIds: Set<string>,
+  moraleShift = 0
 ): void {
   const minutesById = new Map(boxScore.map((e) => [e.playerId, e.minutesPlayed]));
   for (const player of roster) {
@@ -24,6 +25,7 @@ export function advanceRosterMorale(
       won,
       minutes: available ? minutes : 99,
       renown: player.renown,
+      shift: moraleShift,
     });
     if (next !== current) patches.set(player.id, { morale: next });
   }

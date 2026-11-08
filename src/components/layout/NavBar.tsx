@@ -72,6 +72,7 @@ export async function NavBar() {
       label: t("common.nav.groupClub"),
       items: [
         { href: "/franchise", label: t("common.nav.franchise") },
+        { href: "/staff", label: t("common.nav.staff") },
         { href: "/gm", label: t("common.nav.gm"), alert: hasPendingPoach },
         { href: "/press", label: t("common.nav.press"), alert: hasPendingPress },
       ],

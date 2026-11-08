@@ -99,6 +99,52 @@ export function playerReactionMessageText(
       };
 }
 
+// Staff : budget de la nouvelle saison alloué par les propriétaires.
+export function staffSeasonBudgetMessageText(locale: Locale, budget: number, committed: number): InboxMessageText {
+  const b = formatSalary(budget, locale);
+  const c = formatSalary(committed, locale);
+  return locale === "fr"
+    ? {
+        title: `Budget staff de la saison : ${b}`,
+        body: `Les propriétaires t'allouent ${b} pour le staff cette saison. Salaires déjà engagés : ${c}. Pense à combler les postes vacants.`,
+      }
+    : {
+        title: `Staff budget for the season: ${b}`,
+        body: `Ownership has allocated ${b} for staff this season. Salaries already committed: ${c}. Remember to fill any vacancies.`,
+      };
+}
+
+// Staff : départ (retraite ou fin de contrat non prolongé).
+export function staffDepartureMessageText(locale: Locale, name: string, reason: "retired" | "contract"): InboxMessageText {
+  if (locale === "fr") {
+    return reason === "retired"
+      ? { title: `${name} prend sa retraite`, body: `${name} quitte le staff pour prendre sa retraite. Le poste est vacant.` }
+      : {
+          title: `${name} quitte le staff`,
+          body: `Le contrat de ${name} est arrivé à son terme sans prolongation. Le poste est vacant — recrute un remplaçant sur le marché.`,
+        };
+  }
+  return reason === "retired"
+    ? { title: `${name} retires`, body: `${name} is leaving the staff to retire. The position is vacant.` }
+    : {
+        title: `${name} leaves the staff`,
+        body: `${name}'s contract expired without an extension. The position is vacant — hire a replacement on the market.`,
+      };
+}
+
+// Staff : réponse des propriétaires à une demande de rallonge.
+export function budgetRequestMessageText(locale: Locale, approved: boolean, budget: number): InboxMessageText {
+  const b = formatSalary(budget, locale);
+  if (locale === "fr") {
+    return approved
+      ? { title: "Rallonge accordée", body: `Les propriétaires acceptent d'augmenter le budget staff : il passe à ${b}.` }
+      : { title: "Rallonge refusée", body: `Les propriétaires refusent d'augmenter le budget staff (${b}). Une meilleure relation avec la direction aiderait.` };
+  }
+  return approved
+    ? { title: "Budget increase approved", body: `Ownership agrees to raise the staff budget to ${b}.` }
+    : { title: "Budget increase denied", body: `Ownership declines to raise the staff budget (${b}). A better relationship with the front office would help.` };
+}
+
 // Amende de la ligue pour critiques répétées de l'arbitrage.
 export function refereeFineMessageText(locale: Locale, amount: number): InboxMessageText {
   const money = locale === "fr" ? `${amount.toLocaleString("fr-FR")} $` : `$${amount.toLocaleString("en-US")}`;

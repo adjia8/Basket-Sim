@@ -50,15 +50,17 @@ export function moraleAfterGame(params: {
   won: boolean;
   minutes: number;
   renown: number;
+  shift?: number; // entraîneur principal motivant : décale la zone « normale » (±5)
 }): number {
+  const shift = params.shift ?? 0;
   let m = params.morale;
   if (params.played) {
-    if (params.won && m < 75) m += 1;
-    if (!params.won && m > 45) m -= 1;
+    if (params.won && m < 75 + shift) m += 1;
+    if (!params.won && m > 45 + shift) m -= 1;
   }
   if (params.renown >= 70 && params.minutes < 15) m -= 1;
-  if (m > 75) m -= 1;
-  else if (m < 45) m += 1;
+  if (m > 75 + shift) m -= 1;
+  else if (m < 45 + shift) m += 1;
   return clampMorale(m);
 }
 

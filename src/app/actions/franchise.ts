@@ -14,7 +14,8 @@ import { upgradeFacility as upgradeFacilityDataAccess } from "@/lib/data-access/
 export async function upgradeFacility(formData: FormData): Promise<void> {
   const { userId } = await verifySession();
   const component = String(formData.get("component") ?? "");
-  if (component !== "facilities" && component !== "trainingStaff") return;
+  // Le staff ne s'achète plus par paliers : il se recrute (page Staff).
+  if (component !== "facilities") return;
 
   const membership = await prisma.membership.findUnique({
     where: { userId },

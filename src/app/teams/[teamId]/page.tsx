@@ -1,4 +1,8 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ensureCareerStaff, getTeamStaff } from "@/lib/data-access/staff";
+import { StaffTable } from "@/components/staff/StaffTable";
+import { staffSlots } from "@/lib/careers/staff-rules";
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getContractsForTeam, getPayrollForTeam } from "@/lib/data-access/contracts";
 import { getLeagueById } from "@/lib/data-access/leagues";
@@ -210,11 +214,14 @@ export default async function TeamRosterPage({
         ]
       : []),
     { id: "medical", label: t("team.tab.medical") },
+    { id: "staff", label: t("team.tab.staff") },
     { id: "contracts", label: t("team.tab.contracts") },
     ...(isOpponentInMyLeague ? [{ id: "trade", label: t("team.tab.trade") }] : []),
   ];
   const activeTab = tabs.some((tab) => tab.id === requestedTab) ? requestedTab! : tabs[0].id;
   const medical = activeTab === "medical" ? await getMedicalReport(membership.careerId, team.id, team.leagueId) : null;
+  if (activeTab === "staff") await ensureCareerStaff(membership.careerId, team.leagueId, membership.season);
+  const teamStaff = activeTab === "staff" ? await getTeamStaff(membership.careerId, team.id) : null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
@@ -268,6 +275,19 @@ export default async function TeamRosterPage({
             intensity={teamState.trainingIntensity}
           />
           <IndividualTrainingPanel teamId={team.id} roster={roster} t={t} />
+        </div>
+      )}
+
+      {activeTab === "staff" && teamStaff && (
+        <div className="mt-6 space-y-4">
+          {isMyTeam ? (
+            <Link href="/staff" className="inline-block text-sm font-medium text-accent-text hover:underline">
+              {t("staff.title")} →
+            </Link>
+          ) : (
+            <p className="text-xs text-muted">{t("staff.readOnly")}</p>
+          )}
+          <StaffTable staff={teamStaff} slots={staffSlots(team.leagueId)} t={t} locale={locale} manage={false} />
         </div>
       )}
 

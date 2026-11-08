@@ -16,6 +16,17 @@ import { advanceRosterDevelopment, advanceRosterTraining } from "@/lib/data-acce
 import { AI_MAX_RESTED_PER_GAME, WEAR_AI_AUTO_REST } from "@/lib/careers/wear-rules";
 import { PlayerStatePatches } from "@/lib/data-access/player-state-patches";
 import { advanceRosterMorale } from "@/lib/data-access/morale";
+import { ensureCareerStaff, getStaffProfiles } from "@/lib/data-access/staff";
+import { NEUTRAL_STAFF_PROFILE, staffEffects } from "@/lib/careers/staff-rules";
+
+// Le staff d'une carrière n'est généré qu'une fois (voir ensureCareerStaff) :
+// on évite de le revérifier en base à chaque match.
+const careersWithStaff = new Set<string>();
+async function ensureStaffOnce(careerId: string, leagueId: string, season: string): Promise<void> {
+  if (careersWithStaff.has(careerId)) return;
+  await ensureCareerStaff(careerId, leagueId, season.replace(/-(playoffs|preseason)$/, ""));
+  careersWithStaff.add(careerId);
+}
 import { getGmBonusForTeam } from "@/lib/data-access/gm";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { maybeCreatePressConference } from "@/lib/data-access/press";
@@ -259,14 +270,20 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   const awayContractByPlayerId = new Map(awayContracts.map((c) => [c.playerId, c]));
 
   const gameDate = new Date(game.gameDate);
-  const [homeRestDays, awayRestDays, homeTeamState, awayTeamState, homeGm, awayGm] = await Promise.all([
+  await ensureStaffOnce(careerId, game.leagueId, game.season);
+  const [homeRestDays, awayRestDays, homeTeamState, awayTeamState, homeGm, awayGm, staffProfiles] = await Promise.all([
     getRestDays(careerId, game.homeTeamId, game.season, gameDate),
     getRestDays(careerId, game.awayTeamId, game.season, gameDate),
     getOrCreateTeamState(careerId, game.homeTeamId, game.leagueId),
     getOrCreateTeamState(careerId, game.awayTeamId, game.leagueId),
     getGmBonusForTeam(careerId, game.homeTeamId),
     getGmBonusForTeam(careerId, game.awayTeamId),
+    getStaffProfiles(careerId, [game.homeTeamId, game.awayTeamId], game.leagueId),
   ]);
+  // Staff (voir staff-rules.ts) : force en match, cohésion, moral,
+  // progression, usure, fatigue, blessures.
+  const homeStaff = staffEffects(staffProfiles.get(game.homeTeamId) ?? NEUTRAL_STAFF_PROFILE);
+  const awayStaff = staffEffects(staffProfiles.get(game.awayTeamId) ?? NEUTRAL_STAFF_PROFILE);
 
   // Les joueurs actuellement blessés ne jouent pas : exclus du roster transmis
   // au moteur (ni minutes, ni stats de box score). Exception : une blessure
@@ -298,10 +315,12 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   const homeEligibleRoster = homeRoster.filter(makeCanPlay(homeContractByPlayerId));
   const awayEligibleRoster = awayRoster.filter(makeCanPlay(awayContractByPlayerId));
   const result = simulationEngine.simulateGame(homeTeam, homeEligibleRoster, awayTeam, awayEligibleRoster, {
-    homeChemistry: homeTeamState.chemistry + homeGm.chemistry + moraleBonus(homeTeamState.morale),
-    awayChemistry: awayTeamState.chemistry + awayGm.chemistry + moraleBonus(awayTeamState.morale),
-    homeGmBonus: homeGm.strength,
-    awayGmBonus: awayGm.strength,
+    homeChemistry:
+      homeTeamState.chemistry + homeGm.chemistry + moraleBonus(homeTeamState.morale) + homeStaff.chemistryBonus,
+    awayChemistry:
+      awayTeamState.chemistry + awayGm.chemistry + moraleBonus(awayTeamState.morale) + awayStaff.chemistryBonus,
+    homeGmBonus: homeGm.strength + homeStaff.strengthBonus,
+    awayGmBonus: awayGm.strength + awayStaff.strengthBonus,
     homeRotationOrder: parseRotationOrder(homeTeamState.rotationOrderJson),
     awayRotationOrder: parseRotationOrder(awayTeamState.rotationOrderJson),
   });
@@ -348,12 +367,14 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   const awayLoad = awayFocus && awayFocus !== "rest" ? awayIntensity : null;
   const [homeNewInjuries, awayNewInjuries] = await Promise.all([
     advanceRosterInjuries(patches, homeRoster, result.boxScore, homeTeamState.facilitiesLevel, {
-      medicalLevel: homeTeamState.trainingStaffLevel,
+      medicalLevel: homeStaff.medicalLevel,
       intensity: homeLoad,
+      recoveryChance: homeStaff.injuryRecoveryChance,
     }),
     advanceRosterInjuries(patches, awayRoster, result.boxScore, awayTeamState.facilitiesLevel, {
-      medicalLevel: awayTeamState.trainingStaffLevel,
+      medicalLevel: awayStaff.medicalLevel,
       intensity: awayLoad,
+      recoveryChance: awayStaff.injuryRecoveryChance,
     }),
   ]);
 
@@ -369,8 +390,8 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   await Promise.all([
     advanceRosterTraining(patches, homeRoster, homeFocus, homeIntensity),
     advanceRosterTraining(patches, awayRoster, awayFocus, awayIntensity),
-    advanceRosterDevelopment(patches, homeRoster, result.boxScore, homeFocus, homeLoad, homeTeamState.trainingStaffLevel),
-    advanceRosterDevelopment(patches, awayRoster, result.boxScore, awayFocus, awayLoad, awayTeamState.trainingStaffLevel),
+    advanceRosterDevelopment(patches, homeRoster, result.boxScore, homeFocus, homeLoad, homeStaff.developmentLevel),
+    advanceRosterDevelopment(patches, awayRoster, result.boxScore, awayFocus, awayLoad, awayStaff.developmentLevel),
   ]);
 
   // Fatigue : récupération selon les jours de repos réels (accélérée par de
@@ -384,7 +405,8 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
       homeRestDays,
       homeTeamState.facilitiesLevel,
       trainingFatigueDelta(homeFocus, homeIntensity),
-      homeLoad
+      homeLoad,
+      homeStaff
     ),
     advanceRosterFatigue(
       patches,
@@ -393,12 +415,13 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
       awayRestDays,
       awayTeamState.facilitiesLevel,
       trainingFatigueDelta(awayFocus, awayIntensity),
-      awayLoad
+      awayLoad,
+      awayStaff
     ),
   ]);
   // Moral individuel : résultat, temps de jeu, retour vers la normale.
-  advanceRosterMorale(patches, homeRoster, result.boxScore, result.homeScore > result.awayScore, restingIds);
-  advanceRosterMorale(patches, awayRoster, result.boxScore, result.awayScore > result.homeScore, restingIds);
+  advanceRosterMorale(patches, homeRoster, result.boxScore, result.homeScore > result.awayScore, restingIds, homeStaff.moraleShift);
+  advanceRosterMorale(patches, awayRoster, result.boxScore, result.awayScore > result.homeScore, restingIds, awayStaff.moraleShift);
   // Le repos programmé ne vaut que pour ce match.
   for (const player of [...homeRoster, ...awayRoster]) {
     if (player.restNextGame) patches.set(player.id, { restNextGame: false });

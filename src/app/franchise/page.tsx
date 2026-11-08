@@ -27,7 +27,6 @@ export default async function FranchisePage() {
 
   const teamState = await getOrCreateTeamState(membership.careerId, membership.teamId, membership.leagueId);
   const facilitiesCost = upgradeCost(teamState.facilitiesLevel, membership.leagueId);
-  const trainingStaffCost = upgradeCost(teamState.trainingStaffLevel, membership.leagueId);
 
   const [championships, records, legends] = await Promise.all([
     getChampionshipsForTeam(membership.careerId, membership.teamId),
@@ -84,15 +83,16 @@ export default async function FranchisePage() {
           component="facilities"
           upgradeLabel={t("franchisePage.upgrade", { cost: formatSalary(facilitiesCost, locale) })}
         />
-        <FacilityCard
-          label={t("franchisePage.trainingStaffLabel")}
-          description={t("franchisePage.trainingStaffDescription")}
-          level={teamState.trainingStaffLevel}
-          canAfford={teamState.finances >= trainingStaffCost}
-          canUpgrade={isOffseasonWindow}
-          component="trainingStaff"
-          upgradeLabel={t("franchisePage.upgrade", { cost: formatSalary(trainingStaffCost, locale) })}
-        />
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-muted">{t("common.nav.staff")}</p>
+          <p className={`mt-1 text-2xl font-semibold ${toneClass(ratingTone(teamState.trainingStaffLevel))}`}>
+            {teamState.trainingStaffLevel} / 99
+          </p>
+          <p className="mt-2 text-xs text-muted">{t("staff.franchiseLink")}</p>
+          <Link href="/staff" className="mt-3 inline-block text-sm font-medium text-accent-text hover:underline">
+            {t("staff.title")} →
+          </Link>
+        </div>
       </div>
 
       <div className="mt-8">

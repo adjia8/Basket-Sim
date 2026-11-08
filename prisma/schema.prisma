@@ -40,6 +40,31 @@ model Career {
   pressConferences PressConference[]
   inboxMessages    InboxMessage[]
   injuryRecords    InjuryRecord[]
+  staffMembers     StaffMember[]
+}
+
+// Membre du staff (fictif) : entraîneur principal, assistants, préparateurs
+// physiques, staff médical — voir staff-rules.ts. teamId null = sur le
+// marché (libre). Les salaires sont en dollars réels et pèsent sur le
+// budget staff alloué chaque saison par les propriétaires (TeamState.staffBudget).
+model StaffMember {
+  id             String   @id @default(cuid())
+  careerId       String
+  career         Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  teamId         String? // null = libre
+  role           String // "head_coach" | "assistant_coach" | "strength_coach" | "medical"
+  specialty      String? // assistants : "offense" | "defense" | "development"
+  firstName      String
+  lastName       String
+  age            Int
+  rating         Int // 0-99, compétence principale du rôle
+  motivation     Int? // entraîneur principal : gestion humaine (moral, cohésion)
+  salary         Int // dollars par saison
+  yearsRemaining Int      @default(0)
+  hiredSeason    String?
+  createdAt      DateTime @default(now())
+
+  @@index([careerId, teamId])
 }
 
 // Boîte de réception du GM — journal d'événements jamais modifié après
@@ -533,26 +558,29 @@ model DeadCap {
 // Créée paresseusement à la première lecture (défaut 50), même principe que
 // getCurrentDraftPick.
 model TeamState {
-  id                      String    @id @default(cuid())
-  careerId                String
-  career                  Career    @relation(fields: [careerId], references: [id], onDelete: Cascade)
-  teamId                  String
-  team                    Team      @relation(fields: [teamId], references: [id])
-  chemistry               Int       @default(50) // 0-99
-  finances                Int       @default(0) // dollars, trésorerie de franchise — distincte du plafond salarial
-  facilitiesLevel         Int       @default(50) // 0-100
-  trainingStaffLevel      Int       @default(50) // 0-100
-  trainingFocus           String? // "offensive" | "defensive" | "tactical" | "physical" | "chemistry" | "rest", null = aucun
-  trainingIntensity       String    @default("medium") // "low" | "medium" | "high"
-  morale                  Int       @default(50) // 0-99, piloté par les réponses en conférence de presse
-  publicOpinion           Int       @default(50) // 0-99, opinion fans/autres franchises, pilotée par les réponses en conférence de presse
-  lastPressConferenceDate DateTime?
-  lastTradeRequestDate    DateTime? // anti-cluster : dernière fois qu'UNE joueuse de cette équipe a levé une demande de trade
-  lastKnownConferenceRank Int? // dernier rang conférence connu — détecte les mouvements de classement pour la boîte de réception (voir inbox.ts)
-  lastFreeAgentNewsDate   DateTime? // anti-spam pour les messages "agent libre notable disponible" en boîte de réception
-  rotationOrderJson       String? // JSON: string[] d'ids joueuses, ordre GM voulu (5 majeures + 6ème femme + banc) — null = tri automatique (voir rotationOf dans mockEngine.ts)
-  refereeCriticisms       Int       @default(0) // critiques publiques de l'arbitrage cette saison (amendes de la ligue)
-  attendance              Int       @default(50) // 0-99, dérive vers une cible pilotée par le bilan de l'équipe — voir attendance-rules.ts
+  id                       String    @id @default(cuid())
+  careerId                 String
+  career                   Career    @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  teamId                   String
+  team                     Team      @relation(fields: [teamId], references: [id])
+  chemistry                Int       @default(50) // 0-99
+  finances                 Int       @default(0) // dollars, trésorerie de franchise — distincte du plafond salarial
+  facilitiesLevel          Int       @default(50) // 0-100
+  trainingStaffLevel       Int       @default(50) // 0-100
+  trainingFocus            String? // "offensive" | "defensive" | "tactical" | "physical" | "chemistry" | "rest", null = aucun
+  trainingIntensity        String    @default("medium") // "low" | "medium" | "high"
+  morale                   Int       @default(50) // 0-99, piloté par les réponses en conférence de presse
+  publicOpinion            Int       @default(50) // 0-99, opinion fans/autres franchises, pilotée par les réponses en conférence de presse
+  lastPressConferenceDate  DateTime?
+  lastTradeRequestDate     DateTime? // anti-cluster : dernière fois qu'UNE joueuse de cette équipe a levé une demande de trade
+  lastKnownConferenceRank  Int? // dernier rang conférence connu — détecte les mouvements de classement pour la boîte de réception (voir inbox.ts)
+  lastFreeAgentNewsDate    DateTime? // anti-spam pour les messages "agent libre notable disponible" en boîte de réception
+  rotationOrderJson        String? // JSON: string[] d'ids joueuses, ordre GM voulu (5 majeures + 6ème femme + banc) — null = tri automatique (voir rotationOf dans mockEngine.ts)
+  refereeCriticisms        Int       @default(0) // critiques publiques de l'arbitrage cette saison (amendes de la ligue)
+  staffBudget              Int       @default(0) // budget staff de la saison (dollars), alloué par les propriétaires — voir staff-rules.ts
+  staffSeverance           Int       @default(0) // indemnités de licenciement payées cette saison (pèsent sur le budget staff)
+  staffBudgetRequestSeason String? // saison de la dernière demande de rallonge (une par saison)
+  attendance               Int       @default(50) // 0-99, dérive vers une cible pilotée par le bilan de l'équipe — voir attendance-rules.ts
 
   @@unique([careerId, teamId])
 }

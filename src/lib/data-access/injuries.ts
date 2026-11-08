@@ -45,7 +45,11 @@ export async function advanceRosterInjuries(
   facilitiesLevel = 50,
   // Staff médical (TeamState.trainingStaffLevel) et intensité
   // d'entraînement : modulent le risque du jour (voir injuryChance).
-  context: { medicalLevel: number; intensity: TrainingIntensity | null } = { medicalLevel: 50, intensity: null }
+  // recoveryChance : chance par match de guérir un match plus vite (staff médical).
+  context: { medicalLevel: number; intensity: TrainingIntensity | null; recoveryChance?: number } = {
+    medicalLevel: 50,
+    intensity: null,
+  }
 ): Promise<NewInjury[]> {
   const playedIds = new Set(boxScore.map((e) => e.playerId));
   const newInjuries: NewInjury[] = [];
@@ -87,7 +91,7 @@ export async function advanceRosterInjuries(
           // Aucun incident ce match : décompte normal, récupération de
           // conditionnement réduite (jouer diminué guérit moins vite que le
           // repos complet).
-          const remaining = player.injuryGamesRemaining - 1;
+          const remaining = player.injuryGamesRemaining - (Math.random() < (context.recoveryChance ?? 0) ? 2 : 1);
           const recovered = clampConditioning(
             player.conditioning + CONDITIONING_RECOVERY_WHILE_PLAYING_HURT
           );
@@ -108,7 +112,7 @@ export async function advanceRosterInjuries(
       } else {
         // Repos complet (n'a pas joué ce match) : décompte normal, légère
         // érosion de conditionnement tant qu'il reste hors des terrains.
-        const remaining = player.injuryGamesRemaining - 1;
+        const remaining = player.injuryGamesRemaining - (Math.random() < (context.recoveryChance ?? 0) ? 2 : 1);
         const decayed = clampConditioning(
           player.conditioning - conditioningDecayPerMissedGame(severity)
         );

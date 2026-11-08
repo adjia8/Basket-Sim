@@ -30,6 +30,7 @@ import { poachOfferMessageText } from "@/lib/careers/inbox-rules";
 import { getTranslator } from "@/lib/i18n/translate";
 import { teamFullName } from "@/lib/utils";
 import { offseasonRecovery } from "@/lib/careers/injury-rules";
+import { ensureCareerStaff, getStaffProfiles, processStaffOffseason } from "@/lib/data-access/staff";
 import { moraleAfterSummer } from "@/lib/careers/morale-rules";
 
 // Patch PlayerState de l'intersaison côté santé : énergie pleine, blessures
@@ -89,7 +90,11 @@ export async function advanceSeason(): Promise<void> {
   const teamStates = await Promise.all(
     teams.map((t) => getOrCreateTeamState(career.id, t.id, career.leagueId))
   );
-  const trainingStaffByTeamId = new Map(teamStates.map((s) => [s.teamId, s.trainingStaffLevel]));
+  // Progression annuelle des joueurs : selon le niveau « développement » du
+  // vrai staff de leur équipe (voir staff-rules.ts).
+  await ensureCareerStaff(career.id, career.leagueId, career.season);
+  const staffProfilesByTeam = await getStaffProfiles(career.id, teams.map((t) => t.id), career.leagueId);
+  const trainingStaffByTeamId = new Map(teams.map((t) => [t.id, staffProfilesByTeam.get(t.id)?.development ?? 50]));
   const activeContracts = await prisma.contract.findMany({ where: { careerId: career.id } });
   const teamIdByPlayerId = new Map(activeContracts.map((c) => [c.playerId, c.teamId]));
 
@@ -268,6 +273,13 @@ export async function advanceSeason(): Promise<void> {
     where: { id: career.id },
     data: { season: newSeason },
   });
+
+  // 3bis. Staff : vieillissement, retraites, fins de contrat, marché,
+  // budgets de la nouvelle saison, l'IA comble ses postes vacants.
+  const winPctByTeam = new Map(
+    finishedStandings.map((row) => [row.teamId, winPctForStandings(row.wins, row.losses)])
+  );
+  await processStaffOffseason(career.id, career.leagueId, newSeason, winPctByTeam, locale);
 
   // 4. Nouvelle classe de prospects (l'ancienne, non draftée, disparaît).
   // 2 tours × nb d'équipes de la ligue : toujours assez de prospects pour

@@ -6,6 +6,8 @@ import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { estimatedReturnDate } from "@/lib/data-access/injuries";
 import { injuryChance, injuryRiskLevel, type InjuryRiskLevel } from "@/lib/careers/injury-rules";
 import { WEAR_NEEDS_REST } from "@/lib/careers/wear-rules";
+import { getStaffProfiles } from "@/lib/data-access/staff";
+import { NEUTRAL_STAFF_PROFILE, staffEffects } from "@/lib/careers/staff-rules";
 import type { TrainingFocus, TrainingIntensity } from "@/lib/careers/training-rules";
 
 export interface MedicalRow {
@@ -36,12 +38,14 @@ export async function getMedicalReport(
   teamId: string,
   leagueId: string
 ): Promise<{ rows: MedicalRow[]; history: InjuryHistoryRow[] }> {
-  const [roster, state, lastPlayed, records] = await Promise.all([
+  const [roster, state, lastPlayed, records, profiles] = await Promise.all([
     getRosterForTeam(careerId, teamId),
     getOrCreateTeamState(careerId, teamId, leagueId),
     prisma.game.findFirst({ where: { careerId, status: "final" }, orderBy: { gameDate: "desc" }, select: { gameDate: true } }),
     prisma.injuryRecord.findMany({ where: { careerId, teamId }, orderBy: { gameDate: "desc" }, take: 30 }),
+    getStaffProfiles(careerId, [teamId], leagueId),
   ]);
+  const staff = staffEffects(profiles.get(teamId) ?? NEUTRAL_STAFF_PROFILE);
   const focus = state.trainingFocus as TrainingFocus | null;
   const intensity = focus && focus !== "rest" ? (state.trainingIntensity as TrainingIntensity) : null;
   const today = lastPlayed?.gameDate ?? new Date(0);
@@ -54,7 +58,7 @@ export async function getMedicalReport(
         wear: player.wear ?? 0,
         age: player.age,
         facilitiesLevel: state.facilitiesLevel,
-        medicalLevel: state.trainingStaffLevel,
+        medicalLevel: staff.medicalLevel,
         intensity,
         played: true,
       });

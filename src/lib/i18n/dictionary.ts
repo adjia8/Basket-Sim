@@ -14,6 +14,7 @@ import * as freeAgents from "./dict/freeAgents";
 import * as draft from "./dict/draft";
 import * as seasonRecap from "./dict/seasonRecap";
 import * as press from "./dict/press";
+import * as staff from "./dict/staff";
 import * as leaguePages from "./dict/leaguePages";
 import * as promise from "./dict/promise";
 import * as rotation from "./dict/rotation";
@@ -42,6 +43,7 @@ const sources = [
   draft,
   seasonRecap,
   press,
+  staff,
   leaguePages,
   promise,
   rotation,
@@ -66,6 +68,7 @@ export const dictionaries = {
     ...draft.fr,
     ...seasonRecap.fr,
     ...press.fr,
+    ...staff.fr,
     ...leaguePages.fr,
     ...promise.fr,
     ...rotation.fr,
@@ -88,6 +91,7 @@ export const dictionaries = {
     ...draft.en,
     ...seasonRecap.en,
     ...press.en,
+    ...staff.en,
     ...leaguePages.en,
     ...promise.en,
     ...rotation.en,

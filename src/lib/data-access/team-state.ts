@@ -123,7 +123,8 @@ export async function applySeasonFinancials(
     data: {
       finances: state.finances + revenue - tax,
       facilitiesLevel: clampFacilityLevel(state.facilitiesLevel - ANNUAL_DEGRADATION),
-      trainingStaffLevel: clampFacilityLevel(state.trainingStaffLevel - ANNUAL_DEGRADATION),
+      // trainingStaffLevel n'est plus acheté ni dégradé : il reflète le vrai
+      // staff (voir data-access/staff.ts).
     },
   });
 }
