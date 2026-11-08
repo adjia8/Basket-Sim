@@ -74,7 +74,9 @@ export async function generateProspectClass(
 
   const remaining = Math.max(0, classSize - realRows.length);
   const generatedRows = Array.from({ length: remaining }, (_, i) => {
-    const overallRating = randomInt(55, 82); // rookies, pas encore des stars
+    // Échelle NBA 2K27 : un rookie drafté y vaut ~68-79 ; les prospects fictifs
+    // complètent la classe, sans dépasser les meilleurs vrais prospects.
+    const overallRating = randomInt(62, 76);
     return {
       careerId,
       leagueId,
