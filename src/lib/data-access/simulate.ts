@@ -18,6 +18,13 @@ import { PlayerStatePatches } from "@/lib/data-access/player-state-patches";
 import { advanceRosterMorale } from "@/lib/data-access/morale";
 import { ensureCareerStaff, getStaffProfiles } from "@/lib/data-access/staff";
 import { NEUTRAL_STAFF_PROFILE, staffEffects } from "@/lib/careers/staff-rules";
+import { bestTactics, parseTactics, tacticalLoad } from "@/lib/careers/tactics-rules";
+
+// Les 10 meilleurs joueurs disponibles, du plus fort au moins fort : la
+// rotation que l'IA évalue pour choisir sa tactique.
+function topRotation(roster: Player[]): Player[] {
+  return [...roster].sort((a, b) => b.overallRating - a.overallRating).slice(0, 10);
+}
 
 // Le staff d'une carrière n'est généré qu'une fois (voir ensureCareerStaff) :
 // on évite de le revérifier en base à chaque match.
@@ -282,8 +289,10 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
   ]);
   // Staff (voir staff-rules.ts) : force en match, cohésion, moral,
   // progression, usure, fatigue, blessures.
-  const homeStaff = staffEffects(staffProfiles.get(game.homeTeamId) ?? NEUTRAL_STAFF_PROFILE);
-  const awayStaff = staffEffects(staffProfiles.get(game.awayTeamId) ?? NEUTRAL_STAFF_PROFILE);
+  const homeProfile = staffProfiles.get(game.homeTeamId) ?? NEUTRAL_STAFF_PROFILE;
+  const awayProfile = staffProfiles.get(game.awayTeamId) ?? NEUTRAL_STAFF_PROFILE;
+  const homeStaff = staffEffects(homeProfile);
+  const awayStaff = staffEffects(awayProfile);
 
   // Les joueurs actuellement blessés ne jouent pas : exclus du roster transmis
   // au moteur (ni minutes, ni stats de box score). Exception : une blessure
@@ -314,6 +323,14 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
     };
   const homeEligibleRoster = homeRoster.filter(makeCanPlay(homeContractByPlayerId));
   const awayEligibleRoster = awayRoster.filter(makeCanPlay(awayContractByPlayerId));
+  // Tactiques : celles du GM humain ; l'IA prend la mieux adaptée à son
+  // effectif du jour (voir bestTactics).
+  const homeTactics = homeManager
+    ? parseTactics(homeTeamState.tacticsJson)
+    : bestTactics(topRotation(homeEligibleRoster));
+  const awayTactics = awayManager
+    ? parseTactics(awayTeamState.tacticsJson)
+    : bestTactics(topRotation(awayEligibleRoster));
   const result = simulationEngine.simulateGame(homeTeam, homeEligibleRoster, awayTeam, awayEligibleRoster, {
     homeChemistry:
       homeTeamState.chemistry + homeGm.chemistry + moraleBonus(homeTeamState.morale) + homeStaff.chemistryBonus,
@@ -323,6 +340,10 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
     awayGmBonus: awayGm.strength + awayStaff.strengthBonus,
     homeRotationOrder: parseRotationOrder(homeTeamState.rotationOrderJson),
     awayRotationOrder: parseRotationOrder(awayTeamState.rotationOrderJson),
+    homeTactics,
+    awayTactics,
+    homeCoachTactics: homeProfile.tactics,
+    awayCoachTactics: awayProfile.tactics,
   });
 
   // Activation comptée pour CHAQUE joueuse en contrat de développement
@@ -406,7 +427,7 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
       homeTeamState.facilitiesLevel,
       trainingFatigueDelta(homeFocus, homeIntensity),
       homeLoad,
-      homeStaff
+      { ...homeStaff, gainFactor: tacticalLoad(homeTactics) }
     ),
     advanceRosterFatigue(
       patches,
@@ -416,7 +437,7 @@ export async function simulateAndResolveGame(careerId: string, game: Game, local
       awayTeamState.facilitiesLevel,
       trainingFatigueDelta(awayFocus, awayIntensity),
       awayLoad,
-      awayStaff
+      { ...awayStaff, gainFactor: tacticalLoad(awayTactics) }
     ),
   ]);
   // Moral individuel : résultat, temps de jeu, retour vers la normale.

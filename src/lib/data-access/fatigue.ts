@@ -48,7 +48,11 @@ export async function advanceRosterFatigue(
   intensity: TrainingIntensity | null = null,
   // Préparateurs physiques (voir staffEffects) : usure accumulée et
   // récupération d'énergie.
-  fitness: { wearFactor: number; fatigueRecoveryFactor: number } = { wearFactor: 1, fatigueRecoveryFactor: 1 }
+  // gainFactor : charge tactique (rythme rapide, pressing — voir tacticalLoad).
+  fitness: { wearFactor: number; fatigueRecoveryFactor: number; gainFactor?: number } = {
+    wearFactor: 1,
+    fatigueRecoveryFactor: 1,
+  }
 ): Promise<void> {
   const playedIds = new Set(boxScore.map((e) => e.playerId));
   const minutesById = new Map(boxScore.map((e) => [e.playerId, e.minutesPlayed]));
@@ -59,13 +63,13 @@ export async function advanceRosterFatigue(
     const newWear = clampWear(
       wear -
         wearRecovery(restDays, minutes === 0, facilitiesLevel, wear) +
-        wearGainForGame(minutes, restDays, player.ratings.stamina, intensity) * fitness.wearFactor
+        wearGainForGame(minutes, restDays, player.ratings.stamina, intensity) * fitness.wearFactor * (fitness.gainFactor ?? 1)
     );
     const recovered =
       fatigueRecoveryForRestDays(restDays, player.ratings.stamina, facilitiesLevel, wear) * fitness.fatigueRecoveryFactor;
     let newFatigue = Math.max(0, player.fatigue - recovered);
     if (playedIds.has(player.id)) {
-      newFatigue += fatigueGainForGame(player.ratings.stamina);
+      newFatigue += fatigueGainForGame(player.ratings.stamina) * (fitness.gainFactor ?? 1);
     }
     // L'entraînement a lieu entre les matchs, pour tout l'effectif (pas
     // seulement ceux qui ont joué ce match précis).

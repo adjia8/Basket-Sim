@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { getTacticsReport } from "@/lib/data-access/tactics";
+import { TacticsPanel } from "@/components/team/TacticsPanel";
 import { notFound } from "next/navigation";
 import { ensureCareerStaff, getTeamStaff } from "@/lib/data-access/staff";
 import { StaffTable } from "@/components/staff/StaffTable";
@@ -210,6 +212,7 @@ export default async function TeamRosterPage({
     ...(isMyTeam
       ? [
           { id: "rotation", label: t("team.tab.rotation") },
+          { id: "tactics", label: t("tactics.tab") },
           { id: "training", label: t("team.tab.training") },
         ]
       : []),
@@ -222,6 +225,9 @@ export default async function TeamRosterPage({
   const medical = activeTab === "medical" ? await getMedicalReport(membership.careerId, team.id, team.leagueId) : null;
   if (activeTab === "staff") await ensureCareerStaff(membership.careerId, team.leagueId, membership.season);
   const teamStaff = activeTab === "staff" ? await getTeamStaff(membership.careerId, team.id) : null;
+  if (activeTab === "tactics") await ensureCareerStaff(membership.careerId, team.leagueId, membership.season);
+  const tacticsReport = activeTab === "tactics" ? await getTacticsReport(membership.careerId, team.id, team.leagueId) : null;
+  const tacticsOpponent = tacticsReport?.opponent ? await getTeamById(tacticsReport.opponent.teamId) : null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
@@ -276,6 +282,14 @@ export default async function TeamRosterPage({
           />
           <IndividualTrainingPanel teamId={team.id} roster={roster} t={t} />
         </div>
+      )}
+
+      {activeTab === "tactics" && tacticsReport && (
+        <TacticsPanel
+          report={tacticsReport}
+          opponentName={tacticsOpponent ? `${tacticsOpponent.city} ${tacticsOpponent.name}` : null}
+          t={t}
+        />
       )}
 
       {activeTab === "staff" && teamStaff && (

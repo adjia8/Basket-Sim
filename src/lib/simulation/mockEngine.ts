@@ -11,6 +11,15 @@ import {
   rollsTechnicalFoul,
 } from "./foul-rules";
 import { TRAINING_FOCUS_ATTRIBUTES } from "@/lib/careers/training-rules";
+import {
+  DEFAULT_TACTICS,
+  DEPTH_SETTINGS,
+  PACE_SCORING,
+  STAR_USAGE_BOOST,
+  tacticalEdge,
+  threePointShift,
+  type Tactics,
+} from "@/lib/careers/tactics-rules";
 
 const HOME_ADVANTAGE = 2.5;
 // Exportée : l'UI de gestion de rotation (RotationOrderFormClient.tsx) en a
@@ -106,9 +115,9 @@ function playerImpact(player: Player): number {
 // filtré des disqualifiées CE match, une titulaire sortie sur fautes est
 // automatiquement remplacée au quart-temps suivant par la joueuse suivante
 // de rotationOrder — aucune logique supplémentaire nécessaire pour ça.
-function rotationOf(activeRoster: Player[], rotationOrder?: string[]): Player[] {
+function rotationOf(activeRoster: Player[], rotationOrder?: string[], size = ROTATION_SIZE): Player[] {
   if (!rotationOrder || rotationOrder.length === 0) {
-    return [...activeRoster].sort((a, b) => playerImpact(b) - playerImpact(a)).slice(0, ROTATION_SIZE);
+    return [...activeRoster].sort((a, b) => playerImpact(b) - playerImpact(a)).slice(0, size);
   }
   const orderIndex = new Map(rotationOrder.map((id, i) => [id, i]));
   return [...activeRoster]
@@ -118,7 +127,7 @@ function rotationOf(activeRoster: Player[], rotationOrder?: string[]): Player[] 
       if (ai !== bi) return ai - bi;
       return playerImpact(b) - playerImpact(a);
     })
-    .slice(0, ROTATION_SIZE);
+    .slice(0, size);
 }
 
 // gmBonus : bonus de force permanent apporté par le GM humain de l'équipe
@@ -131,15 +140,19 @@ function teamStrength(
   activeRoster: Player[],
   chemistry: number,
   gmBonus = 0,
-  rotationOrder?: string[]
+  rotationOrder?: string[],
+  tactics: Tactics = DEFAULT_TACTICS
 ): number {
-  const rotation = rotationOf(activeRoster, rotationOrder);
+  // Profondeur de rotation (voir tactics-rules.ts) : nombre de joueurs qui
+  // jouent et poids des titulaires.
+  const depth = DEPTH_SETTINGS[tactics.depth];
+  const rotation = rotationOf(activeRoster, rotationOrder, depth.rotationSize);
   if (rotation.length === 0) return 0;
   const starters = rotation.slice(0, 5);
   const bench = rotation.slice(5);
   const startersAvg = average(starters.map(playerImpact));
   const benchAvg = bench.length ? average(bench.map(playerImpact)) : startersAvg;
-  const rawStrength = startersAvg * 0.75 + benchAvg * 0.25;
+  const rawStrength = startersAvg * depth.startersShare + benchAvg * (1 - depth.startersShare);
   // Chimie d'équipe : modificateur ±10% autour de la force brute.
   const chemistryMultiplier = 0.9 + (Math.max(0, Math.min(99, chemistry)) / 99) * 0.2;
   return rawStrength * chemistryMultiplier + gmBonus;
@@ -213,7 +226,10 @@ function shootingPct(rating: number, base: number, spread: number): number {
 // elle ne fait qu'expliquer après coup des points déjà décidés plus haut.
 function deriveShotStats(
   points: number,
-  ratings: PlayerRatings
+  ratings: PlayerRatings,
+  // Style offensif de l'équipe (voir threePointShift) : un jeu extérieur
+  // fait prendre plus de tirs à 3 points, un jeu intérieur moins.
+  threeShift = 0
 ): Pick<
   BoxScoreEntry,
   | "fieldGoalsMade"
@@ -244,7 +260,7 @@ function deriveShotStats(
   // extérieur (scoringOutside > scoringInside), plus cette part grandit.
   const threeTendency = Math.max(
     0.05,
-    Math.min(0.6, 0.18 + ((ratings.scoringOutside - ratings.scoringInside) / 99) * 0.45)
+    Math.min(0.7, 0.18 + threeShift + ((ratings.scoringOutside - ratings.scoringInside) / 99) * 0.45)
   );
   const threeMade = Math.min(Math.floor(points / 3), Math.round((points * threeTendency) / 3));
   const remaining = points - threeMade * 3;
@@ -284,12 +300,15 @@ function applyQuarterBoxScore(
   totals: Map<string, BoxScoreEntry>,
   teamId: string,
   rotation: Player[],
-  quarterScore: number
+  quarterScore: number,
+  // « Jeu pour la star » : le meilleur joueur prend bien plus de tirs.
+  starFocus = false
 ): void {
   if (rotation.length === 0) return;
 
+  const starId = starFocus ? [...rotation].sort((a, b) => b.overallRating - a.overallRating)[0]?.id : undefined;
   const weights = rotation.map((p) =>
-    Math.max(p.ratings.scoringInside + p.ratings.scoringOutside + noise(3), 1)
+    Math.max(p.ratings.scoringInside + p.ratings.scoringOutside + noise(3), 1) * (p.id === starId ? STAR_USAGE_BOOST : 1)
   );
   const totalWeight = weights.reduce((sum, w) => sum + w, 0);
 
@@ -334,11 +353,15 @@ function applyQuarterBoxScore(
 // vraie fréquence de tirs à 3 points sur un match complet). Appelée après la
 // boucle de quart-temps, avant l'ajustement clutch (qui s'additionne par-
 // dessus, voir creditClutchPoint).
-function applyShotStats(totals: Map<string, BoxScoreEntry>, playersById: Map<string, Player>): void {
+function applyShotStats(
+  totals: Map<string, BoxScoreEntry>,
+  playersById: Map<string, Player>,
+  threeShiftByTeam: Map<string, number> = new Map()
+): void {
   for (const entry of totals.values()) {
     const player = playersById.get(entry.playerId);
     if (!player) continue;
-    const shots = deriveShotStats(entry.points, player.ratings);
+    const shots = deriveShotStats(entry.points, player.ratings, threeShiftByTeam.get(entry.teamId) ?? 0);
     entry.fieldGoalsMade = shots.fieldGoalsMade;
     entry.fieldGoalsAttempted = shots.fieldGoalsAttempted;
     entry.threePointersMade = shots.threePointersMade;
@@ -358,14 +381,15 @@ function applyQuarterMinutes(
   totals: Map<string, BoxScoreEntry>,
   teamId: string,
   rotation: Player[],
-  periodMinutes: number
+  periodMinutes: number,
+  startersShare = 0.75
 ): void {
   if (rotation.length === 0) return;
   const totalPlayerMinutes = periodMinutes * 5;
 
   const starters = rotation.slice(0, 5);
   const bench = rotation.slice(5);
-  const startersBudget = bench.length > 0 ? totalPlayerMinutes * 0.75 : totalPlayerMinutes;
+  const startersBudget = bench.length > 0 ? totalPlayerMinutes * startersShare : totalPlayerMinutes;
   const benchBudget = totalPlayerMinutes - startersBudget;
 
   function distribute(group: Player[], budget: number): void {
@@ -439,8 +463,13 @@ interface PeriodTeamsContext {
   awayGmBonus: number;
   homeRotationOrder?: string[];
   awayRotationOrder?: string[];
+  homeTactics: Tactics;
+  awayTactics: Tactics;
+  homeCoachTactics: number;
+  awayCoachTactics: number;
   disqualified: Set<string>;
   totals: Map<string, BoxScoreEntry>;
+  fullGameBase: number; // points de base d'un match complet (pour répartir l'avantage tactique)
 }
 
 // Simule une période de jeu (un quart-temps, ou une prolongation avec des
@@ -458,28 +487,49 @@ function simulatePeriod(
 ): { homeScore: number; awayScore: number } {
   const homeActive = ctx.homeRosterFull.filter((p) => !ctx.disqualified.has(p.id));
   const awayActive = ctx.awayRosterFull.filter((p) => !ctx.disqualified.has(p.id));
-  const homeRotation = rotationOf(homeActive, ctx.homeRotationOrder);
-  const awayRotation = rotationOf(awayActive, ctx.awayRotationOrder);
+  const homeDepth = DEPTH_SETTINGS[ctx.homeTactics.depth];
+  const awayDepth = DEPTH_SETTINGS[ctx.awayTactics.depth];
+  const homeRotation = rotationOf(homeActive, ctx.homeRotationOrder, homeDepth.rotationSize);
+  const awayRotation = rotationOf(awayActive, ctx.awayRotationOrder, awayDepth.rotationSize);
 
   const homeStrength =
-    teamStrength(homeActive, ctx.homeChemistry, ctx.homeGmBonus, ctx.homeRotationOrder) + periodHomeAdvantage;
-  const awayStrength = teamStrength(awayActive, ctx.awayChemistry, ctx.awayGmBonus, ctx.awayRotationOrder);
+    teamStrength(homeActive, ctx.homeChemistry, ctx.homeGmBonus, ctx.homeRotationOrder, ctx.homeTactics) +
+    periodHomeAdvantage;
+  const awayStrength = teamStrength(awayActive, ctx.awayChemistry, ctx.awayGmBonus, ctx.awayRotationOrder, ctx.awayTactics);
+
+  // Tactiques (voir tactics-rules.ts) : rythme commun aux deux équipes, et
+  // avantage tactique de chacune (adéquation, duel attaque/défense,
+  // exécution du coach), réparti sur les périodes au prorata de leur durée.
+  const periodShare = periodBase / ctx.fullGameBase;
+  const pace = (PACE_SCORING[ctx.homeTactics.pace] + PACE_SCORING[ctx.awayTactics.pace]) / 2;
+  const homeEdge = tacticalEdge(
+    { rotation: homeRotation, tactics: ctx.homeTactics, coachTactics: ctx.homeCoachTactics },
+    { rotation: awayRotation, tactics: ctx.awayTactics }
+  ).total;
+  const awayEdge = tacticalEdge(
+    { rotation: awayRotation, tactics: ctx.awayTactics, coachTactics: ctx.awayCoachTactics },
+    { rotation: homeRotation, tactics: ctx.homeTactics }
+  ).total;
 
   const homeScore = Math.max(
     minScore,
-    Math.round(periodBase + (homeStrength - 75) * STRENGTH_COEFFICIENT + noise(noiseSpread))
+    Math.round(
+      periodBase * pace + (homeStrength - 75) * STRENGTH_COEFFICIENT + homeEdge * periodShare + noise(noiseSpread)
+    )
   );
   const awayScore = Math.max(
     minScore,
-    Math.round(periodBase + (awayStrength - 75) * STRENGTH_COEFFICIENT + noise(noiseSpread))
+    Math.round(
+      periodBase * pace + (awayStrength - 75) * STRENGTH_COEFFICIENT + awayEdge * periodShare + noise(noiseSpread)
+    )
   );
 
-  applyQuarterBoxScore(ctx.totals, ctx.home.id, homeRotation, homeScore);
-  applyQuarterBoxScore(ctx.totals, ctx.away.id, awayRotation, awayScore);
+  applyQuarterBoxScore(ctx.totals, ctx.home.id, homeRotation, homeScore, ctx.homeTactics.offense === "star");
+  applyQuarterBoxScore(ctx.totals, ctx.away.id, awayRotation, awayScore, ctx.awayTactics.offense === "star");
   applyQuarterFouls(ctx.totals, ctx.home.id, homeRotation, ctx.disqualified);
   applyQuarterFouls(ctx.totals, ctx.away.id, awayRotation, ctx.disqualified);
-  applyQuarterMinutes(ctx.totals, ctx.home.id, homeRotation, periodMinutes);
-  applyQuarterMinutes(ctx.totals, ctx.away.id, awayRotation, periodMinutes);
+  applyQuarterMinutes(ctx.totals, ctx.home.id, homeRotation, periodMinutes, homeDepth.startersShare);
+  applyQuarterMinutes(ctx.totals, ctx.away.id, awayRotation, periodMinutes, awayDepth.startersShare);
 
   return { homeScore, awayScore };
 }
@@ -498,6 +548,8 @@ export class MockSimulationEngine implements SimulationEngine {
     const awayGmBonus = options?.awayGmBonus ?? 0;
     const homeRotationOrder = options?.homeRotationOrder;
     const awayRotationOrder = options?.awayRotationOrder;
+    const homeTactics = options?.homeTactics ?? DEFAULT_TACTICS;
+    const awayTactics = options?.awayTactics ?? DEFAULT_TACTICS;
     const quarterMinutes = QUARTER_MINUTES[home.leagueId] ?? QUARTER_MINUTES.nba;
     const quarterBase = basePointsForLeague(home.leagueId) / QUARTERS;
     const quarterHomeAdvantage = HOME_ADVANTAGE / QUARTERS;
@@ -518,8 +570,13 @@ export class MockSimulationEngine implements SimulationEngine {
       awayGmBonus,
       homeRotationOrder,
       awayRotationOrder,
+      homeTactics,
+      awayTactics,
+      homeCoachTactics: options?.homeCoachTactics ?? 50,
+      awayCoachTactics: options?.awayCoachTactics ?? 50,
       disqualified,
       totals,
+      fullGameBase: basePointsForLeague(home.leagueId),
     };
     let homeScore = 0;
     let awayScore = 0;
@@ -559,7 +616,14 @@ export class MockSimulationEngine implements SimulationEngine {
       overtimePeriods++;
     }
 
-    applyShotStats(totals, playersById);
+    applyShotStats(
+      totals,
+      playersById,
+      new Map([
+        [home.id, threePointShift(homeTactics.offense)],
+        [away.id, threePointShift(awayTactics.offense)],
+      ])
+    );
 
     // Effet clutch : dans un match serré, léger avantage déterministe à
     // l'équipe dont la rotation (encore en jeu) a la meilleure moyenne de clutch.
@@ -586,8 +650,8 @@ export class MockSimulationEngine implements SimulationEngine {
     if (homeScore === awayScore) {
       const homeActive = homeRosterFull.filter((p) => !disqualified.has(p.id));
       const awayActive = awayRosterFull.filter((p) => !disqualified.has(p.id));
-      const homeFinalStrength = teamStrength(homeActive, homeChemistry, homeGmBonus, homeRotationOrder);
-      const awayFinalStrength = teamStrength(awayActive, awayChemistry, awayGmBonus, awayRotationOrder);
+      const homeFinalStrength = teamStrength(homeActive, homeChemistry, homeGmBonus, homeRotationOrder, homeTactics);
+      const awayFinalStrength = teamStrength(awayActive, awayChemistry, awayGmBonus, awayRotationOrder, awayTactics);
       if (homeFinalStrength >= awayFinalStrength) {
         homeScore += 1;
         creditClutchPoint(totals, home.id, homeActive, homeRotationOrder);

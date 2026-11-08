@@ -1,4 +1,5 @@
 import type { BoxScoreEntry, Player, Team } from "@/lib/types";
+import type { Tactics } from "@/lib/careers/tactics-rules";
 
 export interface SimulationResult {
   homeScore: number;
@@ -21,6 +22,13 @@ export interface SimulationOptions {
   // (comportement inchangé, notamment pour une équipe gérée par l'IA).
   homeRotationOrder?: string[];
   awayRotationOrder?: string[];
+  // Tactiques (voir tactics-rules.ts) et compétence tactique de
+  // l'entraîneur principal (0-99, voir staff-rules.ts) — absentes = tactique
+  // équilibrée par défaut, exécution d'un coach moyen.
+  homeTactics?: Tactics;
+  awayTactics?: Tactics;
+  homeCoachTactics?: number;
+  awayCoachTactics?: number;
 }
 
 export interface SimulationEngine {

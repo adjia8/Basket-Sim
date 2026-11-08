@@ -575,6 +575,7 @@ model TeamState {
   lastTradeRequestDate     DateTime? // anti-cluster : dernière fois qu'UNE joueuse de cette équipe a levé une demande de trade
   lastKnownConferenceRank  Int? // dernier rang conférence connu — détecte les mouvements de classement pour la boîte de réception (voir inbox.ts)
   lastFreeAgentNewsDate    DateTime? // anti-spam pour les messages "agent libre notable disponible" en boîte de réception
+  tacticsJson              String? // JSON Tactics (rythme, attaque, défense, profondeur) — voir tactics-rules.ts ; null = équilibré / IA automatique
   rotationOrderJson        String? // JSON: string[] d'ids joueuses, ordre GM voulu (5 majeures + 6ème femme + banc) — null = tri automatique (voir rotationOf dans mockEngine.ts)
   refereeCriticisms        Int       @default(0) // critiques publiques de l'arbitrage cette saison (amendes de la ligue)
   staffBudget              Int       @default(0) // budget staff de la saison (dollars), alloué par les propriétaires — voir staff-rules.ts

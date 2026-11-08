@@ -1,4 +1,6 @@
 import { notFound, redirect } from "next/navigation";
+import { getTacticsReport } from "@/lib/data-access/tactics";
+import { PreMatchTactics } from "@/components/game/PreMatchTactics";
 import Link from "next/link";
 import { BoxScoreTable } from "@/components/game/BoxScoreTable";
 import { GameRosterPreview } from "@/components/game/GameRosterPreview";
@@ -124,6 +126,17 @@ export default async function GamePage({
   // terminer la saison), même s'il ne gère ni l'une ni l'autre équipe.
   const canAct = mySide !== null || (!homeManager && !awayManager);
 
+  // Encart tactique d'avant-match (mon équipe seulement).
+  const tacticsReport =
+    game.status === "scheduled" && mySide
+      ? await getTacticsReport(
+          membership.careerId,
+          membership.teamId,
+          game.leagueId,
+          mySide === "home" ? game.awayTeamId : game.homeTeamId
+        )
+      : null;
+
   const isFinal = game.status === "final";
   const phase = game.season.endsWith("-preseason") ? "preseason" : game.season.endsWith("-playoffs") ? "playoffs" : "regular";
   const snapshot = (team: Team, roster: typeof awayRoster, form: ("W" | "L")[], rank: number): TeamSnapshot => ({
@@ -212,6 +225,9 @@ export default async function GamePage({
             />
             {dayResults}
           </div>
+          {tacticsReport && tacticsReport.opponent && (
+            <PreMatchTactics report={tacticsReport} myTeamId={membership.teamId} t={t} />
+          )}
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <GameRosterPreview
               team={awayTeam}
