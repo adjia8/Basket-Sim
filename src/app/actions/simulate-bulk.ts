@@ -7,6 +7,7 @@ import { toDomainGame } from "@/lib/data-access/mappers";
 import { simulateAndResolveGame } from "@/lib/data-access/simulate";
 import { calendarDay } from "@/lib/careers/schedule-rules";
 import { maybeLeagueMilestones } from "@/lib/data-access/awards";
+import { maybeAiTradeOffers } from "@/lib/data-access/ai-trades";
 import { getTranslator } from "@/lib/i18n/translate";
 import { endOfGameDay } from "@/lib/data-access/game-clock";
 import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
@@ -81,7 +82,10 @@ async function runLeagueMilestones(
   locale: Awaited<ReturnType<typeof getTranslator>>["locale"]
 ): Promise<void> {
   const career = await prisma.career.findUnique({ where: { id: careerId }, select: { leagueId: true, season: true } });
-  if (career) await maybeLeagueMilestones(careerId, career.leagueId, career.season, locale);
+  if (!career) return;
+  await maybeLeagueMilestones(careerId, career.leagueId, career.season, locale);
+  // Offres d'échange à l'initiative de l'IA (voir ai-trades.ts).
+  await maybeAiTradeOffers(careerId, career.leagueId, career.season, locale);
 }
 
 // Simule, dans l'ordre chronologique, les matchs IA-vs-IA non joués datés

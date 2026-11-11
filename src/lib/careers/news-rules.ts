@@ -133,3 +133,16 @@ export function awardInboxText(locale: Locale, name: string, award: string, wome
         body: `Good news: ${name} receives the "${award}" honor. ${women ? "Her" : "His"} renown and morale are up.`,
       };
 }
+
+export function tradeNews(locale: Locale, teamA: string, teamB: string, aGets: string[], bGets: string[]): NewsText {
+  const list = (l: string[]) => (l.length ? l.join(", ") : "—");
+  return locale === "fr"
+    ? {
+        title: `Échange entre ${teamA} et ${teamB}`,
+        body: `${teamA} reçoit ${list(aGets)}. ${teamB} reçoit ${list(bGets)}.`,
+      }
+    : {
+        title: `Trade between the ${teamA} and the ${teamB}`,
+        body: `The ${teamA} receive ${list(aGets)}. The ${teamB} receive ${list(bGets)}.`,
+      };
+}

@@ -145,6 +145,25 @@ export function budgetRequestMessageText(locale: Locale, approved: boolean, budg
     : { title: "Budget increase denied", body: `Ownership declines to raise the staff budget (${b}). A better relationship with the front office would help.` };
 }
 
+// Offre d'échange à l'initiative d'une équipe IA.
+export function aiTradeOfferMessageText(
+  locale: Locale,
+  teamName: string,
+  target: string,
+  assets: string[]
+): InboxMessageText {
+  const list = assets.join(", ");
+  return locale === "fr"
+    ? {
+        title: `${teamName} veut ${target}`,
+        body: `${teamName} propose un échange : ${list} contre ${target}. Réponds depuis la page Échanges.`,
+      }
+    : {
+        title: `${teamName} want ${target}`,
+        body: `${teamName} propose a trade: ${list} for ${target}. Respond from the Trades page.`,
+      };
+}
+
 // Amende de la ligue pour critiques répétées de l'arbitrage.
 export function refereeFineMessageText(locale: Locale, amount: number): InboxMessageText {
   const money = locale === "fr" ? `${amount.toLocaleString("fr-FR")} $` : `$${amount.toLocaleString("en-US")}`;

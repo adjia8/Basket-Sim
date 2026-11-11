@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { recordTradeNews } from "@/lib/data-access/league-news";
+import { getLocale } from "@/lib/i18n/locale";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getLeagueById } from "@/lib/data-access/leagues";
@@ -13,7 +15,7 @@ import {
   MAX_ROSTER_SIZE,
   MIN_ROSTER_SIZE,
 } from "@/lib/careers/roster-rules";
-import { draftPickTradeValue, TRADE_ACCEPT_TOLERANCE, tradeValue } from "@/lib/careers/trade-rules";
+import { pickTradeValue, playerTradeValue, TRADE_ACCEPT_TOLERANCE } from "@/lib/careers/trade-rules";
 import { getTranslator } from "@/lib/i18n/translate";
 import { formatSalary } from "@/lib/utils";
 
@@ -150,13 +152,27 @@ export async function proposeTrade(
 
   if (!opponentManager) {
     // Adversaire IA : comportement inchangé, heuristique de tolérance + exécution immédiate.
-    const picksPerRound = (await getTeamsByLeague(membership.career.leagueId)).length;
+    // Valeur jugée sur la note et l'âge ACTUELS des joueurs dans la carrière
+    // (pas ceux du catalogue de départ), avec un barème qui valorise les
+    // stars (voir playerTradeValue).
+    const [picksPerRound, states] = await Promise.all([
+      getTeamsByLeague(membership.career.leagueId).then((teams) => teams.length),
+      prisma.playerState.findMany({
+        where: { careerId: membership.careerId, playerId: { in: [...myPlayerIds, ...theirPlayerIds] } },
+        select: { playerId: true, overallRating: true, age: true },
+      }),
+    ]);
+    const stateById = new Map(states.map((st) => [st.playerId, st]));
+    const valueOf = (c: (typeof myContracts)[number]) => {
+      const st = stateById.get(c.playerId);
+      return playerTradeValue(st?.overallRating ?? c.player.overallRating, st?.age ?? c.player.age);
+    };
     const valueGivenByAi =
-      theirContracts.reduce((sum, c) => sum + tradeValue(c.player.overallRating), 0) +
-      theirPicks.reduce((sum, p) => sum + draftPickTradeValue(p.round, p.pickNumber, picksPerRound), 0);
+      theirContracts.reduce((sum, c) => sum + valueOf(c), 0) +
+      theirPicks.reduce((sum, p) => sum + pickTradeValue(p.round, p.pickNumber, picksPerRound), 0);
     const valueReceivedByAi =
-      myContracts.reduce((sum, c) => sum + tradeValue(c.player.overallRating), 0) +
-      myPicks.reduce((sum, p) => sum + draftPickTradeValue(p.round, p.pickNumber, picksPerRound), 0);
+      myContracts.reduce((sum, c) => sum + valueOf(c), 0) +
+      myPicks.reduce((sum, p) => sum + pickTradeValue(p.round, p.pickNumber, picksPerRound), 0);
     if (valueReceivedByAi < valueGivenByAi * TRADE_ACCEPT_TOLERANCE) {
       return { error: t("tradeAction.aiRefuses") };
     }
@@ -191,6 +207,16 @@ export async function proposeTrade(
         })
       ),
     ]);
+
+    await recordTradeNews(
+      membership.careerId,
+      membership.career.season,
+      membership.teamId,
+      opponentTeamId,
+      theirPlayerIds,
+      myPlayerIds,
+      locale
+    );
 
     revalidatePath("/");
     revalidatePath(`/teams/${membership.teamId}`);
@@ -370,6 +396,16 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
       })
     ),
   ]);
+
+  await recordTradeNews(
+    membership.careerId,
+    membership.career.season,
+    offer.toTeamId,
+    offer.fromTeamId,
+    fromPlayerIds,
+    toPlayerIds,
+    await getLocale()
+  );
 
   revalidatePath("/");
   revalidatePath(`/teams/${offer.fromTeamId}`);

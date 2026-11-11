@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { translatorFor } from "@/lib/i18n/translate";
 import type { Locale } from "@/lib/i18n/locale";
 import type { BoxScoreEntry, Player, Team } from "@/lib/types";
-import { performanceNews, starInjuryNews, streakNews } from "@/lib/careers/news-rules";
+import { performanceNews, starInjuryNews, streakNews, tradeNews } from "@/lib/careers/news-rules";
 
 // Seuils d'actualité : on ne garde que le vraiment marquant.
 const BIG_GAME_POINTS: Record<string, number> = { nba: 45, wnba: 35 };
@@ -93,5 +93,34 @@ export async function getLeagueNews(careerId: string, take = 60, type?: string):
     where: { careerId, ...(type ? { type } : {}) },
     orderBy: [{ createdAt: "desc" }],
     take,
+  });
+}
+
+// Annonce un échange conclu (joueurs uniquement : les picks ne font pas les
+// gros titres).
+export async function recordTradeNews(
+  careerId: string,
+  season: string,
+  teamAId: string,
+  teamBId: string,
+  aReceives: string[],
+  bReceives: string[],
+  locale: Locale
+): Promise<void> {
+  const [teams, players] = await Promise.all([
+    prisma.team.findMany({ where: { id: { in: [teamAId, teamBId] } }, select: { id: true, city: true, name: true } }),
+    prisma.player.findMany({ where: { id: { in: [...aReceives, ...bReceives] } }, select: { id: true, firstName: true, lastName: true } }),
+  ]);
+  const teamName = (id: string) => {
+    const t = teams.find((x) => x.id === id);
+    return t ? `${t.city} ${t.name}` : id;
+  };
+  const name = (id: string) => {
+    const p = players.find((x) => x.id === id);
+    return p ? `${p.firstName} ${p.lastName}` : id;
+  };
+  const text = tradeNews(locale, teamName(teamAId), teamName(teamBId), aReceives.map(name), bReceives.map(name));
+  await prisma.leagueNews.create({
+    data: { careerId, season, type: "trade", title: text.title, body: text.body, teamId: teamAId },
   });
 }

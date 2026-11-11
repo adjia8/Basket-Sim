@@ -654,6 +654,7 @@ model TeamState {
   tacticsJson              String? // JSON Tactics (rythme, attaque, défense, profondeur) — voir tactics-rules.ts ; null = équilibré / IA automatique
   rotationOrderJson        String? // JSON: string[] d'ids joueuses, ordre GM voulu (5 majeures + 6ème femme + banc) — null = tri automatique (voir rotationOf dans mockEngine.ts)
   refereeCriticisms        Int       @default(0) // critiques publiques de l'arbitrage cette saison (amendes de la ligue)
+  lastAiTradeOfferAt       DateTime? // date (jeu) de la dernière offre d'échange reçue d'une équipe IA — voir ai-trades.ts
   staffBudget              Int       @default(0) // budget staff de la saison (dollars), alloué par les propriétaires — voir staff-rules.ts
   staffSeverance           Int       @default(0) // indemnités de licenciement payées cette saison (pèsent sur le budget staff)
   staffBudgetRequestSeason String? // saison de la dernière demande de rallonge (une par saison)
