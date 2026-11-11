@@ -1,4 +1,5 @@
 import "server-only";
+import { growthFactor } from "@/lib/careers/potential-rules";
 import type { PlayerStatePatches } from "./player-state-patches";
 import type { BoxScoreEntry, Player } from "@/lib/types";
 import {
@@ -49,7 +50,10 @@ export async function advanceRosterDevelopment(
   const minutesById = new Map(boxScore.map((e) => [e.playerId, e.minutesPlayed]));
   for (const player of roster) {
     if (player.injured) continue;
-    const chance = developmentChance(player.age, minutesById.get(player.id) ?? 0, intensity, staffLevel);
+    // Potentiel (voir potential-rules.ts) : plus de marge = progression plus
+    // rapide ; au plafond, plus de progression.
+    const growth = player.potential ? growthFactor(player.overallRating, player.potential) : 1;
+    const chance = developmentChance(player.age, minutesById.get(player.id) ?? 0, intensity, staffLevel) * growth;
     if (chance === 0 || Math.random() >= chance) continue;
     const attribute = attributeToDevelop(player.individualFocus, teamFocus);
     const progress = (player.developmentProgress ?? 0) + 1;
@@ -57,7 +61,7 @@ export async function advanceRosterDevelopment(
     patches.set(player.id, {
       [attribute]: Math.min(99, player.ratings[attribute] + 1),
       developmentProgress: levelUp ? 0 : progress,
-      ...(levelUp ? { overallRating: Math.min(99, player.overallRating + 1) } : {}),
+      ...(levelUp ? { overallRating: Math.min(99, player.potential || 99, player.overallRating + 1) } : {}),
     });
   }
 }

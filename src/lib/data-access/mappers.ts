@@ -131,6 +131,7 @@ export function toDomainPlayerWithState(
     individualFocus: (state?.individualFocus as Player["individualFocus"]) ?? undefined,
     developmentProgress: state?.developmentProgress ?? 0,
     morale: state?.morale ?? 60,
+    potential: state?.potential ?? 0,
     nationality: row.nationality,
   };
 }
@@ -158,6 +159,7 @@ export function toDomainProspect(row: PrismaProspect): Prospect {
     },
     scoutingNote: row.scoutingNote ?? undefined,
     nationality: row.nationality,
+    potential: row.potential,
   };
 }
 

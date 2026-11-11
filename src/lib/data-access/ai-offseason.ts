@@ -48,7 +48,11 @@ export async function runAiDraft(careerId: string, season: string, leagueId: str
     if (humanTeamIds.has(pick.teamId)) return { picked, humanTeamOnTheClock: pick.teamId, done: false };
     if (Date.now() - startedAt > DRAFT_TIME_BUDGET_MS) return { picked, humanTeamOnTheClock: null, done: false };
 
-    const best = await prisma.prospect.findFirst({ where: { careerId }, orderBy: { overallRating: "desc" } });
+    // L'IA drafte sur la note ET le potentiel (voir potential-rules.ts) : un
+    // jeune au plafond élevé peut passer devant un prospect plus prêt.
+    const prospects = await prisma.prospect.findMany({ where: { careerId } });
+    const draftValue = (p: (typeof prospects)[number]) => p.overallRating * 0.6 + (p.potential || p.overallRating) * 0.4;
+    const best = prospects.sort((a, b) => draftValue(b) - draftValue(a))[0];
     if (!best) return { picked, humanTeamOnTheClock: null, done: true };
     if (await performDraftPick(pick, best, teams.length, leagueId)) picked++;
   }

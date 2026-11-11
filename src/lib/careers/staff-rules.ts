@@ -11,16 +11,16 @@
 // blessures). Les salaires sont en dollars réels et doivent tenir dans le
 // budget staff alloué chaque saison par les propriétaires.
 
-export type StaffRole = "head_coach" | "assistant_coach" | "strength_coach" | "medical";
+export type StaffRole = "head_coach" | "assistant_coach" | "strength_coach" | "medical" | "scout";
 export type AssistantSpecialty = "offense" | "defense" | "development";
 
-export const STAFF_ROLES: StaffRole[] = ["head_coach", "assistant_coach", "strength_coach", "medical"];
+export const STAFF_ROLES: StaffRole[] = ["head_coach", "assistant_coach", "strength_coach", "medical", "scout"];
 export const ASSISTANT_SPECIALTIES: AssistantSpecialty[] = ["offense", "defense", "development"];
 
 // Postes par équipe.
 export const STAFF_SLOTS: Record<string, Record<StaffRole, number>> = {
-  nba: { head_coach: 1, assistant_coach: 3, strength_coach: 2, medical: 2 },
-  wnba: { head_coach: 1, assistant_coach: 2, strength_coach: 1, medical: 1 },
+  nba: { head_coach: 1, assistant_coach: 3, strength_coach: 2, medical: 2, scout: 2 },
+  wnba: { head_coach: 1, assistant_coach: 2, strength_coach: 1, medical: 1, scout: 1 },
 };
 
 export function staffSlots(leagueId: string): Record<StaffRole, number> {
@@ -34,12 +34,14 @@ const SALARY_SCALE: Record<string, Record<StaffRole, [number, number]>> = {
     assistant_coach: [300_000, 2_000_000],
     strength_coach: [150_000, 800_000],
     medical: [200_000, 1_000_000],
+    scout: [150_000, 700_000],
   },
   wnba: {
     head_coach: [200_000, 1_500_000],
     assistant_coach: [60_000, 250_000],
     strength_coach: [50_000, 160_000],
     medical: [60_000, 180_000],
+    scout: [40_000, 120_000],
   },
 };
 
@@ -115,6 +117,7 @@ const AGE_RANGE: Record<StaffRole, [number, number]> = {
   assistant_coach: [28, 60],
   strength_coach: [26, 55],
   medical: [30, 62],
+  scout: [28, 65],
 };
 
 export interface GeneratedStaff {
@@ -170,6 +173,7 @@ export function generateTeamStaff(leagueId: string, level: number): GeneratedSta
     staff.push(generateStaffMember(leagueId, "assistant_coach", level, specialties[i % specialties.length]));
   }
   for (let i = 0; i < slots.strength_coach; i++) staff.push(generateStaffMember(leagueId, "strength_coach", level));
+  for (let i = 0; i < slots.scout; i++) staff.push(generateStaffMember(leagueId, "scout", level));
   for (let i = 0; i < slots.medical; i++) staff.push(generateStaffMember(leagueId, "medical", level));
   return staff;
 }
@@ -180,7 +184,8 @@ export function generateStaffPool(leagueId: string, count: number): GeneratedSta
   const pool: GeneratedStaff[] = [];
   for (let i = 0; i < count; i++) {
     const r = Math.random();
-    const role: StaffRole = r < 0.15 ? "head_coach" : r < 0.55 ? "assistant_coach" : r < 0.77 ? "strength_coach" : "medical";
+    const role: StaffRole =
+      r < 0.13 ? "head_coach" : r < 0.48 ? "assistant_coach" : r < 0.66 ? "strength_coach" : r < 0.84 ? "medical" : "scout";
     const target = 30 + Math.pow(Math.random(), 1.4) * 55; // surtout 30-60, quelques 75-85
     pool.push(generateStaffMember(leagueId, role, target));
   }
@@ -227,6 +232,7 @@ export interface StaffProfile {
   development: number;
   fitness: number;
   medical: number;
+  scouting: number; // recruteurs : précision des estimations (potentiel, prospects)
   overall: number;
 }
 
@@ -238,6 +244,7 @@ export const NEUTRAL_STAFF_PROFILE: StaffProfile = {
   development: 50,
   fitness: 50,
   medical: 50,
+  scouting: 50,
   overall: 50,
 };
 
@@ -273,6 +280,7 @@ export function staffProfile(members: StaffMemberLike[], leagueId: string): Staf
     slotAverage(members.filter((m) => m.role === "strength_coach").map((m) => m.rating), slots.strength_coach)
   );
   const medical = Math.round(slotAverage(members.filter((m) => m.role === "medical").map((m) => m.rating), slots.medical));
+  const scouting = Math.round(slotAverage(members.filter((m) => m.role === "scout").map((m) => m.rating), slots.scout));
   return {
     tactics,
     motivation,
@@ -281,6 +289,7 @@ export function staffProfile(members: StaffMemberLike[], leagueId: string): Staf
     development,
     fitness,
     medical,
+    scouting,
     // Niveau global « encadrement » (ancien TeamState.trainingStaffLevel,
     // encore lu par les promesses et l'attractivité pour les agents libres).
     overall: Math.round((development + fitness + medical) / 3),

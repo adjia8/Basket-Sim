@@ -79,6 +79,7 @@ export interface Player {
   individualFocus?: "offensive" | "defensive" | "tactical" | "physical";
   developmentProgress?: number;
   morale?: number; // 0-99, moral individuel (voir morale-rules.ts)
+  potential?: number; // 0-99, potentiel caché (0 = inconnu) — voir potential-rules.ts
   nationality: string;
   // Salaire/durée de contrat réels connus (source publique) — voir
   // generateCareerContracts, qui les préfère à la génération procédurale
@@ -160,6 +161,7 @@ export interface Prospect {
   ratings: PlayerRatings;
   scoutingNote?: string; // ex. "Duke (NCAA)" — undefined pour un prospect généré
   nationality: string;
+  potential?: number; // potentiel caché (voir potential-rules.ts) — jamais affiché tel quel
 }
 
 // --- Classement ---

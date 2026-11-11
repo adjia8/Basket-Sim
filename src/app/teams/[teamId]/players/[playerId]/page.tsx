@@ -1,4 +1,8 @@
 import { notFound } from "next/navigation";
+import { getStaffProfiles } from "@/lib/data-access/staff";
+import { NEUTRAL_STAFF_PROFILE } from "@/lib/careers/staff-rules";
+import { estimateRating, ratingStars } from "@/lib/careers/potential-rules";
+import { Stars } from "@/components/ui/Stars";
 import { getPlayerAwards } from "@/lib/data-access/awards";
 import { awardName } from "@/lib/careers/news-rules";
 import { moraleLevel } from "@/lib/careers/morale-rules";
@@ -128,6 +132,17 @@ export default async function PlayerDetailPage({
     isTradeDeadlinePassed(membership.careerId, membership.season),
     getPlayerAwards(membership.careerId, playerId),
   ]);
+
+  // Potentiel estimé (voir potential-rules.ts) : par les recruteurs, ou pour
+  // mes propres joueurs par le meilleur de mes recruteurs et de mes coachs
+  // chargés du développement.
+  const myStaff =
+    (await getStaffProfiles(membership.careerId, [membership.teamId], membership.leagueId)).get(membership.teamId) ??
+    NEUTRAL_STAFF_PROFILE;
+  const knowledge = isMyTeam ? Math.max(myStaff.scouting, myStaff.development) : myStaff.scouting;
+  const potentialEstimate = player.potential
+    ? estimateRating(player.potential, knowledge, `${membership.careerId}:${membership.teamId}:${playerId}:pot`)
+    : null;
   const stats = seasonStats.get(playerId) ?? {
     gamesPlayed: 0, points: 0, rebounds: 0, assists: 0, ppg: 0, rpg: 0, apg: 0,
   };
@@ -272,6 +287,17 @@ export default async function PlayerDetailPage({
         </h2>
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
           <Stat label={t("player.overall")} value={player.overallRating} bold tone={ratingTone(player.overallRating)} />
+          {potentialEstimate && (
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted">{t("player.potential")}</p>
+              <p className="mt-0.5">
+                <Stars value={ratingStars(potentialEstimate.mid)} />{" "}
+                <span className="text-xs text-faint tabular">
+                  {potentialEstimate.low}-{potentialEstimate.high}
+                </span>
+              </p>
+            </div>
+          )}
           {(Object.keys(ratingLabel) as (keyof PlayerRatings)[]).map((key) => (
             <Stat
               key={key}

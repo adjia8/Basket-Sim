@@ -1,3 +1,5 @@
+import { annualGrowth } from "./potential-rules";
+
 export const RETIREMENT_AGE = 40;
 
 // `trainingStaffLevel` (0-100, 50 = neutre) accélère la progression des
@@ -34,8 +36,14 @@ export interface AgeableRatings {
 // Applique un delta uniforme à l'overall ET à chaque attribut (plutôt que de
 // recalculer l'overall comme une moyenne, ce qui écraserait les biais de
 // poste déjà appliqués à la génération initiale — voir player-helpers.ts).
-export function ageOneSeason(state: AgeableRatings, trainingStaffLevel = 50): AgeableRatings {
-  const delta = ratingDeltaForAge(state.age, trainingStaffLevel);
+// Avec un potentiel connu (voir potential-rules.ts), la progression d'un
+// jeune dépend de sa marge restante et ne dépasse jamais son plafond ; sans
+// potentiel (ancien comportement), barème fixe par âge.
+export function ageOneSeason(state: AgeableRatings & { potential?: number }, trainingStaffLevel = 50): AgeableRatings {
+  const staffBonus = state.age < 25 ? Math.round((Math.max(0, Math.min(100, trainingStaffLevel)) - 50) / 25) : 0;
+  const delta = state.potential
+    ? annualGrowth(state.age, state.overallRating, state.potential, staffBonus)
+    : ratingDeltaForAge(state.age, trainingStaffLevel);
   return {
     age: state.age + 1,
     overallRating: clampRating(state.overallRating + delta),

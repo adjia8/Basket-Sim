@@ -6,6 +6,7 @@ import { initialTrainingStaffLevel } from "@/lib/careers/finance-rules";
 import {
   budgetIncreaseChance,
   BUDGET_INCREASE_RATE,
+  generateStaffMember,
   generateStaffPool,
   generateTeamStaff,
   NEUTRAL_STAFF_PROFILE,
@@ -71,7 +72,10 @@ function toRow(careerId: string, teamId: string | null, s: GeneratedStaff, seaso
 // requêtes simultanées ne génèrent jamais deux staffs.
 export async function ensureCareerStaff(careerId: string, leagueId: string, season: string): Promise<void> {
   const existing = await prisma.staffMember.count({ where: { careerId } });
-  if (existing > 0) return;
+  if (existing > 0) {
+    await ensureScouts(careerId, leagueId, season);
+    return;
+  }
   const teams = await prisma.team.findMany({ where: { leagueId }, select: { id: true, marketAppeal: true } });
   const states = await prisma.teamState.findMany({ where: { careerId }, select: { teamId: true, trainingStaffLevel: true } });
   const levelByTeam = new Map(states.map((s) => [s.teamId, s.trainingStaffLevel]));
@@ -86,6 +90,37 @@ export async function ensureCareerStaff(careerId: string, leagueId: string, seas
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`staff:${careerId}`}))`;
     if ((await tx.staffMember.count({ where: { careerId } })) > 0) return;
+    await tx.staffMember.createMany({ data: rows });
+  });
+}
+
+// Recruteurs ajoutés après coup (carrières dont le staff existait déjà) :
+// chaque équipe reçoit les siens à son niveau d'encadrement, et quelques
+// candidats rejoignent le marché.
+async function ensureScouts(careerId: string, leagueId: string, season: string): Promise<void> {
+  if ((await prisma.staffMember.count({ where: { careerId, role: "scout" } })) > 0) return;
+  const slots = staffSlots(leagueId).scout;
+  const teams = await prisma.team.findMany({ where: { leagueId }, select: { id: true, marketAppeal: true } });
+  const states = await prisma.teamState.findMany({ where: { careerId }, select: { teamId: true, trainingStaffLevel: true } });
+  const levelByTeam = new Map(states.map((st) => [st.teamId, st.trainingStaffLevel]));
+  const rows = [
+    ...teams.flatMap((team) =>
+      Array.from({ length: slots }, () =>
+        toRow(
+          careerId,
+          team.id,
+          generateStaffMember(leagueId, "scout", levelByTeam.get(team.id) ?? initialTrainingStaffLevel(team.marketAppeal, team.id)),
+          season
+        )
+      )
+    ),
+    ...Array.from({ length: 8 }, () =>
+      toRow(careerId, null, generateStaffMember(leagueId, "scout", 30 + Math.random() * 50), null)
+    ),
+  ];
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`scouts:${careerId}`}))`;
+    if ((await tx.staffMember.count({ where: { careerId, role: "scout" } })) > 0) return;
     await tx.staffMember.createMany({ data: rows });
   });
 }
@@ -118,7 +153,7 @@ function toView(m: {
   };
 }
 
-const ROLE_ORDER: Record<string, number> = { head_coach: 0, assistant_coach: 1, strength_coach: 2, medical: 3 };
+const ROLE_ORDER: Record<string, number> = { head_coach: 0, assistant_coach: 1, strength_coach: 2, medical: 3, scout: 4 };
 
 export async function getTeamStaff(careerId: string, teamId: string): Promise<StaffMemberView[]> {
   const rows = await prisma.staffMember.findMany({ where: { careerId, teamId } });

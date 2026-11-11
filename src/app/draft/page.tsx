@@ -10,6 +10,10 @@ import { draftForAiTeam, draftProspect } from "@/app/actions/draft";
 import { rookieScaleContract } from "@/lib/careers/rookie-scale";
 import { getTranslator } from "@/lib/i18n/translate";
 import { formatSalary, teamFullName } from "@/lib/utils";
+import { ensureCareerStaff, getStaffProfiles } from "@/lib/data-access/staff";
+import { NEUTRAL_STAFF_PROFILE } from "@/lib/careers/staff-rules";
+import { estimateError, estimateRating, ratingStars } from "@/lib/careers/potential-rules";
+import { Stars } from "@/components/ui/Stars";
 
 export default async function DraftPage() {
   const membership = await getCurrentMembership();
@@ -51,6 +55,19 @@ export default async function DraftPage() {
   ]);
 
   const isMyTurn = currentPick.teamId === membership.teamId;
+
+  // Brouillard du recrutement (voir potential-rules.ts) : le GM ne voit que
+  // les estimations de ses recruteurs, triées sur l'estimation (trier sur la
+  // vraie note la trahirait).
+  await ensureCareerStaff(membership.careerId, membership.leagueId, membership.season);
+  const scouting = ((await getStaffProfiles(membership.careerId, [membership.teamId], membership.leagueId)).get(membership.teamId) ?? NEUTRAL_STAFF_PROFILE).scouting;
+  const scouted = prospects
+    .map((p) => ({
+      prospect: p,
+      current: estimateRating(p.overallRating, scouting, `${membership.careerId}:${membership.teamId}:${p.id}:cur`, 0.6),
+      potential: estimateRating(p.potential || p.overallRating, scouting, `${membership.careerId}:${membership.teamId}:${p.id}:pot`),
+    }))
+    .sort((a, b) => b.current.mid - a.current.mid);
   const pickTerms = rookieScaleContract(currentPick.pickNumber, picksPerRound, membership.leagueId);
 
   return (
@@ -86,6 +103,12 @@ export default async function DraftPage() {
         </form>
       )}
 
+      {prospects.length > 0 && (
+        <p className="mt-4 text-xs text-muted">
+          {t("draft.scoutingHint", { level: scouting, error: Math.round(estimateError(scouting) / 2) })}
+        </p>
+      )}
+
       {prospects.length === 0 ? (
         <p className="mt-6 text-sm text-muted">{t("draft.noProspects")}</p>
       ) : (
@@ -96,18 +119,30 @@ export default async function DraftPage() {
                 <th className="py-2 pr-4">{t("draft.colProspect")}</th>
                 <th className="py-2 pr-4">{t("draft.colPosition")}</th>
                 <th className="py-2 pr-4">{t("draft.colOverall")}</th>
+                <th className="py-2 pr-4">{t("draft.colPotential")}</th>
                 <th className="py-2 pr-4">{t("draft.colAge")}</th>
                 {isMyTurn && <th className="py-2">{t("draft.colAction")}</th>}
               </tr>
             </thead>
             <tbody>
-              {prospects.map((prospect) => (
+              {scouted.map(({ prospect, current, potential }) => (
                 <tr key={prospect.id} className="border-b border-line-soft">
                   <td className="py-2 pr-4 font-medium">
                     {prospect.firstName} {prospect.lastName}
                   </td>
                   <td className="py-2 pr-4">{prospect.position}</td>
-                  <td className="py-2 pr-4 font-semibold">{prospect.overallRating}</td>
+                  <td className="py-2 pr-4 tabular">
+                    <span className="font-semibold">{current.mid}</span>{" "}
+                    <span className="text-xs text-faint">
+                      ({current.low}-{current.high})
+                    </span>
+                  </td>
+                  <td className="py-2 pr-4 tabular">
+                    <Stars value={ratingStars(potential.mid)} />{" "}
+                    <span className="text-xs text-faint">
+                      {potential.low}-{potential.high}
+                    </span>
+                  </td>
                   <td className="py-2 pr-4">{prospect.age}</td>
                   {isMyTurn && (
                     <td className="py-2">

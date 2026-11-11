@@ -511,6 +511,7 @@ model PlayerState {
   developmentProgress  Int     @default(0) // progrès accumulés vers le prochain point d'overall (jeunes joueurs)
   morale               Int     @default(60) // 0-99, moral individuel (conférences de presse, résultats) — voir morale-rules.ts
   catalogOverall       Int? // note du catalogue (NBA 2K) avec laquelle ce joueur a été synchronisé — voir scripts/sync-ratings.ts
+  potential            Int     @default(0) // potentiel caché (note maximale atteignable) — voir potential-rules.ts
 
   // Demande de trade + promesse du GM — voir src/lib/data-access/trade-requests.ts.
   // wantsTrade est déclenché par un tirage probabiliste sous cooldown (jamais
@@ -551,6 +552,7 @@ model Prospect {
   clutch         Int
   stamina        Int
   scoutingNote   String? // ex. "Duke (NCAA)", "Real Madrid (Espagne)" — null pour un prospect généré
+  potential      Int     @default(0) // potentiel caché — voir potential-rules.ts
   nationality    String  @default("États-Unis")
 
   @@index([careerId])

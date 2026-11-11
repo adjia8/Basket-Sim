@@ -1,4 +1,5 @@
 import "server-only";
+import { initialPotential } from "./potential-rules";
 import { prisma } from "@/lib/prisma";
 import type { Position } from "@/lib/types";
 import { NBA_REAL_PROSPECTS, type ProspectSeed } from "@/lib/mock-data/real-prospects-nba";
@@ -67,6 +68,7 @@ export async function generateProspectClass(
     clutch: spreadAround(p.overallRating),
     stamina: spreadAround(p.overallRating),
     scoutingNote: p.scoutingNote,
+    potential: initialPotential(p.overallRating, p.age),
     // Vraies personnes identifiables : pas de tirage aléatoire, "États-Unis"
     // par défaut (dominante NCAA de ces listes) sauf annotation explicite.
     nationality: p.nationality ?? "États-Unis",
@@ -77,6 +79,7 @@ export async function generateProspectClass(
     // Échelle NBA 2K27 : un rookie drafté y vaut ~68-79 ; les prospects fictifs
     // complètent la classe, sans dépasser les meilleurs vrais prospects.
     const overallRating = randomInt(62, 76);
+    const age = randomInt(19, 22);
     return {
       careerId,
       leagueId,
@@ -84,7 +87,7 @@ export async function generateProspectClass(
       lastName: pick(LAST_NAMES),
       position: pick(POSITIONS),
       heightCm: randomInt(180, 216),
-      age: randomInt(19, 22),
+      age,
       overallRating,
       scoringInside: spreadAround(overallRating),
       scoringOutside: spreadAround(overallRating),
@@ -97,6 +100,7 @@ export async function generateProspectClass(
       clutch: spreadAround(overallRating),
       stamina: spreadAround(overallRating),
       scoutingNote: null as string | null,
+      potential: initialPotential(overallRating, age),
       // Prospect entièrement fictif : tirage pondéré déterministe (pas de
       // vraie personne à mal représenter).
       nationality: randomNationality(`${careerId}-${leagueId}-${season}-generated-${i}`),

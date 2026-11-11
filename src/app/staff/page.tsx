@@ -17,6 +17,7 @@ import {
   type StaffRole,
 } from "@/lib/careers/staff-rules";
 import { hireStaffAction, requestBudgetAction } from "@/app/actions/staff";
+import { estimateError } from "@/lib/careers/potential-rules";
 import { StaffTable, RatingBar } from "@/components/staff/StaffTable";
 import { getTranslator, type Translator } from "@/lib/i18n/translate";
 import type { DictionaryKey } from "@/lib/i18n/dictionary";
@@ -189,6 +190,16 @@ export default async function StaffPage({
           effects={[
             { text: t("staff.effect.wear", { value: signed(impact.wearPct) }), good: tone(impact.wearPct, true) },
             { text: t("staff.effect.recovery", { value: signed(impact.fatigueRecoveryPct) }), good: tone(impact.fatigueRecoveryPct) },
+          ]}
+        />
+        <AreaCard
+          label={t("staff.area.scouting")}
+          level={profile.scouting}
+          effects={[
+            {
+              text: t("staff.effect.scouting", { value: Math.round(estimateError(profile.scouting) / 2) }),
+              good: profile.scouting >= 60 ? true : profile.scouting < 40 ? false : null,
+            },
           ]}
         />
         <AreaCard

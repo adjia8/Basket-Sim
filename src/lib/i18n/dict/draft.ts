@@ -15,6 +15,8 @@ export const keys = [
   "draft.colPosition",
   "draft.colOverall",
   "draft.colAge",
+  "draft.colPotential",
+  "draft.scoutingHint",
   "draft.colAction",
   "draft.draftButton",
 ] as const;
@@ -36,8 +38,10 @@ export const fr: Record<DraftKey, string> = {
   "draft.noProspects": "Aucun prospect disponible pour l'instant.",
   "draft.colProspect": "Prospect",
   "draft.colPosition": "Poste",
-  "draft.colOverall": "Overall",
+  "draft.colOverall": "Note estimée",
   "draft.colAge": "Âge",
+  "draft.colPotential": "Potentiel",
+  "draft.scoutingHint": "Notes et potentiels estimés par tes recruteurs (niveau {level}/99, précision ±{error} pts). De meilleurs recruteurs resserrent les fourchettes.",
   "draft.colAction": "Action",
   "draft.draftButton": "Drafter",
 };
@@ -57,8 +61,10 @@ export const en: Record<DraftKey, string> = {
   "draft.noProspects": "No prospects available right now.",
   "draft.colProspect": "Prospect",
   "draft.colPosition": "Pos",
-  "draft.colOverall": "Overall",
+  "draft.colOverall": "Est. rating",
   "draft.colAge": "Age",
+  "draft.colPotential": "Potential",
+  "draft.scoutingHint": "Ratings and potential estimated by your scouts (level {level}/99, accuracy ±{error} pts). Better scouts narrow the ranges.",
   "draft.colAction": "Action",
   "draft.draftButton": "Draft",
 };

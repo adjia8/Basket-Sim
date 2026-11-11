@@ -1,4 +1,5 @@
 import "server-only";
+import { initialPotential } from "./potential-rules";
 import { prisma } from "@/lib/prisma";
 import type { Player } from "@/lib/types";
 
@@ -16,6 +17,8 @@ export async function generateCareerPlayerStates(
     // Note du catalogue de référence, pour appliquer plus tard les mises à
     // jour des notes NBA 2K (voir scripts/sync-ratings.ts).
     catalogOverall: player.overallRating,
+    // Potentiel caché, tiré selon l'âge (voir potential-rules.ts).
+    potential: initialPotential(player.overallRating, player.age),
     scoringInside: player.ratings.scoringInside,
     scoringOutside: player.ratings.scoringOutside,
     playmaking: player.ratings.playmaking,

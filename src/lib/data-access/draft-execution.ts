@@ -79,6 +79,8 @@ export async function performDraftPick(
           playerId: newPlayerId,
           age: prospect.age,
           overallRating: prospect.overallRating,
+          // Le potentiel du prospect le suit en NBA (voir potential-rules.ts).
+          potential: prospect.potential || prospect.overallRating,
           scoringInside: prospect.scoringInside,
           scoringOutside: prospect.scoringOutside,
           playmaking: prospect.playmaking,
