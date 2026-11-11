@@ -45,6 +45,7 @@ model Career {
   playerSeasonStats PlayerSeasonStat[]
   awards            Award[]
   leagueNews        LeagueNews[]
+  negotiations      ContractNegotiation[]
 }
 
 // Statistiques cumulées d'un joueur sur une saison (libellé du match :
@@ -442,6 +443,8 @@ model Contract {
   isRookieScale             Boolean  @default(false) // contrat rookie non renégocié — voir extendContract dans actions/roster.ts
   developmentGamesActivated Int      @default(0) // matchs activés sous CE contrat de développement (WNBA, limite 12) — voir DEVELOPMENT_CONTRACT_GAME_LIMIT dans contract-type-rules.ts
   lastExtendedSeason        String? // saison où extendContract a été utilisé — voir evaluatePendingPromises (promesse "renewal")
+  optionType                String? // "player" | "team" : option sur la dernière année — voir contract-negotiation-rules.ts
+  optionDeclined            Boolean  @default(false) // option d'équipe que le GM a décidé de ne pas lever
   createdAt                 DateTime @default(now())
 
   @@unique([careerId, playerId])
@@ -683,4 +686,27 @@ model InjuryRecord {
 
   @@index([careerId, playerId])
   @@index([careerId, teamId])
+}
+
+// Négociation de contrat en cours entre une équipe et un joueur (prolongation
+// ou agent libre) — voir contract-negotiation-rules.ts. La position du joueur
+// est recalculée à chaque fois ; seul l'état mutable est stocké ici.
+model ContractNegotiation {
+  id             String    @id @default(cuid())
+  careerId       String
+  career         Career    @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  playerId       String
+  teamId         String
+  season         String
+  patienceLeft   Int
+  rounds         Int       @default(0)
+  counterSalary  Int?
+  counterYears   Int?
+  counterOption  String?
+  status         String    @default("open") // "open" | "walked"
+  walkedGameDate DateTime?
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([careerId, playerId, teamId])
+  @@index([careerId])
 }

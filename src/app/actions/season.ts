@@ -28,10 +28,11 @@ import { evaluatePendingPromises } from "@/lib/data-access/trade-requests";
 import { createInboxMessage } from "@/lib/data-access/inbox";
 import { poachOfferMessageText } from "@/lib/careers/inbox-rules";
 import { getTranslator } from "@/lib/i18n/translate";
-import { teamFullName } from "@/lib/utils";
+import { formatSalary, playerHref, teamFullName } from "@/lib/utils";
 import { offseasonRecovery } from "@/lib/careers/injury-rules";
 import { ensureCareerStaff, getStaffProfiles, processStaffOffseason } from "@/lib/data-access/staff";
 import { moraleAfterSummer } from "@/lib/careers/morale-rules";
+import { resolveContractOptions } from "@/lib/data-access/negotiations";
 
 // Patch PlayerState de l'intersaison côté santé : énergie pleine, blessures
 // guéries d'environ 50 matchs, statut de blessure effacé si rétabli.
@@ -102,6 +103,29 @@ export async function advanceSeason(): Promise<void> {
   // sert de marqueur "cette intersaison" pour retiredSeason et pour la
   // nouvelle classe de prospects réels éventuelle.
   const newSeason = nextSeasonLabel(career.season);
+
+  // 0. Options sur la dernière année (joueur / équipe), avant le décrément.
+  const optionEvents = await resolveContractOptions(career.id, career.leagueId);
+  if (optionEvents.length > 0) {
+    const { t: tOpt, locale: optLocale } = await getTranslator();
+    const humanTeamIds = new Set(
+      (await prisma.membership.findMany({ where: { careerId: career.id }, select: { teamId: true } })).map((m) => m.teamId)
+    );
+    for (const ev of optionEvents) {
+      if (!humanTeamIds.has(ev.teamId)) continue;
+      const vars = { player: ev.playerName, amount: formatSalary(ev.salary, optLocale) };
+      await createInboxMessage(
+        career.id,
+        ev.teamId,
+        career.season,
+        "contract",
+        tOpt(`nego.optionInbox.${ev.kind}.title`, vars),
+        tOpt(`nego.optionInbox.${ev.kind}.body`, vars),
+        playerHref(ev.playerId, ev.kind === "playerIn" ? ev.teamId : null),
+        { playerId: ev.playerId }
+      );
+    }
+  }
 
   // 1. Contrats : décrément, résiliation à 0 (le joueur devient agent libre).
   await prisma.contract.updateMany({

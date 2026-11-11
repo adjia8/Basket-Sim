@@ -147,6 +147,8 @@ export interface Contract {
   contractType: ContractType;
   isRookieScale: boolean;
   developmentGamesActivated: number;
+  optionType: "player" | "team" | null; // option sur la dernière année
+  optionDeclined: boolean;
 }
 
 // --- Prospect (draft) ---

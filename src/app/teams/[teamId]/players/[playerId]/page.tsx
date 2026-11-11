@@ -19,11 +19,14 @@ import { prisma } from "@/lib/prisma";
 import { minAcceptableSalary } from "@/lib/careers/player-demands";
 import { PROMISE_TYPES } from "@/lib/careers/promise-rules";
 import { PlayerAvatar } from "@/components/team/PlayerAvatar";
-import { ExtendContractForm } from "@/components/team/ExtendContractForm";
+import { NegotiationPanel } from "@/components/team/NegotiationPanel";
+import { getNegotiationView } from "@/lib/data-access/negotiations";
+import { isFreeAgencyOpen } from "@/lib/data-access/season-windows";
+import { setTeamOptionDeclined } from "@/app/actions/negotiation";
 import { PromoteContractForm } from "@/components/team/PromoteContractForm";
 import { MakePromiseForm } from "@/components/team/MakePromiseForm";
 import { releasePlayer, offerAlternateContract } from "@/app/actions/roster";
-import { MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import { MAX_ROSTER_SIZE, MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import { injuryChance, injuryRiskLevel } from "@/lib/careers/injury-rules";
 import { WEAR_NEEDS_REST } from "@/lib/careers/wear-rules";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
@@ -176,6 +179,71 @@ export default async function PlayerDetailPage({
   const suggestedSalary = contract?.isRookieScale
     ? contract.salary
     : minAcceptableSalary(player.renown, player.overallRating, leagueId);
+  // Négociation (prolongation de mon joueur, ou agent libre pendant la
+  // période des agents libres) — voir contract-negotiation-rules.ts.
+  const canNegotiateFreeAgent =
+    !contract && !retired && (await isFreeAgencyOpen(membership.careerId, membership.season));
+  const negotiation =
+    canExtend || canNegotiateFreeAgent
+      ? await getNegotiationView({
+          careerId: membership.careerId,
+          leagueId: membership.leagueId,
+          season: membership.season,
+          teamId: membership.teamId,
+          playerId,
+        })
+      : null;
+  const myRosterFull =
+    canNegotiateFreeAgent &&
+    (await prisma.contract.count({
+      where: { careerId: membership.careerId, teamId: membership.teamId, contractType: "standard" },
+    })) >= (MAX_ROSTER_SIZE[membership.leagueId] ?? MAX_ROSTER_SIZE.nba);
+  const optionLabel = (o: "none" | "player" | "team") =>
+    o === "player" ? t("nego.option.player") : o === "team" ? t("nego.option.team") : t("nego.option.none");
+  const optionSuffix = (o: "none" | "player" | "team") => (o === "none" ? "" : ` (${optionLabel(o).toLowerCase()})`);
+  const negotiationPanel = negotiation && (
+    <NegotiationPanel
+      playerId={player.id}
+      minSalary={salaryRange.min}
+      maxSalary={salaryRange.max}
+      suggestedSalary={negotiation.counter?.salary ?? negotiation.stance.askSalary}
+      suggestedYears={negotiation.counter?.years ?? negotiation.stance.preferredYears}
+      patienceLeft={negotiation.patienceLeft}
+      patienceMax={negotiation.stance.patience}
+      hasCounter={!!negotiation.counter}
+      labels={{
+        title: t(negotiation.kind === "extension" ? "nego.titleExtension" : "nego.titleFreeAgent"),
+        ask:
+          t("nego.ask", {
+            amount: formatSalary(negotiation.stance.askSalary, locale),
+            years: negotiation.stance.preferredYears,
+          }) + (negotiation.stance.preferredOption === "player" ? `, ${t("nego.askOption")}` : ""),
+        patience: t("nego.patience"),
+        salary: t("nego.salary"),
+        years: t("nego.years"),
+        option: t("nego.option"),
+        optionNone: t("nego.option.none"),
+        optionPlayer: t("nego.option.player"),
+        optionTeam: t("nego.option.team"),
+        optionHint: t("nego.optionHint"),
+        submit: t("nego.submit"),
+        submitting: t("nego.submitting"),
+        counterHeading: t("nego.counterHeading"),
+        counterText: negotiation.counter
+          ? `${formatSalary(negotiation.counter.salary, locale)} · ${t("staff.years", { count: negotiation.counter.years })}${optionSuffix(negotiation.counter.option)}`
+          : null,
+        acceptCounter: t("nego.acceptCounter"),
+        note: negotiation.rookieScale ? t("nego.rookieNote") : null,
+        blocked: myRosterFull
+          ? t("nego.rosterFull")
+          : negotiation.refuses
+          ? t("nego.refuses", { player: `${player.firstName} ${player.lastName}` })
+          : negotiation.lockedDays !== null
+            ? t("nego.locked", { player: `${player.firstName} ${player.lastName}`, days: negotiation.lockedDays })
+            : null,
+      }}
+    />
+  );
   const altType = ALT_CONTRACT_TYPE[leagueId];
   const altTypeLabel = altType ? t(`domain.contractType.${altType}` as const) : "";
   const contractTypeLabels: Record<string, string> = {
@@ -378,6 +446,7 @@ export default async function PlayerDetailPage({
               {t("player.seeFreeAgents")}
             </Link>
           </p>
+          {negotiationPanel}
         </div>
       )}
 
@@ -411,26 +480,26 @@ export default async function PlayerDetailPage({
             <p className="mt-1 text-sm text-bad">{t("player.activationLimitReached")}</p>
           )}
 
-          {canExtend && (
-            <div className="mt-4 card p-3">
-              <p className="text-sm font-medium">{t("player.proposeExtension")}</p>
-              <ExtendContractForm
-                playerId={player.id}
-                minSalary={salaryRange.min}
-                maxSalary={salaryRange.max}
-                suggestedSalary={suggestedSalary}
-                suggestedYears={2}
-                isRookieScale={contract.isRookieScale}
-                labels={{
-                  proposedSalary: t("extend.proposedSalary"),
-                  duration: t("extend.duration"),
-                  proposing: t("common.proposing"),
-                  proposeButton: t("extend.proposeButton"),
-                  rookieNote: t("extend.rookieNote"),
-                }}
-              />
+          {contract.optionType && (
+            <div className="mt-2 text-sm">
+              <span className="font-medium">
+                {t("nego.contractOption", { option: optionLabel(contract.optionType) })}
+              </span>
+              <span className="ml-1 text-muted">{t("nego.optionYear")}</span>
+              {isMyTeam && contract.optionType === "team" && contract.yearsRemaining >= 2 && (
+                <form action={setTeamOptionDeclined} className="mt-1 flex flex-wrap items-center gap-2">
+                  <input type="hidden" name="playerId" value={player.id} />
+                  <input type="hidden" name="value" value={contract.optionDeclined ? "false" : "true"} />
+                  {contract.optionDeclined && <span className="text-xs text-bad">{t("nego.teamOptionDeclined")}</span>}
+                  <button type="submit" className="rounded-md border border-line px-3 py-1 text-xs hover:bg-surface-2">
+                    {contract.optionDeclined ? t("nego.exerciseTeamOption") : t("nego.declineTeamOption")}
+                  </button>
+                </form>
+              )}
             </div>
           )}
+
+          {canExtend && negotiationPanel}
 
           {isMyTeam && (
             <div className="mt-4 flex flex-wrap gap-2">

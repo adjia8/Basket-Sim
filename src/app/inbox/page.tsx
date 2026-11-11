@@ -59,6 +59,7 @@ function actionsFor(message: InboxMessageView, teamId: string, t: Translator): M
       return [{ label: t("inbox.action.answerPress"), href: "/press", primary: true }];
     case "trade_offer":
       return [{ label: t("inbox.action.viewTrades"), href: "/trades", primary: true }];
+    case "contract":
     case "award":
       return message.playerId
         ? [{ label: t("inbox.action.viewPlayer"), href: playerHref(message.playerId, teamId), primary: true }]
@@ -174,7 +175,7 @@ function MessageCard({
   actions: MessageAction[];
   poachDecision: boolean;
 }) {
-  const typeLabel = ["press", "injury", "trade_request", "free_agent", "free_agency", "standings", "poach_offer", "press_review", "player_reaction", "fine", "staff", "trade_offer", "award"].includes(message.type)
+  const typeLabel = ["press", "injury", "trade_request", "free_agent", "free_agency", "standings", "poach_offer", "press_review", "player_reaction", "fine", "staff", "trade_offer", "award", "contract"].includes(message.type)
     ? t(`inbox.type.${message.type}` as "inbox.type.press")
     : message.type;
   return (

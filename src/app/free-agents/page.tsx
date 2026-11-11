@@ -6,7 +6,6 @@ import { getTeamById } from "@/lib/data-access/teams";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { isFreeAgencyOpen } from "@/lib/data-access/season-windows";
 import { prisma } from "@/lib/prisma";
-import { signFreeAgent } from "@/app/actions/roster";
 import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import { checkSalaryMove, NBA_MINIMUM_EXCEPTION, payrollWarningLine } from "@/lib/careers/cap-rules";
 import {
@@ -140,15 +139,13 @@ export default async function FreeAgentsPage() {
                       !affordable ? (
                         <span key="act" className="text-xs text-muted">{t("freeAgents.overBudget")}</span>
                       ) : meetsDemands ? (
-                        <form key="act" action={signFreeAgent}>
-                          <input type="hidden" name="playerId" value={player.id} />
-                          <button
-                            type="submit"
-                            className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-accent-fg transition hover:bg-accent-hover"
-                          >
-                            {t("freeAgents.sign")}
-                          </button>
-                        </form>
+                        <Link
+                          key="act"
+                          href={playerHref(player.id)}
+                          className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-accent-fg transition hover:bg-accent-hover"
+                        >
+                          {t("nego.negotiate")}
+                        </Link>
                       ) : (
                         <span key="act" className="text-xs text-bad">{t("freeAgents.refuses")}</span>
                       ),

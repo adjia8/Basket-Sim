@@ -173,6 +173,8 @@ export function toDomainContract(row: PrismaContract): Contract {
     guaranteed: row.guaranteed,
     contractType: row.contractType as Contract["contractType"],
     isRookieScale: row.isRookieScale,
+    optionType: (row.optionType as "player" | "team" | null) ?? null,
+    optionDeclined: row.optionDeclined,
     developmentGamesActivated: row.developmentGamesActivated,
   };
 }

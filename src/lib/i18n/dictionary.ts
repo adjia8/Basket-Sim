@@ -22,6 +22,7 @@ import * as leaguePages from "./dict/leaguePages";
 import * as promise from "./dict/promise";
 import * as rotation from "./dict/rotation";
 import * as inbox from "./dict/inbox";
+import * as negotiation from "./dict/negotiation";
 
 // Chaque module dict/<zone>.ts exporte { fr, en } avec les MÊMES clés (voir
 // common.ts pour le patron : un tableau `keys as const`, puis deux
@@ -54,6 +55,7 @@ const sources = [
   promise,
   rotation,
   inbox,
+  negotiation,
 ];
 
 export const dictionaries = {
@@ -82,6 +84,7 @@ export const dictionaries = {
     ...promise.fr,
     ...rotation.fr,
     ...inbox.fr,
+    ...negotiation.fr,
   },
   en: {
     ...common.en,
@@ -108,6 +111,7 @@ export const dictionaries = {
     ...promise.en,
     ...rotation.en,
     ...inbox.en,
+    ...negotiation.en,
   },
 };
 
