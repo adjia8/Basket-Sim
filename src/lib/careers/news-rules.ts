@@ -135,7 +135,8 @@ export function awardInboxText(locale: Locale, name: string, award: string, wome
 }
 
 export function tradeNews(locale: Locale, teamA: string, teamB: string, aGets: string[], bGets: string[]): NewsText {
-  const list = (l: string[]) => (l.length ? l.join(", ") : "—");
+  // Pas de double point quand la liste finit par « Jr. ».
+  const list = (l: string[]) => (l.length ? l.join(", ") : "—").replace(/\.$/, "");
   return locale === "fr"
     ? {
         title: `Échange entre ${teamA} et ${teamB}`,

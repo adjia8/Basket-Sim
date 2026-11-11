@@ -105,7 +105,8 @@ export async function recordTradeNews(
   teamBId: string,
   aReceives: string[],
   bReceives: string[],
-  locale: Locale
+  locale: Locale,
+  bReceivesPicks: string[] = []
 ): Promise<void> {
   const [teams, players] = await Promise.all([
     prisma.team.findMany({ where: { id: { in: [teamAId, teamBId] } }, select: { id: true, city: true, name: true } }),
@@ -119,7 +120,10 @@ export async function recordTradeNews(
     const p = players.find((x) => x.id === id);
     return p ? `${p.firstName} ${p.lastName}` : id;
   };
-  const text = tradeNews(locale, teamName(teamAId), teamName(teamBId), aReceives.map(name), bReceives.map(name));
+  const text = tradeNews(locale, teamName(teamAId), teamName(teamBId), aReceives.map(name), [
+    ...bReceives.map(name),
+    ...bReceivesPicks,
+  ]);
   await prisma.leagueNews.create({
     data: { careerId, season, type: "trade", title: text.title, body: text.body, teamId: teamAId },
   });

@@ -26,6 +26,7 @@ model Career {
   league            League             @relation(fields: [leagueId], references: [id])
   season            String
   createdAt         DateTime           @default(now())
+  lastAiAiTradeAt   DateTime? // date (jeu) du dernier échange entre équipes IA — voir ai-trades.ts
   memberships       Membership[]
   games             Game[]
   contracts         Contract[]
