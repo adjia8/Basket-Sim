@@ -13,6 +13,9 @@ export async function generateCareerPlayerStates(
     playerId: player.id,
     age: player.age,
     overallRating: player.overallRating,
+    // Note du catalogue de référence, pour appliquer plus tard les mises à
+    // jour des notes NBA 2K (voir scripts/sync-ratings.ts).
+    catalogOverall: player.overallRating,
     scoringInside: player.ratings.scoringInside,
     scoringOutside: player.ratings.scoringOutside,
     playmaking: player.ratings.playmaking,

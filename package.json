@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:e2e": "playwright test",
+    "sync:ratings": "tsx scripts/sync-ratings.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {
