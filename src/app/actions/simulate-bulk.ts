@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { toDomainGame } from "@/lib/data-access/mappers";
 import { simulateAndResolveGame } from "@/lib/data-access/simulate";
 import { calendarDay } from "@/lib/careers/schedule-rules";
+import { maybeLeagueMilestones } from "@/lib/data-access/awards";
 import { getTranslator } from "@/lib/i18n/translate";
 import { endOfGameDay } from "@/lib/data-access/game-clock";
 import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
@@ -73,6 +74,16 @@ async function simulateInDayGroups(
   return { simulated, failed: false };
 }
 
+// All-Stars et trophées de fin de saison (voir awards.ts) : vérifiés après
+// chaque lot de matchs.
+async function runLeagueMilestones(
+  careerId: string,
+  locale: Awaited<ReturnType<typeof getTranslator>>["locale"]
+): Promise<void> {
+  const career = await prisma.career.findUnique({ where: { id: careerId }, select: { leagueId: true, season: true } });
+  if (career) await maybeLeagueMilestones(careerId, career.leagueId, career.season, locale);
+}
+
 // Simule, dans l'ordre chronologique, les matchs IA-vs-IA non joués datés
 // au plus tard `upTo` — jamais un match impliquant un manager humain (voir
 // l'en-tête de ce fichier).
@@ -105,6 +116,7 @@ async function simulateAiGamesUpTo(
     if (batch.failed || batch.simulated === 0) break;
   }
   const remaining = await prisma.game.count({ where });
+  if (simulated > 0) await runLeagueMilestones(careerId, locale);
   return { simulated, remaining };
 }
 
@@ -171,6 +183,7 @@ export async function simulateAllAiGames(): Promise<SimulateAllAiGamesResult> {
   // incohérentes ne bloque pas le lot : il restera "scheduled" et sera
   // retenté au prochain lot.
   const { simulated: simulatedCount } = await simulateInDayGroups(careerId, locale, batch);
+  if (simulatedCount > 0) await runLeagueMilestones(careerId, locale);
 
   revalidatePath("/schedule");
   revalidatePath("/standings");
@@ -245,6 +258,7 @@ export async function simulateNextMyGames(): Promise<SimulateNextMyGamesResult> 
   try {
     await simulateAndResolveGame(careerId, game, locale);
     simulatedCount = 1;
+    await runLeagueMilestones(careerId, locale);
   } catch {
     // Laisse le match "scheduled" ; l'appelant s'arrête car simulated === 0.
   }

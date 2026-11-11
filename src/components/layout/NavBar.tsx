@@ -56,6 +56,9 @@ export async function NavBar() {
       label: t("common.nav.groupLeague"),
       items: [
         { href: "/standings", label: t("common.nav.standings") },
+        { href: "/stats", label: t("league.nav.stats") },
+        { href: "/awards", label: t("league.nav.awards") },
+        { href: "/news", label: t("league.nav.news") },
         { href: "/playoffs", label: t("common.nav.playoffs") },
         { href: "/season-recap", label: t("common.nav.recap") },
       ],

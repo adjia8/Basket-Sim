@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { getPlayerAwards } from "@/lib/data-access/awards";
+import { awardName } from "@/lib/careers/news-rules";
 import { moraleLevel } from "@/lib/careers/morale-rules";
 import Link from "next/link";
 import { getCurrentMembership } from "@/lib/auth/dal";
@@ -113,7 +115,7 @@ export default async function PlayerDetailPage({
   });
   const riskLevel = injuryRiskLevel(riskChance);
 
-  const [seasonStats, stints, standardRosterSize, altSlotsUsed, demandState, tradeDeadlinePassed] = await Promise.all([
+  const [seasonStats, stints, standardRosterSize, altSlotsUsed, demandState, tradeDeadlinePassed, honors] = await Promise.all([
     getSeasonStatsForPlayers(membership.careerId, membership.season, [playerId]),
     getStintsForPlayer(membership.careerId, playerId),
     teamId
@@ -124,6 +126,7 @@ export default async function PlayerDetailPage({
       : Promise.resolve(0),
     isMyTeam ? getPlayerDemandState(membership.careerId, playerId) : Promise.resolve(null),
     isTradeDeadlinePassed(membership.careerId, membership.season),
+    getPlayerAwards(membership.careerId, playerId),
   ]);
   const stats = seasonStats.get(playerId) ?? {
     gamesPlayed: 0, points: 0, rebounds: 0, assists: 0, ppg: 0, rpg: 0, apg: 0,
@@ -435,6 +438,20 @@ export default async function PlayerDetailPage({
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {honors.length > 0 && (
+        <div className="mt-6 card p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">{t("league.awards.playerHeading")}</h2>
+          <ul className="space-y-1 text-sm">
+            {honors.map((a) => (
+              <li key={a.id} className="flex items-center justify-between gap-2">
+                <span>🏆 {awardName(a.type, locale, player.leagueId === "wnba")}</span>
+                <span className="text-muted">{a.season}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

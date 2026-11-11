@@ -20,27 +20,99 @@ model User {
 }
 
 model Career {
-  id               String            @id @default(cuid())
-  inviteCode       String            @unique
-  leagueId         String
-  league           League            @relation(fields: [leagueId], references: [id])
-  season           String
-  createdAt        DateTime          @default(now())
-  memberships      Membership[]
-  games            Game[]
-  contracts        Contract[]
-  playerStates     PlayerState[]
-  prospects        Prospect[]
-  tradeOffers      TradeOffer[]
-  draftPicks       DraftPick[]
-  deadCap          DeadCap[]
-  playoffSeries    PlayoffSeries[]
-  teamStates       TeamState[]
-  playerTeamStints PlayerTeamStint[]
-  pressConferences PressConference[]
-  inboxMessages    InboxMessage[]
-  injuryRecords    InjuryRecord[]
-  staffMembers     StaffMember[]
+  id                String             @id @default(cuid())
+  inviteCode        String             @unique
+  leagueId          String
+  league            League             @relation(fields: [leagueId], references: [id])
+  season            String
+  createdAt         DateTime           @default(now())
+  memberships       Membership[]
+  games             Game[]
+  contracts         Contract[]
+  playerStates      PlayerState[]
+  prospects         Prospect[]
+  tradeOffers       TradeOffer[]
+  draftPicks        DraftPick[]
+  deadCap           DeadCap[]
+  playoffSeries     PlayoffSeries[]
+  teamStates        TeamState[]
+  playerTeamStints  PlayerTeamStint[]
+  pressConferences  PressConference[]
+  inboxMessages     InboxMessage[]
+  injuryRecords     InjuryRecord[]
+  staffMembers      StaffMember[]
+  playerSeasonStats PlayerSeasonStat[]
+  awards            Award[]
+  leagueNews        LeagueNews[]
+}
+
+// Statistiques cumulées d'un joueur sur une saison (libellé du match :
+// saison régulière, "-playoffs", "-preseason"), mises à jour à chaque match
+// (voir data-access/season-stats.ts). teamId = dernière équipe.
+model PlayerSeasonStat {
+  id          String @id @default(cuid())
+  careerId    String
+  career      Career @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  season      String
+  playerId    String
+  teamId      String
+  gamesPlayed Int    @default(0)
+  minutes     Float  @default(0)
+  points      Int    @default(0)
+  rebounds    Int    @default(0)
+  assists     Int    @default(0)
+  steals      Int    @default(0)
+  blocks      Int    @default(0)
+  turnovers   Int    @default(0)
+  fgm         Int    @default(0)
+  fga         Int    @default(0)
+  tpm         Int    @default(0)
+  tpa         Int    @default(0)
+  ftm         Int    @default(0)
+  fta         Int    @default(0)
+
+  @@unique([careerId, season, playerId])
+  @@index([careerId, season])
+}
+
+// Trophées et distinctions (voir awards-rules.ts) : MVP, défenseur, rookie,
+// sixième homme, meilleure progression, coach de l'année, équipes All-NBA,
+// All-Star.
+model Award {
+  id        String   @id @default(cuid())
+  careerId  String
+  career    Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  season    String
+  type      String // "mvp" | "dpoy" | "roy" | "sixth_man" | "mip" | "coach" | "all_nba_1" | "all_nba_2" | "all_nba_3" | "all_star"
+  rank      Int      @default(1) // 1 = lauréat (2-3 = podium du vote)
+  playerId  String?
+  teamId    String
+  staffId   String? // coach de l'année
+  label     String? // nom figé (coach)
+  statLine  String? // ligne de stats au moment du vote
+  createdAt DateTime @default(now())
+
+  @@index([careerId, season])
+  @@index([careerId, playerId])
+}
+
+// Actualité de la ligue (toutes équipes) : exploits, blessures de stars,
+// séries, trophées, signatures… Texte écrit dans la langue de la requête
+// qui l'a créée, comme la boîte de réception.
+model LeagueNews {
+  id        String    @id @default(cuid())
+  careerId  String
+  career    Career    @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  season    String
+  gameDate  DateTime?
+  type      String // "performance" | "injury" | "streak" | "award" | "all_star" | "signing" | "draft" | "playoffs"
+  title     String
+  body      String
+  teamId    String?
+  playerId  String?
+  createdAt DateTime  @default(now())
+
+  @@index([careerId, createdAt])
 }
 
 // Membre du staff (fictif) : entraîneur principal, assistants, préparateurs

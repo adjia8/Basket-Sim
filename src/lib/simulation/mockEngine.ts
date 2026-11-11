@@ -296,19 +296,64 @@ function deriveShotStats(
 // quart-temps et accumule dans le total par joueur sur toute la partie —
 // un joueur sorti en cours de match garde ce qu'il a déjà accumulé dans les
 // quart-temps précédents.
+// Totaux d'équipe par match (référence NBA, 48 minutes) pour les stats hors
+// points — répartis ensuite entre les joueurs selon leurs minutes et leur
+// spécialité. Avant, chaque joueur de la rotation recevait « ses » rebonds,
+// passes, interceptions… à chaque quart-temps quel que soit son temps de
+// jeu : tout le monde tournait autour de 10 rebonds et 7 passes.
+const TEAM_PER_GAME = { rebounds: 44, assists: 26, steals: 7.5, blocks: 5, turnovers: 14 };
+const GAME_MINUTES_REFERENCE = 48;
+
+// Poids du poste pour les rebonds et les contres (les intérieurs dominent).
+const REBOUND_POSITION: Record<string, number> = { C: 1.3, PF: 1.15, SF: 0.95, SG: 0.8, PG: 0.7 };
+const BLOCK_POSITION: Record<string, number> = { C: 1.8, PF: 1.3, SF: 0.8, SG: 0.5, PG: 0.4 };
+
+// Rapport à une note de référence, élevé à une puissance : plus l'exposant
+// est fort, plus les meilleurs du domaine accaparent la statistique.
+function skill(rating: number, exponent: number): number {
+  return Math.pow(Math.max(20, rating) / 70, exponent);
+}
+
+// Tirage multinomial : chaque unité (rebond, passe…) va à un joueur avec une
+// probabilité proportionnelle à son poids.
+function distributeCount(total: number, weights: number[]): number[] {
+  const counts = new Array<number>(weights.length).fill(0);
+  const sum = weights.reduce((acc, w) => acc + w, 0);
+  if (sum <= 0) return counts;
+  for (let k = 0; k < total; k++) {
+    let r = Math.random() * sum;
+    let i = 0;
+    while (i < weights.length - 1 && r >= weights[i]) r -= weights[i++];
+    counts[i]++;
+  }
+  return counts;
+}
+
+function teamTotal(perGame: number, periodMinutes: number): number {
+  const mean = (perGame * periodMinutes) / GAME_MINUTES_REFERENCE;
+  return Math.max(0, Math.round(mean + noise(Math.sqrt(mean) * 1.2)));
+}
+
 function applyQuarterBoxScore(
   totals: Map<string, BoxScoreEntry>,
   teamId: string,
   rotation: Player[],
   quarterScore: number,
+  minutes: number[],
+  periodMinutes: number,
   // « Jeu pour la star » : le meilleur joueur prend bien plus de tirs.
   starFocus = false
 ): void {
   if (rotation.length === 0) return;
 
   const starId = starFocus ? [...rotation].sort((a, b) => b.overallRating - a.overallRating)[0]?.id : undefined;
-  const weights = rotation.map((p) =>
-    Math.max(p.ratings.scoringInside + p.ratings.scoringOutside + noise(3), 1) * (p.id === starId ? STAR_USAGE_BOOST : 1)
+  // Points : minutes × prise de responsabilité offensive (une star de 96
+  // prend ~2× plus de tirs par minute qu'un joueur à 75).
+  const weights = rotation.map(
+    (p, i) =>
+      Math.max(minutes[i] ?? 0, 0.1) *
+      skill((p.ratings.scoringInside + p.ratings.scoringOutside) / 2 + noise(3), 1.8) *
+      (p.id === starId ? STAR_USAGE_BOOST : 1)
   );
   const totalWeight = weights.reduce((sum, w) => sum + w, 0);
 
@@ -330,18 +375,42 @@ function applyQuarterBoxScore(
     quarterPoints[byLeftoverFraction[k].i] += 1;
   }
 
+  // Autres stats : total d'équipe réaliste, réparti selon les minutes et la
+  // spécialité de chacun.
+  const m = (i: number) => Math.max(minutes[i] ?? 0, 0);
+  const rebounds = distributeCount(
+    teamTotal(TEAM_PER_GAME.rebounds, periodMinutes),
+    rotation.map((p, i) => m(i) * skill(p.ratings.rebounding, 2.5) * (REBOUND_POSITION[p.position] ?? 1))
+  );
+  const assists = distributeCount(
+    teamTotal(TEAM_PER_GAME.assists, periodMinutes),
+    rotation.map((p, i) => m(i) * skill(p.ratings.playmaking, 3.5))
+  );
+  const steals = distributeCount(
+    teamTotal(TEAM_PER_GAME.steals, periodMinutes),
+    rotation.map((p, i) => m(i) * skill(p.ratings.defenseOutside, 2.5))
+  );
+  const blocks = distributeCount(
+    teamTotal(TEAM_PER_GAME.blocks, periodMinutes),
+    rotation.map((p, i) => m(i) * skill(p.ratings.defenseInside, 6) * (BLOCK_POSITION[p.position] ?? 1))
+  );
+  const turnovers = distributeCount(
+    teamTotal(TEAM_PER_GAME.turnovers, periodMinutes),
+    rotation.map(
+      (p, i) =>
+        (m(i) * skill((p.ratings.scoringInside + p.ratings.scoringOutside + 2 * p.ratings.playmaking) / 4, 2)) /
+        skill(p.ratings.basketballIQ, 0.5)
+    )
+  );
+
   rotation.forEach((player, i) => {
     const entry = totals.get(player.id) ?? emptyBoxEntry(player.id, teamId);
     entry.points += quarterPoints[i];
-    entry.rebounds += Math.max(0, Math.round((player.ratings.rebounding / 99) * 2.75 + noise(1)));
-    entry.assists += Math.max(0, Math.round((player.ratings.playmaking / 99) * 2 + noise(1)));
-    entry.steals += Math.max(0, Math.round((player.ratings.defenseOutside / 99) * 1.2 + noise(0.8)));
-    entry.blocks += Math.max(0, Math.round((player.ratings.defenseInside / 99) * 1.0 + noise(0.7)));
-    entry.turnovers += Math.max(
-      0,
-      Math.round((player.ratings.playmaking / 99) * 1.5 - (player.ratings.basketballIQ / 99) * 0.5 + noise(0.8))
-    );
-
+    entry.rebounds += rebounds[i];
+    entry.assists += assists[i];
+    entry.steals += steals[i];
+    entry.blocks += blocks[i];
+    entry.turnovers += turnovers[i];
     totals.set(player.id, entry);
   });
 }
@@ -377,34 +446,39 @@ function applyShotStats(
 // budget 75/25 (même logique que teamStrength), puis au sein de chaque
 // groupe au prorata de playerImpact — une joueuse qui pèse plus lourd sur
 // la force de l'équipe joue aussi plus de minutes.
+function quarterMinutes(rotation: Player[], periodMinutes: number, startersShare = 0.75): number[] {
+  if (rotation.length === 0) return [];
+  const totalPlayerMinutes = periodMinutes * 5;
+  const benchCount = Math.max(0, rotation.length - 5);
+  const startersBudget = benchCount > 0 ? totalPlayerMinutes * startersShare : totalPlayerMinutes;
+  const benchBudget = totalPlayerMinutes - startersBudget;
+  const minutes = new Array<number>(rotation.length).fill(0);
+  // Exposant < 1 chez les titulaires (les stars jouent un peu plus, sans
+  // dépasser ~38 min), > 1 sur le banc (le 6e homme joue nettement plus que
+  // le 10e).
+  const distribute = (from: number, to: number, budget: number, exponent: number) => {
+    const group = rotation.slice(from, to);
+    if (group.length === 0) return;
+    const weights = group.map((p) => Math.pow(Math.max(playerImpact(p), 1), exponent));
+    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+    group.forEach((_, i) => (minutes[from + i] = Math.round((weights[i] / totalWeight) * budget * 10) / 10));
+  };
+  distribute(0, 5, startersBudget, 0.3);
+  distribute(5, rotation.length, benchBudget, 2.5);
+  return minutes;
+}
+
 function applyQuarterMinutes(
   totals: Map<string, BoxScoreEntry>,
   teamId: string,
   rotation: Player[],
-  periodMinutes: number,
-  startersShare = 0.75
+  minutes: number[]
 ): void {
-  if (rotation.length === 0) return;
-  const totalPlayerMinutes = periodMinutes * 5;
-
-  const starters = rotation.slice(0, 5);
-  const bench = rotation.slice(5);
-  const startersBudget = bench.length > 0 ? totalPlayerMinutes * startersShare : totalPlayerMinutes;
-  const benchBudget = totalPlayerMinutes - startersBudget;
-
-  function distribute(group: Player[], budget: number): void {
-    if (group.length === 0) return;
-    const weights = group.map((p) => Math.max(playerImpact(p), 1));
-    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
-    group.forEach((player, i) => {
-      const entry = totals.get(player.id) ?? emptyBoxEntry(player.id, teamId);
-      entry.minutesPlayed += Math.round(((weights[i] / totalWeight) * budget) * 10) / 10;
-      totals.set(player.id, entry);
-    });
-  }
-
-  distribute(starters, startersBudget);
-  distribute(bench, benchBudget);
+  rotation.forEach((player, i) => {
+    const entry = totals.get(player.id) ?? emptyBoxEntry(player.id, teamId);
+    entry.minutesPlayed += minutes[i] ?? 0;
+    totals.set(player.id, entry);
+  });
 }
 
 // Tire les événements de faute du quart-temps pour la rotation active et met
@@ -534,12 +608,30 @@ function simulatePeriod(
     )
   );
 
-  applyQuarterBoxScore(ctx.totals, ctx.home.id, homeRotation, homeScore, ctx.homeTactics.offense === "star");
-  applyQuarterBoxScore(ctx.totals, ctx.away.id, awayRotation, awayScore, ctx.awayTactics.offense === "star");
+  const homeMinutes = quarterMinutes(homeRotation, periodMinutes, homeDepth.startersShare);
+  const awayMinutes = quarterMinutes(awayRotation, periodMinutes, awayDepth.startersShare);
+  applyQuarterBoxScore(
+    ctx.totals,
+    ctx.home.id,
+    homeRotation,
+    homeScore,
+    homeMinutes,
+    periodMinutes,
+    ctx.homeTactics.offense === "star"
+  );
+  applyQuarterBoxScore(
+    ctx.totals,
+    ctx.away.id,
+    awayRotation,
+    awayScore,
+    awayMinutes,
+    periodMinutes,
+    ctx.awayTactics.offense === "star"
+  );
   applyQuarterFouls(ctx.totals, ctx.home.id, homeRotation, ctx.disqualified);
   applyQuarterFouls(ctx.totals, ctx.away.id, awayRotation, ctx.disqualified);
-  applyQuarterMinutes(ctx.totals, ctx.home.id, homeRotation, periodMinutes, homeDepth.startersShare);
-  applyQuarterMinutes(ctx.totals, ctx.away.id, awayRotation, periodMinutes, awayDepth.startersShare);
+  applyQuarterMinutes(ctx.totals, ctx.home.id, homeRotation, homeMinutes);
+  applyQuarterMinutes(ctx.totals, ctx.away.id, awayRotation, awayMinutes);
 
   return { homeScore, awayScore };
 }

@@ -13,6 +13,8 @@ import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { advanceRosterDevelopment, advanceRosterTraining } from "@/lib/data-access/training";
 import { AI_MAX_RESTED_PER_GAME, WEAR_AI_AUTO_REST } from "@/lib/careers/wear-rules";
 import { PlayerStatePatches } from "@/lib/data-access/player-state-patches";
+import { recordGameStats } from "@/lib/data-access/season-stats";
+import { leagueNewsForGame } from "@/lib/data-access/league-news";
 import { chemistryTarget, nextChemistry } from "@/lib/careers/chemistry-rules";
 import { attendanceTarget, nextAttendance } from "@/lib/careers/attendance-rules";
 import { advanceRosterMorale } from "@/lib/data-access/morale";
@@ -338,7 +340,8 @@ export async function simulateAndResolveGame(
         id: { not: game.id },
         OR: [{ homeTeamId: { in: teamIds } }, { awayTeamId: { in: teamIds } }],
       },
-      select: { homeTeamId: true, awayTeamId: true, homeScore: true, awayScore: true },
+      select: { homeTeamId: true, awayTeamId: true, homeScore: true, awayScore: true, gameDate: true },
+      orderBy: { gameDate: "asc" },
     }),
   ]);
 
@@ -611,6 +614,39 @@ export async function simulateAndResolveGame(
     });
   };
 
+  // Actualité de la ligue (toutes équipes) : exploits, blessures de stars,
+  // séries marquantes.
+  const streakOf = (teamId: string): number => {
+    const results = [
+      ...priorGames,
+      { homeTeamId: game.homeTeamId, awayTeamId: game.awayTeamId, homeScore: result.homeScore, awayScore: result.awayScore },
+    ]
+      .filter((g) => (g.homeTeamId === teamId || g.awayTeamId === teamId) && g.homeScore !== null && g.awayScore !== null)
+      .map((g) => (g.homeTeamId === teamId ? g.homeScore! > g.awayScore! : g.awayScore! > g.homeScore!));
+    const last = results.at(-1);
+    let count = 0;
+    for (let i = results.length - 1; i >= 0 && results[i] === last; i--) count++;
+    return last ? count : -count;
+  };
+  const news = leagueNewsForGame({
+    locale,
+    women: game.leagueId === "wnba",
+    season: game.season,
+    gameDate,
+    home: homeTeam,
+    away: awayTeam,
+    boxScore: result.boxScore,
+    rosters: [...homeRoster, ...awayRoster],
+    injuries: [
+      ...homeNewInjuries.map((i) => ({ ...i, teamId: game.homeTeamId })),
+      ...awayNewInjuries.map((i) => ({ ...i, teamId: game.awayTeamId })),
+    ],
+    streaks: new Map([
+      [game.homeTeamId, streakOf(game.homeTeamId)],
+      [game.awayTeamId, streakOf(game.awayTeamId)],
+    ]),
+  });
+
   // Toutes les écritures du match en une seule vague parallèle.
   await Promise.all([
     prisma.game.updateMany({
@@ -634,6 +670,10 @@ export async function simulateAndResolveGame(
         })
       : Promise.resolve(),
     patches.apply(careerId),
+    recordGameStats(careerId, game.season, result.boxScore),
+    news.length > 0
+      ? prisma.leagueNews.createMany({ data: news.map((n) => ({ careerId, ...n })) })
+      : Promise.resolve(),
     injuryRecords.length > 0
       ? prisma.injuryRecord.createMany({
           data: injuryRecords.map((i) => ({

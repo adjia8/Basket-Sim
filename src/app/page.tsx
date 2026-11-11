@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { DashboardClient } from "@/components/dashboard/DashboardClient";
+import { getLeagueNews } from "@/lib/data-access/league-news";
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getPayrollForTeam } from "@/lib/data-access/contracts";
 import { getLeagueById } from "@/lib/data-access/leagues";
@@ -33,7 +35,10 @@ export default async function DashboardPage() {
     ? teams.find((t) => t.id === playoffs.champion)
     : undefined;
 
+  const news = await getLeagueNews(membership.careerId, 5);
+
   return (
+    <>
     <DashboardClient
       teamId={membership.teamId}
       teams={teams}
@@ -76,5 +81,26 @@ export default async function DashboardPage() {
         deletingCareer: t("dashboard.deletingCareer"),
       }}
     />
+    {news.length > 0 && (
+      <section className="mx-auto max-w-6xl px-4 pb-10 lg:px-8">
+        <div className="card p-4">
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <h2 className="eyebrow">{t("league.news.dashboardHeading")}</h2>
+            <Link href="/news" className="text-xs font-medium text-accent-text hover:underline">
+              {t("league.news.seeAll")} →
+            </Link>
+          </div>
+          <ul className="divide-y divide-line-soft text-sm">
+            {news.map((n) => (
+              <li key={n.id} className="py-2">
+                <p className="font-medium">{n.title}</p>
+                {n.body && <p className="text-xs text-muted">{n.body}</p>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+    )}
+    </>
   );
 }
