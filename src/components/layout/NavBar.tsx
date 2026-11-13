@@ -56,6 +56,7 @@ export async function NavBar() {
       label: t("common.nav.groupLeague"),
       items: [
         { href: "/standings", label: t("common.nav.standings") },
+        ...(membership?.leagueId === "nba" ? [{ href: "/cup", label: t("cup.title") }] : []),
         { href: "/stats", label: t("league.nav.stats") },
         { href: "/awards", label: t("league.nav.awards") },
         { href: "/news", label: t("league.nav.news") },

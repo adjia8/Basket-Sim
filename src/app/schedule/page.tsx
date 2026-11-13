@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Fragment } from "react";
+import { allStarGameDate, cupSeasonLabel } from "@/lib/careers/nba-cup-rules";
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getScheduleForCareer, getScheduleForTeam } from "@/lib/data-access/schedule";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
@@ -29,7 +31,7 @@ export default async function SchedulePage({
   const membership = await getCurrentMembership();
   const { t, locale } = await getTranslator();
 
-  const [teams, preseasonGames, games] = await Promise.all([
+  const [teams, preseasonGames, regularGames, cupGames] = await Promise.all([
     getTeamsByLeague(membership.leagueId),
     showAll
       ? getScheduleForCareer(membership.careerId, preseasonSeasonLabel(membership.season))
@@ -37,7 +39,19 @@ export default async function SchedulePage({
     showAll
       ? getScheduleForCareer(membership.careerId, membership.season)
       : getScheduleForTeam(membership.careerId, membership.teamId, membership.season),
+    // Phase finale de la NBA Cup (libellé de saison à part, voir nba-cup-rules.ts).
+    showAll
+      ? getScheduleForCareer(membership.careerId, cupSeasonLabel(membership.season))
+      : getScheduleForTeam(membership.careerId, membership.teamId, cupSeasonLabel(membership.season)),
   ]);
+  const games = [...regularGames, ...cupGames].sort((a, b) => a.gameDate.localeCompare(b.gameDate));
+  const allStarDay = membership.leagueId === "nba" ? allStarGameDate(membership.season).toISOString().slice(0, 10) : null;
+  const cupLabels: Record<string, string> = {
+    group: t("cup.title"),
+    qf: `${t("cup.title")} · ${t("cup.stage.qf")}`,
+    sf: `${t("cup.title")} · ${t("cup.stage.sf")}`,
+    final: `${t("cup.title")} · ${t("cup.stage.final")}`,
+  };
 
   const teamById = new Map(teams.map((t) => [t.id, t]));
 
@@ -121,7 +135,15 @@ export default async function SchedulePage({
             {t("schedule.regularSeasonHeading")}
           </h2>
         )}
-        <GameList games={games} teamById={teamById} locale={locale} upcomingLabel={t("schedule.upcoming")} />
+        <GameList
+          games={games}
+          teamById={teamById}
+          locale={locale}
+          upcomingLabel={t("schedule.upcoming")}
+          cupLabels={cupLabels}
+          breakAfter={allStarDay}
+          breakLabel={t("cup.allStarBreak")}
+        />
       </div>
     </div>
   );
@@ -132,25 +154,42 @@ function GameList({
   teamById,
   locale,
   upcomingLabel,
+  cupLabels,
+  breakAfter,
+  breakLabel,
 }: {
   games: Game[];
   teamById: Map<string, Team>;
   locale: Locale;
   upcomingLabel: string;
+  cupLabels?: Record<string, string>;
+  breakAfter?: string | null;
+  breakLabel?: string;
 }) {
+  // Séparateur de la pause du All-Star : avant le premier match qui la suit.
+  const firstAfterBreak = breakAfter ? games.find((g) => g.gameDate > breakAfter)?.id : undefined;
   return (
     <div className="space-y-2">
       {games.map((game) => {
         const home = teamById.get(game.homeTeamId);
         const away = teamById.get(game.awayTeamId);
         return (
+          <Fragment key={game.id}>
+          {game.id === firstAfterBreak && (
+            <p className="py-2 text-center text-xs font-semibold uppercase tracking-wide text-warn">⭐ {breakLabel}</p>
+          )}
           <Link
-            key={game.id}
             href={`/game/${game.id}`}
             className="flex items-center justify-between card px-4 py-3 text-sm transition hover:bg-surface-2"
           >
             <span>
               {away ? teamFullName(away) : "?"} @ {home ? teamFullName(home) : "?"}
+              {game.cupStage && cupLabels && (
+                <span className="ml-2 rounded bg-accent/15 px-1.5 py-0.5 text-xs font-medium text-accent-text">
+                  🏆 {cupLabels[game.cupStage]}
+                  {game.cupStage === "group" && game.cupGroup ? ` · ${game.cupGroup}` : ""}
+                </span>
+              )}
             </span>
             <span className="flex items-center gap-3 text-muted">
               <span>{formatGameDate(game.gameDate, locale)}</span>
@@ -165,6 +204,7 @@ function GameList({
               )}
             </span>
           </Link>
+          </Fragment>
         );
       })}
     </div>

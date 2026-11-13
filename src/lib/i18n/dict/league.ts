@@ -42,6 +42,7 @@ export const keys = [
   "league.news.type.award",
   "league.news.type.all_star",
   "league.news.type.trade",
+  "league.news.type.cup",
   "league.news.dashboardHeading",
   "league.news.seeAll",
 ] as const;
@@ -93,6 +94,7 @@ export const fr: Record<LeagueKey, string> = {
   "league.news.type.award": "Trophée",
   "league.news.type.all_star": "All-Star",
   "league.news.type.trade": "Échange",
+  "league.news.type.cup": "NBA Cup",
   "league.news.dashboardHeading": "Actualité de la ligue",
   "league.news.seeAll": "Toute l'actualité",
 };
@@ -142,6 +144,7 @@ export const en: Record<LeagueKey, string> = {
   "league.news.type.award": "Award",
   "league.news.type.all_star": "All-Star",
   "league.news.type.trade": "Trade",
+  "league.news.type.cup": "NBA Cup",
   "league.news.dashboardHeading": "League news",
   "league.news.seeAll": "All news",
 };

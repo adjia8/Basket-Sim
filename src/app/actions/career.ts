@@ -9,6 +9,7 @@ import { generateCareerContracts } from "@/lib/careers/generate-contracts";
 import { generateCareerPlayerStates } from "@/lib/careers/generate-player-states";
 import { generateInviteCode } from "@/lib/careers/invite-code";
 import { preseasonSeasonLabel, seasonCalendar } from "@/lib/careers/schedule-rules";
+import { nbaScheduleExtras } from "@/lib/careers/nba-cup-rules";
 import {
   createUnresolvedPicksForSeason,
   FUTURE_PICK_WINDOW,
@@ -256,6 +257,7 @@ export async function createCareer(
     seasonLabel: league.season,
     startDate: calendar.regularSeasonStart,
     seasonDays: calendar.regularSeasonDays,
+    ...nbaScheduleExtras(league.id, league.season, null),
   });
 
   // Chaque équipe possède déjà ses picks des prochaines saisons, échangeables

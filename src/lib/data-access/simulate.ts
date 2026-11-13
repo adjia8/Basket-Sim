@@ -60,7 +60,7 @@ async function cachedTeam(teamId: string): Promise<Team | undefined> {
 const careersWithStaff = new Set<string>();
 async function ensureStaffOnce(careerId: string, leagueId: string, season: string): Promise<void> {
   if (careersWithStaff.has(careerId)) return;
-  await ensureCareerStaff(careerId, leagueId, season.replace(/-(playoffs|preseason)$/, ""));
+  await ensureCareerStaff(careerId, leagueId, season.replace(/-(playoffs|preseason|cup)$/, ""));
   careersWithStaff.add(careerId);
 }
 import { gmBonusFromProfile } from "@/lib/data-access/gm";
@@ -670,7 +670,8 @@ export async function simulateAndResolveGame(
         })
       : Promise.resolve(),
     patches.apply(careerId),
-    recordGameStats(careerId, game.season, result.boxScore),
+    // Phase finale de la NBA Cup : hors statistiques de saison (voir nba-cup-rules.ts).
+    game.season.endsWith("-cup") ? Promise.resolve() : recordGameStats(careerId, game.season, result.boxScore),
     news.length > 0
       ? prisma.leagueNews.createMany({ data: news.map((n) => ({ careerId, ...n })) })
       : Promise.resolve(),
@@ -696,7 +697,7 @@ export async function simulateAndResolveGame(
   // transfert et boîte de réception ne concernent que les GM humains).
   if (!homeManager && !awayManager) return updated;
 
-  const standings = await getStandings(careerId, game.leagueId, game.season);
+  const standings = await getStandings(careerId, game.leagueId, game.season.replace(/-cup$/, ""));
   const homeStandingsRow = standings.find((s) => s.teamId === game.homeTeamId);
   const awayStandingsRow = standings.find((s) => s.teamId === game.awayTeamId);
 

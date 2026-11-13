@@ -5,7 +5,7 @@ import { getTranslator } from "@/lib/i18n/translate";
 import type { DictionaryKey } from "@/lib/i18n/dictionary";
 import { formatGameDate } from "@/lib/utils";
 
-const TYPES = ["performance", "injury", "streak", "trade", "award", "all_star"] as const;
+const TYPES = ["performance", "injury", "streak", "trade", "award", "all_star", "cup"] as const;
 
 const TYPE_TONE: Record<string, string> = {
   performance: "bg-accent/15 text-accent-text",
@@ -14,6 +14,7 @@ const TYPE_TONE: Record<string, string> = {
   award: "bg-good/15 text-good",
   all_star: "bg-warn/15 text-warn",
   trade: "bg-surface-3 text-fg",
+  cup: "bg-accent/15 text-accent-text",
 };
 
 export default async function NewsPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {

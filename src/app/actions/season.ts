@@ -33,6 +33,7 @@ import { offseasonRecovery } from "@/lib/careers/injury-rules";
 import { ensureCareerStaff, getStaffProfiles, processStaffOffseason } from "@/lib/data-access/staff";
 import { moraleAfterSummer } from "@/lib/careers/morale-rules";
 import { resolveContractOptions } from "@/lib/data-access/negotiations";
+import { nbaScheduleExtras } from "@/lib/careers/nba-cup-rules";
 
 // Patch PlayerState de l'intersaison côté santé : énergie pleine, blessures
 // guéries d'environ 50 matchs, statut de blessure effacé si rétabli.
@@ -81,6 +82,18 @@ export async function advanceSeason(): Promise<void> {
       : a.pointsFor - a.pointsAgainst - (b.pointsFor - b.pointsAgainst)
   );
   const draftOrderTeamIds = draftOrder.map((row) => row.teamId);
+  // Chapeaux du tirage de la NBA Cup suivante (meilleurs bilans d'abord).
+  const conferenceOf = new Map(
+    (await prisma.team.findMany({ where: { leagueId: career.leagueId }, include: { conference: true } })).map((t) => [
+      t.id,
+      /east/i.test(t.conference.name) ? "east" : "west",
+    ])
+  );
+  const bestFirst = [...draftOrderTeamIds].reverse();
+  const rankedByConference = {
+    east: bestFirst.filter((id) => conferenceOf.get(id) === "east"),
+    west: bestFirst.filter((id) => conferenceOf.get(id) === "west"),
+  };
 
   // Niveaux de personnel de training par équipe, capturés maintenant (avant
   // la dégradation annuelle plus bas) — le bonus de progression des jeunes
@@ -352,6 +365,7 @@ export async function advanceSeason(): Promise<void> {
     seasonLabel: newSeason,
     startDate: calendar.regularSeasonStart,
     seasonDays: calendar.regularSeasonDays,
+    ...nbaScheduleExtras(career.leagueId, newSeason, rankedByConference),
   });
 
   revalidatePath("/", "layout");

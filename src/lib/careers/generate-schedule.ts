@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { PRESEASON_ROUNDS, PRESEASON_SPAN_DAYS, REGULAR_SEASON_GAMES, SEASON_LENGTH_DAYS } from "./schedule-rules";
 import type { League } from "@/lib/types";
+import { groupRounds } from "./nba-cup-rules";
 
 export function addDays(date: Date, days: number): Date {
   const next = new Date(date);
@@ -95,6 +96,13 @@ export interface GenerateScheduleOptions {
   // Durée de la saison régulière en jours (voir seasonCalendar) — défaut :
   // SEASON_LENGTH_DAYS de la ligue.
   seasonDays?: number;
+  // Jours calendaires (AAAA-MM-JJ) sans match ordinaire : soirs de Cup,
+  // phase finale de la Cup, pause du All-Star (voir nba-cup-rules.ts).
+  reservedDays?: Set<string>;
+  // NBA Cup : groupes de 5, et les 5 soirs de groupe. Un des matchs
+  // ordinaires de chaque paire d'un même groupe est déplacé sur son soir de
+  // Cup et marqué comme match de groupe (le total de 82 ne change pas).
+  cup?: { groups: Record<string, string[]>; nights: Date[] };
 }
 
 export async function generateCareerSchedule(
@@ -136,10 +144,27 @@ export async function generateCareerSchedule(
   // croissant en tour tant que totalRounds <= seasonDays (le cas normal —
   // ~82-90 tours pour 170 jours NBA, ~44-55 pour 130 jours WNBA) ; repli à un
   // tour = un jour sinon (saison compressée mais toujours sans collision).
+  // Jours réellement disponibles (hors jours réservés).
+  const reserved = options.reservedDays ?? new Set<string>();
+  const openOffsets: number[] = [];
+  for (let d = 0; d < seasonDays; d++) {
+    if (!reserved.has(addDays(startDate, d).toISOString().slice(0, 10))) openOffsets.push(d);
+  }
+  const openDays = openOffsets.length;
   const dayForRound = (round: number): number =>
-    totalRounds <= seasonDays ? Math.floor((round * seasonDays) / totalRounds) : round;
+    totalRounds <= openDays ? openOffsets[Math.floor((round * openDays) / totalRounds)] : round;
 
-  const rows = pairs.map(([teamA, teamB], index) => {
+  const rows: {
+    careerId: string;
+    leagueId: string;
+    season: string;
+    gameDate: Date;
+    homeTeamId: string;
+    awayTeamId: string;
+    status: string;
+    cupStage?: string;
+    cupGroup?: string;
+  }[] = pairs.map(([teamA, teamB], index) => {
     const dayOffset = dayForRound(roundOfPair[index]);
     const gameDate = addDays(startDate, dayOffset);
     const homeTeamId = index % 2 === 0 ? teamA : teamB;
@@ -155,6 +180,34 @@ export async function generateCareerSchedule(
       status: "scheduled",
     };
   });
+
+  if (options.cup) {
+    const key = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+    // Pour chaque paire, ses matchs du plus tardif au plus précoce : on
+    // déplace le plus tardif (le calendrier de novembre reste aéré).
+    const byPair = new Map<string, number[]>();
+    rows.forEach((r, i) => {
+      const k = key(r.homeTeamId, r.awayTeamId);
+      (byPair.get(k) ?? byPair.set(k, []).get(k)!).push(i);
+    });
+    for (const list of byPair.values()) list.sort((a, b) => rows[b].gameDate.getTime() - rows[a].gameDate.getTime());
+    for (const [group, teams] of Object.entries(options.cup.groups)) {
+      groupRounds(teams).forEach((games, round) => {
+        for (const [home, away] of games) {
+          const index = byPair.get(key(home, away))?.shift();
+          if (index === undefined) continue;
+          rows[index] = {
+            ...rows[index],
+            gameDate: options.cup!.nights[round],
+            homeTeamId: home,
+            awayTeamId: away,
+            cupStage: "group",
+            cupGroup: group,
+          };
+        }
+      });
+    }
+  }
 
   await prisma.game.createMany({ data: rows });
 }

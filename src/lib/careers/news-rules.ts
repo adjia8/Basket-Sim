@@ -21,6 +21,9 @@ const AWARD_NAMES: Record<AwardType, { fr: string; frWomen: string; en: string }
   all_nba_2: { fr: "2e équipe All-NBA", frWomen: "2e équipe All-WNBA", en: "All-NBA Second Team" },
   all_nba_3: { fr: "3e équipe All-NBA", frWomen: "3e équipe All-WNBA", en: "All-NBA Third Team" },
   all_star: { fr: "All-Star", frWomen: "All-Star", en: "All-Star" },
+  all_star_mvp: { fr: "MVP du All-Star Game", frWomen: "MVP du All-Star Game", en: "All-Star Game MVP" },
+  nba_cup: { fr: "Vainqueur de la NBA Cup", frWomen: "Vainqueur de la Commissioner's Cup", en: "NBA Cup champion" },
+  cup_mvp: { fr: "MVP de la NBA Cup", frWomen: "MVP de la Commissioner's Cup", en: "NBA Cup MVP" },
 };
 
 export function awardName(type: AwardType, locale: Locale, women = false): string {

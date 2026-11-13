@@ -6,7 +6,7 @@ import { calendarDay } from "@/lib/careers/schedule-rules";
 // matchs simulés, donc « aujourd'hui » = le jour du dernier match joué de
 // la Career (ou, avant tout match, le jour du tout premier match prévu).
 
-export type SeasonPhase = "preseason" | "regular" | "playoffs";
+export type SeasonPhase = "preseason" | "regular" | "cup" | "playoffs";
 
 export interface NextMyGame {
   id: string;
@@ -28,6 +28,7 @@ export interface GameClock {
 function phaseOf(season: string): SeasonPhase {
   if (season.endsWith("-preseason")) return "preseason";
   if (season.endsWith("-playoffs")) return "playoffs";
+  if (season.endsWith("-cup")) return "cup";
   return "regular";
 }
 

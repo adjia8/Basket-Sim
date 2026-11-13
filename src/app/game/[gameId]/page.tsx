@@ -209,7 +209,13 @@ export default async function GamePage({
       : null;
 
   const isFinal = game.status === "final";
-  const phase = game.season.endsWith("-preseason") ? "preseason" : game.season.endsWith("-playoffs") ? "playoffs" : "regular";
+  const phase = game.season.endsWith("-preseason")
+    ? "preseason"
+    : game.season.endsWith("-playoffs")
+      ? "playoffs"
+      : game.season.endsWith("-cup")
+        ? "cup"
+        : "regular";
   const snapshot = (team: Team, roster: typeof awayRoster, form: ("W" | "L")[], rank: number): TeamSnapshot => ({
     team,
     row: standings.find((s) => s.teamId === team.id),

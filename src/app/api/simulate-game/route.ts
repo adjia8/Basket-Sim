@@ -5,6 +5,7 @@ import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getGameById, setGameReady } from "@/lib/data-access/schedule";
 import { simulateAndResolveGame } from "@/lib/data-access/simulate";
 import { getTranslator } from "@/lib/i18n/translate";
+import { advanceNbaCup, maybePlayAllStarGame } from "@/lib/data-access/nba-cup";
 import { maybeLeagueMilestones } from "@/lib/data-access/awards";
 import { HALFTIME_TONES, PREGAME_TONES, type TalkTone } from "@/lib/careers/team-talk-rules";
 
@@ -111,7 +112,11 @@ export async function POST(request: Request) {
   // All-Stars et trophées (voir awards.ts), une fois le match terminé.
   if (updated?.status === "final") {
     const career = await prisma.career.findUnique({ where: { id: membership.careerId }, select: { leagueId: true, season: true } });
-    if (career) await maybeLeagueMilestones(membership.careerId, career.leagueId, career.season, locale);
+    if (career) {
+      await maybeLeagueMilestones(membership.careerId, career.leagueId, career.season, locale);
+      await maybePlayAllStarGame(membership.careerId, career.leagueId, career.season, locale);
+      await advanceNbaCup(membership.careerId, career.leagueId, career.season, locale);
+    }
   }
 
   return NextResponse.json({ simulated: true, game: updated });

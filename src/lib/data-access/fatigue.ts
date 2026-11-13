@@ -19,7 +19,9 @@ export async function getRestDays(
   const previous = await prisma.game.findFirst({
     where: {
       careerId,
-      season,
+      // Tous les matchs de la saison (régulière, NBA Cup, playoffs) : seul
+      // le dernier match joué compte pour le repos.
+      season: { startsWith: season.slice(0, 9) },
       status: "final",
       gameDate: { lt: currentGameDate },
       OR: [{ homeTeamId: teamId }, { awayTeamId: teamId }],

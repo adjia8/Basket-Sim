@@ -54,6 +54,9 @@ export default async function AwardsPage() {
       podium: list.filter((a) => a.type === type && a.rank > 1),
     })).filter((x) => x.winner);
     const allStars = list.filter((a) => a.type === "all_star");
+    const asgMvp = list.find((a) => a.type === "all_star_mvp");
+    const cupWinner = list.find((a) => a.type === "nba_cup");
+    const cupMvp = list.find((a) => a.type === "cup_mvp");
     return (
       <section key={season} className="mt-8">
         <h2 className="text-lg font-semibold">{t("league.awards.season", { season })}</h2>
@@ -96,8 +99,27 @@ export default async function AwardsPage() {
             </ul>
           </div>
         )}
+        {cupWinner && (
+          <div className="card mt-3 p-4 text-sm">
+            <p className="eyebrow">{awardName("nba_cup", locale, women)}</p>
+            <p className="mt-1 text-base">
+              🏆 <Link href="/cup" className="font-medium hover:underline">{cupWinner.label}</Link>
+            </p>
+            {cupMvp && (
+              <p className="mt-1 text-xs text-muted">
+                {awardName("cup_mvp", locale, women)} : {who(cupMvp)} {cupMvp.statLine && `· ${cupMvp.statLine}`}
+              </p>
+            )}
+          </div>
+        )}
         <div className="card mt-3 p-4 text-sm">
           <p className="eyebrow mb-2">{t("league.awards.allStars")}</p>
+          {asgMvp && (
+            <p className="mb-2">
+              ⭐ <span className="text-muted">{awardName("all_star_mvp", locale, women)} : </span>
+              {who(asgMvp)} {asgMvp.statLine && <span className="text-xs text-muted">· {asgMvp.statLine}</span>}
+            </p>
+          )}
           {allStars.length === 0 ? (
             <p className="text-muted">{t("league.awards.allStarsPending")}</p>
           ) : (

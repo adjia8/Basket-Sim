@@ -7,6 +7,7 @@ import { toDomainGame } from "@/lib/data-access/mappers";
 import { simulateAndResolveGame } from "@/lib/data-access/simulate";
 import { calendarDay } from "@/lib/careers/schedule-rules";
 import { maybeLeagueMilestones } from "@/lib/data-access/awards";
+import { advanceNbaCup, cupBarrier, maybePlayAllStarGame } from "@/lib/data-access/nba-cup";
 import { maybeAiTradeOffers } from "@/lib/data-access/ai-trades";
 import { getTranslator } from "@/lib/i18n/translate";
 import { endOfGameDay } from "@/lib/data-access/game-clock";
@@ -84,6 +85,9 @@ async function runLeagueMilestones(
   const career = await prisma.career.findUnique({ where: { id: careerId }, select: { leagueId: true, season: true } });
   if (!career) return;
   await maybeLeagueMilestones(careerId, career.leagueId, career.season, locale);
+  // Calendrier réel NBA : All-Star Game pendant la pause, NBA Cup.
+  await maybePlayAllStarGame(careerId, career.leagueId, career.season, locale);
+  await advanceNbaCup(careerId, career.leagueId, career.season, locale);
   // Offres d'échange à l'initiative de l'IA (voir ai-trades.ts).
   await maybeAiTradeOffers(careerId, career.leagueId, career.season, locale);
 }
@@ -109,10 +113,30 @@ async function simulateAiGamesUpTo(
 
   const deadline = Date.now() + CATCH_UP_TIME_BUDGET_MS;
   let simulated = 0;
+  const career = await prisma.career.findUnique({ where: { id: careerId }, select: { leagueId: true, season: true } });
   while (Date.now() < deadline) {
+    // NBA Cup : on ne dépasse pas la date du prochain tour de phase finale
+    // tant que ce tour n'est pas créé (voir cupBarrier).
+    const barrier = career ? await cupBarrier(careerId, career.leagueId, career.season) : null;
+    const bounded = barrier && (!upTo || barrier <= upTo) ? { ...where, gameDate: { lt: barrier } } : where;
     // Quelques journées à la fois (au lieu d'une requête par match).
-    const rows = await prisma.game.findMany({ where, orderBy: { gameDate: "asc" }, take: 40 });
-    if (rows.length === 0) break;
+    const rows = await prisma.game.findMany({ where: bounded, orderBy: { gameDate: "asc" }, take: 40 });
+    if (rows.length === 0) {
+      if (bounded === where || !career) break;
+      // Arrivé à la barrière : on tente de créer le tour suivant.
+      const before = barrier!.getTime();
+      const humanGamesCreated = await advanceNbaCup(careerId, career.leagueId, career.season, locale);
+      const next = await cupBarrier(careerId, career.leagueId, career.season);
+      // Le calendrier d'un GM humain vient de changer : on rend la main pour
+      // qu'il recalcule son prochain match.
+      if (humanGamesCreated) return { simulated, remaining: 1 };
+      if (next?.getTime() === before) {
+        // Tour précédent pas fini (match d'un autre GM humain à jouer) : on
+        // ne compte pas les matchs bloqués derrière la barrière.
+        return { simulated, remaining: await prisma.game.count({ where: bounded }) };
+      }
+      continue;
+    }
     // Match à données incohérentes : on s'arrête là (il restera "scheduled"
     // et sera retenté) plutôt que de boucler dessus.
     const batch = await simulateInDayGroups(careerId, locale, rows, { deadline, stopOnError: true });
@@ -179,7 +203,16 @@ export async function simulateAllAiGames(): Promise<SimulateAllAiGamesResult> {
   });
 
   const totalPending = pendingRows.length;
-  const batch = pendingRows.slice(0, BATCH_SIZE);
+  // NBA Cup : pas au-delà du prochain tour de phase finale tant qu'il n'est
+  // pas créé (voir cupBarrier).
+  const career = await prisma.career.findUnique({ where: { id: careerId }, select: { leagueId: true, season: true } });
+  let barrier = career ? await cupBarrier(careerId, career.leagueId, career.season) : null;
+  if (career && barrier && pendingRows.length > 0 && pendingRows[0].gameDate >= barrier) {
+    await advanceNbaCup(careerId, career.leagueId, career.season, locale);
+    barrier = await cupBarrier(careerId, career.leagueId, career.season);
+  }
+  const eligibleRows = barrier ? pendingRows.filter((g) => g.gameDate < barrier!) : pendingRows;
+  const batch = (eligibleRows.length > 0 ? eligibleRows : pendingRows).slice(0, BATCH_SIZE);
 
   // Jamais deux matchs d'une même équipe en même temps : le repos/la
   // fatigue/la chimie dépendent de l'ordre de ses matchs — d'où des groupes

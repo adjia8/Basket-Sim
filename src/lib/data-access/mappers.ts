@@ -196,5 +196,7 @@ export function toDomainGame(row: PrismaGame): Game {
     homeReady: row.homeReady,
     awayReady: row.awayReady,
     playoffSeriesId: row.playoffSeriesId ?? undefined,
+    cupStage: (row.cupStage as Game["cupStage"]) ?? undefined,
+    cupGroup: row.cupGroup ?? undefined,
   };
 }

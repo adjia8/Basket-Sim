@@ -132,6 +132,8 @@ export interface Game {
   homeReady: boolean;
   awayReady: boolean;
   playoffSeriesId?: string;
+  cupStage?: "group" | "qf" | "sf" | "final"; // NBA Cup, voir nba-cup-rules.ts
+  cupGroup?: string;
 }
 
 // --- Contrat ---

@@ -9,6 +9,7 @@ import { winPctForStandings } from "@/lib/careers/player-demands";
 import { teamStrengthScore } from "@/lib/careers/gm-rules";
 import { clampMorale } from "@/lib/careers/morale-rules";
 import { NBA_ROOKIES_START_SEASON } from "@/lib/mock-data/rookies-nba";
+import { allStarSelectionDue } from "@/lib/careers/nba-cup-rules";
 import {
   ALL_NBA,
   ALL_STAR_SEASON_FRACTION,
@@ -31,7 +32,7 @@ import type { Team } from "@/lib/types";
 
 const START_SEASON = "2026-2027";
 
-interface AwardDraft {
+export interface AwardDraft {
   type: AwardType;
   rank: number;
   playerId: string | null;
@@ -67,7 +68,7 @@ async function leagueContext(careerId: string, leagueId: string, season: string)
 
 // Enregistre les distinctions UNE seule fois (verrou consultatif, puis
 // revérification) — renvoie false si un autre appel l'a déjà fait.
-async function saveAwardsOnce(
+export async function saveAwardsOnce(
   careerId: string,
   season: string,
   sentinel: AwardType,
@@ -95,7 +96,7 @@ async function saveAwardsOnce(
 }
 
 // Renommée et moral des lauréats (podiums exclus).
-async function applyAwardEffects(careerId: string, drafts: AwardDraft[]): Promise<void> {
+export async function applyAwardEffects(careerId: string, drafts: AwardDraft[]): Promise<void> {
   const winners = drafts.filter((d) => d.rank === 1 && d.playerId);
   if (winners.length === 0) return;
   const states = await prisma.playerState.findMany({
@@ -115,7 +116,7 @@ async function applyAwardEffects(careerId: string, drafts: AwardDraft[]): Promis
 }
 
 // Notifie les GM humains dont un joueur est distingué.
-async function notifyHumans(
+export async function notifyHumans(
   careerId: string,
   season: string,
   drafts: AwardDraft[],
@@ -309,14 +310,20 @@ async function computeSeasonAwards(careerId: string, leagueId: string, season: s
 // une fois la saison régulière terminée. Idempotente.
 export async function maybeLeagueMilestones(careerId: string, leagueId: string, season: string, locale: Locale): Promise<void> {
   if (!isRegularSeason(season)) return;
-  const [total, finals, allStars, mvps] = await Promise.all([
+  const [total, finals, allStars, mvps, lastPlayed] = await Promise.all([
     prisma.game.count({ where: { careerId, season } }),
     prisma.game.count({ where: { careerId, season, status: "final" } }),
     prisma.award.count({ where: { careerId, season, type: "all_star" } }),
     prisma.award.count({ where: { careerId, season, type: "mvp" } }),
+    prisma.game.findFirst({ where: { careerId, season, status: "final" }, orderBy: { gameDate: "desc" }, select: { gameDate: true } }),
   ]);
   if (total === 0) return;
-  if (allStars === 0 && finals / total >= ALL_STAR_SEASON_FRACTION) await selectAllStars(careerId, leagueId, season, locale);
+  // NBA : calé sur la vraie date du All-Star Game ; WNBA : fraction de saison.
+  const allStarDue =
+    leagueId === "nba"
+      ? allStarSelectionDue(season, lastPlayed?.gameDate ?? null)
+      : finals / total >= ALL_STAR_SEASON_FRACTION;
+  if (allStars === 0 && allStarDue) await selectAllStars(careerId, leagueId, season, locale);
   if (mvps === 0 && finals === total) await computeSeasonAwards(careerId, leagueId, season, locale);
 }
 

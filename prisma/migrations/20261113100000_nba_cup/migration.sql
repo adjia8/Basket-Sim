@@ -1,0 +1,2 @@
+ALTER TABLE "Game" ADD COLUMN "cupStage" TEXT;
+ALTER TABLE "Game" ADD COLUMN "cupGroup" TEXT;

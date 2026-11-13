@@ -103,7 +103,7 @@ export async function getFranchiseRecords(careerId: string, teamId: string): Pro
     const opponentTeamId = isHome ? game.awayTeamId : game.homeTeamId;
     const won = teamScore > opponentScore;
 
-    if (!game.season.endsWith("-playoffs")) {
+    if (/^\d{4}-\d{4}$/.test(game.season)) {
       const row = recordBySeason.get(game.season) ?? { wins: 0, losses: 0 };
       if (won) row.wins++;
       else row.losses++;

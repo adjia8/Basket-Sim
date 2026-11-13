@@ -389,6 +389,11 @@ model Game {
   playoffSeries   PlayoffSeries? @relation(fields: [playoffSeriesId], references: [id], onDelete: SetNull)
   gameNumber      Int? // position dans la série (1er match, 2e, ...) — détermine qui reçoit
 
+  // NBA Cup (voir nba-cup-rules.ts) : "group" | "qf" | "sf" | "final", et le
+  // groupe (ex. "Ouest C") ou l'affiche de phase finale (ex. "E1-E4").
+  cupStage String?
+  cupGroup String?
+
   @@index([careerId])
   @@index([playoffSeriesId])
 }
