@@ -1,5 +1,6 @@
 "use server";
 
+import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
@@ -34,8 +35,8 @@ export async function setTrainingPlan(
   if (!VALID_FOCUSES.has(focusRaw as TrainingFocus)) return { error: t("training.invalidFocus") };
   if (!VALID_INTENSITIES.has(intensityRaw as TrainingIntensity)) return { error: t("training.invalidIntensity") };
 
-  const membership = await prisma.membership.findUnique({
-    where: { userId },
+  const membership = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(userId),
     include: { career: true },
   });
   if (!membership) return { error: t("rosterAction.noCareer") };

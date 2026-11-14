@@ -1,3 +1,4 @@
+import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
@@ -26,8 +27,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: t("simulateAction.notAuthenticated") }, { status: 401 });
   }
 
-  const membership = await prisma.membership.findUnique({
-    where: { userId: session.userId },
+  const membership = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(session.userId),
   });
   if (!membership) {
     return NextResponse.json({ error: t("simulateAction.noCareer") }, { status: 404 });

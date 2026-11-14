@@ -16,7 +16,10 @@ model User {
   email        String      @unique
   passwordHash String
   createdAt    DateTime    @default(now())
-  membership   Membership?
+  memberships  Membership[]
+  // Carrière en cours (un compte peut en avoir plusieurs, voir
+  // src/lib/auth/active-membership.ts).
+  activeMembershipId String?
 }
 
 model Career {
@@ -212,7 +215,7 @@ model Membership {
   id        String     @id @default(cuid())
   careerId  String
   career    Career     @relation(fields: [careerId], references: [id], onDelete: Cascade)
-  userId    String     @unique
+  userId    String
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   teamId    String
   team      Team       @relation(fields: [teamId], references: [id])
@@ -221,6 +224,7 @@ model Membership {
 
   @@unique([careerId, teamId])
   @@index([careerId])
+  @@index([userId])
 }
 
 // Identité du GM incarné par ce Membership — 1:1, persiste tel quel à

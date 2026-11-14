@@ -1,5 +1,6 @@
 "use server";
 
+import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
@@ -8,7 +9,7 @@ import { getLocale } from "@/lib/i18n/locale";
 
 async function currentMembership() {
   const { userId } = await verifySession();
-  return prisma.membership.findUnique({ where: { userId }, include: { career: true } });
+  return prisma.membership.findFirst({ where: await activeMembershipWhere(userId), include: { career: true } });
 }
 
 function revalidatePress() {

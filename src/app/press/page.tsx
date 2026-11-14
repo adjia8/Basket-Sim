@@ -1,3 +1,4 @@
+import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { verifySession, flattenMembership } from "@/lib/auth/dal";
@@ -139,8 +140,8 @@ function ConferenceResult({ conference, t, locale }: { conference: PressConferen
 // pendingReassignment.
 export default async function PressPage() {
   const { userId } = await verifySession();
-  const membershipRow = await prisma.membership.findUnique({
-    where: { userId },
+  const membershipRow = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(userId),
     include: { career: true, gmProfile: { select: { pendingReassignment: true } } },
   });
   if (!membershipRow) redirect("/onboarding");

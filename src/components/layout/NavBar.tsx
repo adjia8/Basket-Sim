@@ -51,6 +51,7 @@ export async function NavBar() {
         ...(membership ? [{ href: `/teams/${membership.teamId}`, label: t("common.nav.myTeam") }] : []),
         { href: "/schedule", label: t("common.nav.schedule") },
         { href: "/teams", label: t("common.nav.teams") },
+        { href: "/careers", label: t("careers.nav") },
       ],
     },
     {

@@ -1,5 +1,6 @@
 "use server";
 
+import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
@@ -160,7 +161,7 @@ export interface CatchUpResult {
 export async function catchUpLeagueBefore(gameId: string): Promise<CatchUpResult> {
   const { userId } = await verifySession();
   const { locale } = await getTranslator();
-  const membership = await prisma.membership.findUnique({ where: { userId } });
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId) });
   if (!membership) return { simulated: 0, remaining: 0, error: "No career" };
 
   const target = await prisma.game.findFirst({ where: { id: gameId, careerId: membership.careerId } });
@@ -179,7 +180,7 @@ export async function simulateAllAiGames(): Promise<SimulateAllAiGamesResult> {
   const { userId } = await verifySession();
   const { locale } = await getTranslator();
 
-  const membership = await prisma.membership.findUnique({ where: { userId } });
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId) });
   if (!membership) {
     return { simulated: 0, remaining: 0, error: "No career" };
   }
@@ -256,7 +257,7 @@ export async function simulateNextMyGames(): Promise<SimulateNextMyGamesResult> 
   const { userId } = await verifySession();
   const { locale } = await getTranslator();
 
-  const membership = await prisma.membership.findUnique({ where: { userId } });
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId) });
   if (!membership) {
     return { simulated: 0, remaining: 0, leagueGamesSimulated: 0, error: "No career" };
   }
@@ -334,7 +335,7 @@ export type ContinueResult =
 export async function continueGame(options: { acknowledgeInbox?: boolean } = {}): Promise<ContinueResult> {
   const { userId } = await verifySession();
   const { locale } = await getTranslator();
-  const membership = await prisma.membership.findUnique({ where: { userId }, include: { career: true } });
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId), include: { career: true } });
   if (!membership) return { kind: "error" };
 
   const { careerId, teamId, career } = membership;

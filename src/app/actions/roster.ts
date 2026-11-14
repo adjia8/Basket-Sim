@@ -1,5 +1,6 @@
 "use server";
 
+import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
@@ -31,8 +32,8 @@ export async function releasePlayer(formData: FormData): Promise<void> {
   const { userId } = await verifySession();
   const playerId = String(formData.get("playerId") ?? "");
 
-  const membership = await prisma.membership.findUnique({
-    where: { userId },
+  const membership = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(userId),
     include: { career: true },
   });
   if (!membership) return;
@@ -100,7 +101,7 @@ export async function setPlayingThroughInjury(formData: FormData): Promise<void>
   const playerId = String(formData.get("playerId") ?? "");
   const value = formData.get("value") === "true";
 
-  const membership = await prisma.membership.findUnique({ where: { userId } });
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId) });
   if (!membership) return;
 
   const contract = await prisma.contract.findUnique({
@@ -129,8 +130,8 @@ export async function offerAlternateContract(formData: FormData): Promise<void> 
   const { userId } = await verifySession();
   const playerId = String(formData.get("playerId") ?? "");
 
-  const membership = await prisma.membership.findUnique({
-    where: { userId },
+  const membership = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(userId),
     include: { career: true },
   });
   if (!membership) return;
@@ -195,8 +196,8 @@ export async function promoteToStandardContract(
   const { t, locale } = await getTranslator();
   const playerId = String(formData.get("playerId") ?? "");
 
-  const membership = await prisma.membership.findUnique({
-    where: { userId },
+  const membership = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(userId),
     include: { career: true },
   });
   if (!membership) return { error: t("rosterAction.noCareer") };
@@ -273,7 +274,7 @@ export async function setRestNextGame(formData: FormData): Promise<void> {
   const playerId = String(formData.get("playerId") ?? "");
   const value = formData.get("value") === "true";
 
-  const membership = await prisma.membership.findUnique({ where: { userId } });
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId) });
   if (!membership) return;
   const contract = await prisma.contract.findUnique({
     where: { careerId_playerId: { careerId: membership.careerId, playerId } },
@@ -298,7 +299,7 @@ export async function setIndividualFocus(formData: FormData): Promise<void> {
   const focusRaw = String(formData.get("focus") ?? "");
   const focus = INDIVIDUAL_FOCUSES.has(focusRaw) ? focusRaw : null;
 
-  const membership = await prisma.membership.findUnique({ where: { userId } });
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId) });
   if (!membership) return;
   const contract = await prisma.contract.findUnique({
     where: { careerId_playerId: { careerId: membership.careerId, playerId } },

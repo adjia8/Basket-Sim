@@ -1,5 +1,6 @@
 "use server";
 
+import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { revalidatePath } from "next/cache";
 import { recordTradeNews } from "@/lib/data-access/league-news";
 import { getLocale } from "@/lib/i18n/locale";
@@ -36,8 +37,8 @@ export async function proposeTrade(
   const myPickIds = formData.getAll("myPickIds").map(String);
   const theirPickIds = formData.getAll("theirPickIds").map(String);
 
-  const membership = await prisma.membership.findUnique({
-    where: { userId },
+  const membership = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(userId),
     include: { career: true },
   });
   if (!membership) return { error: t("tradeAction.noCareer") };
@@ -252,8 +253,8 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
   const tradeOfferId = String(formData.get("tradeOfferId") ?? "");
   const decision = String(formData.get("decision") ?? "");
 
-  const membership = await prisma.membership.findUnique({
-    where: { userId },
+  const membership = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(userId),
     include: { career: true },
   });
   if (!membership) return;
@@ -418,7 +419,7 @@ export async function cancelTradeOffer(formData: FormData): Promise<void> {
   const { userId } = await verifySession();
   const tradeOfferId = String(formData.get("tradeOfferId") ?? "");
 
-  const membership = await prisma.membership.findUnique({ where: { userId } });
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId) });
   if (!membership) return;
 
   const offer = await prisma.tradeOffer.findUnique({ where: { id: tradeOfferId } });

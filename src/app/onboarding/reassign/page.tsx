@@ -1,3 +1,4 @@
+import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { redirect } from "next/navigation";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
@@ -14,8 +15,8 @@ import { teamFullName } from "@/lib/utils";
 // boucle de redirection si cette page l'appelait aussi.
 export default async function ReassignFranchisePage() {
   const { userId } = await verifySession();
-  const membership = await prisma.membership.findUnique({
-    where: { userId },
+  const membership = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(userId),
     include: { career: true, gmProfile: true },
   });
   if (!membership?.gmProfile?.pendingReassignment) redirect("/");

@@ -1,5 +1,6 @@
 "use server";
 
+import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
@@ -58,7 +59,7 @@ export async function negotiateContract(
   const playerId = String(formData.get("playerId") ?? "");
   const acceptCounter = formData.get("mode") === "acceptCounter";
 
-  const membership = await prisma.membership.findUnique({ where: { userId }, include: { career: true } });
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId), include: { career: true } });
   if (!membership) return { error: t("rosterAction.noCareer") };
   const { careerId, teamId } = membership;
   const { leagueId, season } = membership.career;
@@ -192,7 +193,7 @@ export async function setTeamOptionDeclined(formData: FormData): Promise<void> {
   const { userId } = await verifySession();
   const playerId = String(formData.get("playerId") ?? "");
   const declined = formData.get("value") === "true";
-  const membership = await prisma.membership.findUnique({ where: { userId } });
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId) });
   if (!membership) return;
   const contract = await prisma.contract.findUnique({
     where: { careerId_playerId: { careerId: membership.careerId, playerId } },

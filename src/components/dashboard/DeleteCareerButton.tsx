@@ -11,7 +11,9 @@ export interface DeleteCareerLabels {
   deleting: string;
 }
 
-export function DeleteCareerButton({ labels }: { labels: DeleteCareerLabels }) {
+// Sans `membershipId` : supprime la carrière active (dashboard) ; avec : une
+// carrière précise de la page « Mes carrières ».
+export function DeleteCareerButton({ labels, membershipId }: { labels: DeleteCareerLabels; membershipId?: string }) {
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -34,7 +36,14 @@ export function DeleteCareerButton({ labels }: { labels: DeleteCareerLabels }) {
         <button
           type="button"
           disabled={pending}
-          onClick={() => startTransition(() => deleteCareer())}
+          onClick={() =>
+            startTransition(() => {
+              if (!membershipId) return deleteCareer();
+              const form = new FormData();
+              form.set("membershipId", membershipId);
+              return deleteCareer(form);
+            })
+          }
           className="rounded-md bg-bad px-4 py-1.5 text-sm font-medium text-white transition hover:bg-bad/90 disabled:opacity-50"
         >
           {pending ? labels.deleting : labels.confirmButton}

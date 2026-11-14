@@ -1,5 +1,6 @@
 "use server";
 
+import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
@@ -59,7 +60,7 @@ export async function login(
 
   await createSession(user.id);
   revalidatePath("/", "layout");
-  const membership = await prisma.membership.findUnique({ where: { userId: user.id } });
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(user.id) });
   redirect(membership ? "/" : "/onboarding");
 }
 

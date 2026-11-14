@@ -1,5 +1,6 @@
 "use server";
 
+import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { verifySession } from "@/lib/auth/dal";
@@ -35,8 +36,8 @@ export async function reassignFranchise(formData: FormData): Promise<void> {
   const { userId } = await verifySession();
   const teamId = String(formData.get("teamId") ?? "");
 
-  const membership = await prisma.membership.findUnique({
-    where: { userId },
+  const membership = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(userId),
     include: { gmProfile: true },
   });
   if (!membership?.gmProfile?.pendingReassignment) return;
@@ -60,8 +61,8 @@ export async function reassignFranchise(formData: FormData): Promise<void> {
 export async function acceptPoachOffer(): Promise<void> {
   const { userId } = await verifySession();
 
-  const membership = await prisma.membership.findUnique({
-    where: { userId },
+  const membership = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(userId),
     include: { gmProfile: true },
   });
   const offerTeamId = membership?.gmProfile?.pendingOfferTeamId;
@@ -79,8 +80,8 @@ export async function acceptPoachOffer(): Promise<void> {
 export async function declinePoachOffer(): Promise<void> {
   const { userId } = await verifySession();
 
-  const membership = await prisma.membership.findUnique({
-    where: { userId },
+  const membership = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(userId),
     include: { gmProfile: true },
   });
   if (!membership?.gmProfile) return;

@@ -1,5 +1,6 @@
 "use server";
 
+import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { verifySession } from "@/lib/auth/dal";
@@ -15,7 +16,7 @@ export async function markMessageRead(formData: FormData): Promise<void> {
   const messageId = String(formData.get("messageId") ?? "");
   if (!messageId) return;
 
-  const membership = await prisma.membership.findUnique({ where: { userId } });
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId) });
   if (!membership) return;
 
   await markInboxMessageRead(membership.careerId, messageId);
@@ -26,7 +27,7 @@ export async function markMessageRead(formData: FormData): Promise<void> {
 
 export async function markAllMessagesRead(): Promise<void> {
   const { userId } = await verifySession();
-  const membership = await prisma.membership.findUnique({ where: { userId } });
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId) });
   if (!membership) return;
 
   await markAllInboxMessagesRead(membership.careerId, membership.teamId);
@@ -43,7 +44,7 @@ export async function openMessage(formData: FormData): Promise<void> {
   const { userId } = await verifySession();
   const messageId = String(formData.get("messageId") ?? "");
   const href = String(formData.get("href") ?? "");
-  const membership = await prisma.membership.findUnique({ where: { userId } });
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId) });
   if (membership && messageId) await markInboxMessageRead(membership.careerId, messageId);
   revalidatePath("/", "layout");
   redirect(href.startsWith("/") && !href.startsWith("//") ? href : "/inbox");
@@ -55,7 +56,7 @@ export async function respondToPoachFromInbox(formData: FormData): Promise<void>
   const { userId } = await verifySession();
   const messageId = String(formData.get("messageId") ?? "");
   const accept = formData.get("decision") === "accept";
-  const membership = await prisma.membership.findUnique({ where: { userId } });
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId) });
   if (!membership) return;
   if (messageId) await markInboxMessageRead(membership.careerId, messageId);
   if (accept) {

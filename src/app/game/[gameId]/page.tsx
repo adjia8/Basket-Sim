@@ -1,3 +1,4 @@
+import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { notFound, redirect } from "next/navigation";
 import { getTacticsReport } from "@/lib/data-access/tactics";
 import { PreMatchTactics } from "@/components/game/PreMatchTactics";
@@ -44,8 +45,8 @@ export default async function GamePage({
   params: Promise<{ gameId: string }>;
 }) {
   const { userId } = await verifySession();
-  const membershipRow = await prisma.membership.findUnique({
-    where: { userId },
+  const membershipRow = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(userId),
     include: { career: true, gmProfile: { select: { pendingReassignment: true } } },
   });
   if (!membershipRow) redirect("/onboarding");

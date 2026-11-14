@@ -1,5 +1,6 @@
 "use server";
 
+import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getCurrentDraftPick } from "@/lib/data-access/draft-picks";
@@ -12,8 +13,8 @@ export async function draftProspect(formData: FormData): Promise<void> {
   const { userId } = await verifySession();
   const prospectId = String(formData.get("prospectId") ?? "");
 
-  const membership = await prisma.membership.findUnique({
-    where: { userId },
+  const membership = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(userId),
     include: { career: true },
   });
   if (!membership) return;
@@ -43,8 +44,8 @@ export async function draftProspect(formData: FormData): Promise<void> {
 export async function draftForAiTeam(): Promise<void> {
   const { userId } = await verifySession();
 
-  const membership = await prisma.membership.findUnique({
-    where: { userId },
+  const membership = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(userId),
     include: { career: true },
   });
   if (!membership) return;

@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getLeagues } from "@/lib/data-access/leagues";
@@ -19,8 +18,9 @@ export default async function OnboardingPage({
   searchParams: Promise<{ code?: string }>;
 }) {
   const { userId } = await verifySession();
-  const existing = await prisma.membership.findUnique({ where: { userId } });
-  if (existing) redirect("/");
+  // Plusieurs carrières par compte : l'onboarding sert aussi à en créer une
+  // nouvelle (lien depuis « Mes carrières »).
+  const existingCount = await prisma.membership.count({ where: { userId } });
 
   const { t, locale } = await getTranslator();
   const { code } = await searchParams;
@@ -70,6 +70,11 @@ export default async function OnboardingPage({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
+      {existingCount > 0 && (
+        <Link href="/careers" className="mb-4 inline-block text-sm text-accent-text hover:underline">
+          ← {t("careers.backToList", { count: existingCount })}
+        </Link>
+      )}
       <h1 className="text-2xl font-bold tracking-tight">{t("onboarding.chooseTeamTitle")}</h1>
       <p className="mt-1 text-soft">{t("onboarding.chooseTeamSubtitle")}</p>
       <div className="mt-8">

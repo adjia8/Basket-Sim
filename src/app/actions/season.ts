@@ -1,5 +1,6 @@
 "use server";
 
+import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
@@ -53,8 +54,8 @@ const POACH_OFFER_CHANCE = 0.25;
 export async function advanceSeason(): Promise<void> {
   const { userId } = await verifySession();
   const { locale } = await getTranslator();
-  const membership = await prisma.membership.findUnique({
-    where: { userId },
+  const membership = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(userId),
     include: { career: { include: { league: { include: { conferences: true } } } } },
   });
   if (!membership) return;

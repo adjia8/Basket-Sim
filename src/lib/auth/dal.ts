@@ -1,4 +1,5 @@
 import "server-only";
+import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { decrypt, getSessionCookie } from "./session";
@@ -47,8 +48,8 @@ export function flattenMembership(membership: {
 
 export const getCurrentMembership = cache(async (): Promise<CurrentMembership> => {
   const { userId } = await verifySession();
-  const membership = await prisma.membership.findUnique({
-    where: { userId },
+  const membership = await prisma.membership.findFirst({
+    where: await activeMembershipWhere(userId),
     include: { career: true, gmProfile: { select: { pendingReassignment: true } } },
   });
   if (!membership) {
@@ -76,8 +77,8 @@ export const getOptionalCurrentMembership = cache(
   async (): Promise<CurrentMembership | null> => {
     const session = await getSession();
     if (!session?.userId) return null;
-    const membership = await prisma.membership.findUnique({
-      where: { userId: session.userId },
+    const membership = await prisma.membership.findFirst({
+      where: await activeMembershipWhere(session.userId),
       include: { career: true },
     });
     return membership ? flattenMembership(membership) : null;

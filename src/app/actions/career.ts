@@ -1,5 +1,11 @@
 "use server";
 
+import {
+  MAX_CAREERS_PER_USER,
+  activeMembershipWhere,
+  getActiveMembershipId,
+  setActiveMembership,
+} from "@/lib/auth/active-membership";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/auth/dal";
@@ -84,14 +90,14 @@ export async function createCareer(
       include: { conferences: true },
     }),
     prisma.team.findFirst({ where: { id: teamId, leagueId } }),
-    prisma.membership.findUnique({ where: { userId } }),
+    prisma.membership.count({ where: { userId } }),
   ]);
 
   if (!league || !team) {
     return { error: "Ligue ou équipe invalide." };
   }
-  if (existing) {
-    redirect("/");
+  if (existing >= MAX_CAREERS_PER_USER) {
+    return { error: `Limite de ${MAX_CAREERS_PER_USER} carrières atteinte : supprime-en une depuis « Mes carrières ».` };
   }
 
   let career: { id: string; memberships: { id: string }[] };
@@ -267,6 +273,9 @@ export async function createCareer(
     await createUnresolvedPicksForSeason(career.id, futureSeason, leagueTeamIds);
   }
 
+  // La nouvelle carrière devient la carrière active du compte.
+  await setActiveMembership(userId, career!.memberships[0].id);
+
   revalidatePath("/", "layout");
   redirect("/");
 }
@@ -291,14 +300,17 @@ export async function joinCareer(
 
   const [career, existing] = await Promise.all([
     prisma.career.findUnique({ where: { inviteCode } }),
-    prisma.membership.findUnique({ where: { userId } }),
+    prisma.membership.findMany({ where: { userId }, select: { careerId: true } }),
   ]);
 
-  if (existing) {
-    redirect("/");
-  }
   if (!career) {
     return { error: "Code d'invitation invalide." };
+  }
+  if (existing.some((m) => m.careerId === career.id)) {
+    return { error: "Tu fais déjà partie de cette carrière : reprends-la depuis « Mes carrières »." };
+  }
+  if (existing.length >= MAX_CAREERS_PER_USER) {
+    return { error: `Limite de ${MAX_CAREERS_PER_USER} carrières atteinte : supprime-en une depuis « Mes carrières ».` };
   }
 
   const team = await prisma.team.findFirst({
@@ -338,6 +350,8 @@ export async function joinCareer(
     },
   });
 
+  await setActiveMembership(userId, membership.id);
+
   revalidatePath("/", "layout");
   redirect("/");
 }
@@ -348,12 +362,17 @@ export async function joinCareer(
 // peut être partagée entre plusieurs managers humains (rejoint par code
 // d'invitation, voir JoinCareerForm), donc un simple "je pars" ne doit
 // jamais effacer la partie des autres.
-export async function deleteCareer(): Promise<void> {
+export async function deleteCareer(formData?: FormData): Promise<void> {
   const { userId } = await verifySession();
-  const membership = await prisma.membership.findUnique({ where: { userId } });
-  if (!membership) redirect("/onboarding");
+  // Depuis « Mes carrières » : la carrière choisie ; sinon la carrière active.
+  const requestedId = formData ? String(formData.get("membershipId") ?? "") : "";
+  const membership = await prisma.membership.findFirst({
+    where: requestedId ? { id: requestedId, userId } : await activeMembershipWhere(userId),
+  });
+  if (!membership) redirect("/careers");
 
-  await prisma.membership.delete({ where: { userId } });
+  const wasActive = membership.id === (await getActiveMembershipId(userId));
+  await prisma.membership.delete({ where: { id: membership.id } });
 
   const remaining = await prisma.membership.count({ where: { careerId: membership.careerId } });
   if (remaining === 0) {
@@ -363,6 +382,21 @@ export async function deleteCareer(): Promise<void> {
     await prisma.player.deleteMany({ where: { careerId: membership.careerId } });
   }
 
+  // Carrière active supprimée : on bascule sur la plus récente restante.
+  const next = await prisma.membership.findFirst({ where: { userId }, orderBy: { joinedAt: "desc" } });
+  if (wasActive) await setActiveMembership(userId, next?.id ?? null);
+
   revalidatePath("/", "layout");
-  redirect("/onboarding");
+  redirect(next ? "/careers" : "/onboarding");
+}
+
+// Reprend une autre carrière du compte (page « Mes carrières »).
+export async function switchCareer(formData: FormData): Promise<void> {
+  const { userId } = await verifySession();
+  const membershipId = String(formData.get("membershipId") ?? "");
+  const membership = await prisma.membership.findFirst({ where: { id: membershipId, userId } });
+  if (!membership) redirect("/careers");
+  await setActiveMembership(userId, membership.id);
+  revalidatePath("/", "layout");
+  redirect("/");
 }
