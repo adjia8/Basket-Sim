@@ -7,48 +7,96 @@
 /* Palette sémantique — les composants n'utilisent jamais black/white en
    dur mais ces rôles (surface, ligne, texte atténué, accent...), redéfinis
    une seule fois par thème ici. */
+/* « Arena Night » (thème de base) : une salle NBA un soir de match — bleu
+   nuit, orange ballon, cyan de tableau d'affichage pour les infos. */
 :root {
-  --bg: #eef1f5;
+  --bg: #eef2fa;
   --surface: #ffffff;
-  --surface-2: #f3f5f8;
-  --surface-3: #e4e8ee;
-  --line: #d6dce4;
-  --line-soft: #e7ebf0;
-  --line-strong: #aab4c0;
-  --fg: #0f1720;
-  --soft: #364352;
-  --muted: #5a6777;
-  --faint: #8592a1;
-  --accent: #f26b1d;
-  --accent-hover: #e15d10;
-  --accent-fg: #1a0b02;
-  --accent-text: #b44a08;
-  --good: #1a7f37;
-  --bad: #cf222e;
-  --warn: #9a6700;
-  --info: #0969da;
+  --surface-2: #f2f5fb;
+  --surface-3: #e3e9f4;
+  --line: #d3dbea;
+  --line-soft: #e5eaf3;
+  --line-strong: #a3b0c8;
+  --fg: #0b1430;
+  --soft: #2b3756;
+  --muted: #4d5b7c;
+  --faint: #8390ab;
+  --accent: #e8601c;
+  --accent-hover: #d4530f;
+  --accent-fg: #160800;
+  --accent-text: #b2470e;
+  --good: #0f7a55;
+  --bad: #d4283b;
+  --warn: #8f6200;
+  --info: #0a74a3;
 }
 
 .dark {
-  --bg: #0a0e13;
-  --surface: #11171f;
-  --surface-2: #171f29;
-  --surface-3: #202a36;
-  --line: #243040;
-  --line-soft: #19222d;
-  --line-strong: #3a4859;
-  --fg: #e6edf3;
-  --soft: #b6c2ce;
-  --muted: #8794a3;
-  --faint: #5d6b7b;
-  --accent: #f5782b;
-  --accent-hover: #ff8a42;
-  --accent-fg: #1a0b02;
-  --accent-text: #ff9a5a;
-  --good: #3fb950;
-  --bad: #f8645b;
-  --warn: #d6a01e;
-  --info: #58a6ff;
+  --bg: #070b16;
+  --surface: #0e1528;
+  --surface-2: #152039;
+  --surface-3: #1d2a47;
+  --line: #22304f;
+  --line-soft: #172238;
+  --line-strong: #364a72;
+  --fg: #e8eefc;
+  --soft: #b9c4dc;
+  --muted: #8d9bbb;
+  --faint: #5f6d8e;
+  --accent: #ff7a2f;
+  --accent-hover: #ff8f4f;
+  --accent-fg: #160800;
+  --accent-text: #ff9d63;
+  --good: #34d399;
+  --bad: #ff5d6c;
+  --warn: #fbbf24;
+  --info: #38d3ff;
+}
+
+/* « Trophée » pendant les playoffs (attribut data-phase posé par
+   layout.tsx) : noir profond et or, comme le trophée Larry O'Brien. */
+html[data-phase="playoffs"] {
+  --bg: #f2f1ee;
+  --surface: #ffffff;
+  --surface-2: #f6f4ef;
+  --surface-3: #ebe7dd;
+  --line: #e0dccf;
+  --line-soft: #ece9e1;
+  --line-strong: #b9b19c;
+  --fg: #1b1812;
+  --soft: #3d372b;
+  --muted: #5e574a;
+  --faint: #958c7a;
+  --accent: #c99a27;
+  --accent-hover: #b8891a;
+  --accent-fg: #1a1200;
+  --accent-text: #7d5c0c;
+  --good: #1a7f4a;
+  --bad: #c0392b;
+  --warn: #b4590b;
+  --info: #2c62a0;
+}
+
+html.dark[data-phase="playoffs"] {
+  --bg: #0c0b09;
+  --surface: #15130f;
+  --surface-2: #1e1b15;
+  --surface-3: #29251d;
+  --line: #2e2a21;
+  --line-soft: #1f1c16;
+  --line-strong: #4a4435;
+  --fg: #f2ece0;
+  --soft: #cfc6b4;
+  --muted: #a39a88;
+  --faint: #6e6656;
+  --accent: #d9a62e;
+  --accent-hover: #e8b947;
+  --accent-fg: #1a1200;
+  --accent-text: #e8c063;
+  --good: #5cc28a;
+  --bad: #ef6b5e;
+  --warn: #f08a3a;
+  --info: #6fa8dc;
 }
 
 @theme inline {

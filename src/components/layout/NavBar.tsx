@@ -6,6 +6,7 @@ import { getPendingPressConference } from "@/lib/data-access/press";
 import { getUnreadInboxCount } from "@/lib/data-access/inbox";
 import { prisma } from "@/lib/prisma";
 import { ThemeToggle } from "./ThemeToggle";
+import { TeamAccentToggle } from "./TeamAccentToggle";
 import { LanguageToggle } from "./LanguageToggle";
 import { SidebarNav, type NavSection } from "./SidebarNav";
 import { getTranslator } from "@/lib/i18n/translate";
@@ -96,6 +97,14 @@ export async function NavBar() {
     <div className="flex items-center gap-3">
       <LanguageToggle locale={locale} label={t("common.languageToggle.label")} />
       <ThemeToggle toLightLabel={t("common.themeToggle.toLight")} toDarkLabel={t("common.themeToggle.toDark")} />
+      {team && (
+        <TeamAccentToggle
+          onLabel={t("common.teamAccent.on")}
+          offLabel={t("common.teamAccent.off")}
+          primaryColor={team.primaryColor}
+          secondaryColor={team.secondaryColor}
+        />
+      )}
     </div>
   );
 
