@@ -1,4 +1,5 @@
 import "server-only";
+import { personalityFor, scaleMoraleDelta } from "@/lib/careers/personality-rules";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getStandings } from "@/lib/data-access/standings";
@@ -383,7 +384,8 @@ async function resolveConference(
   // Moral individuel : le vestiaire entier, puis le joueur visé en plus.
   const moraleWrites: { playerId: string; morale: number }[] = [];
   for (const [playerId, current] of moraleById) {
-    const delta = squadDelta + (playerDeltas.get(playerId) ?? 0);
+    // Tempérament : réaction amplifiée (sanguin) ou atténuée (imperturbable).
+    const delta = scaleMoraleDelta(squadDelta + (playerDeltas.get(playerId) ?? 0), personalityFor(playerId, 0));
     if (delta !== 0) moraleWrites.push({ playerId, morale: clampMorale(current + delta) });
   }
 

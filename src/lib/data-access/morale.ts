@@ -1,7 +1,8 @@
 import "server-only";
 import type { BoxScoreEntry, Player } from "@/lib/types";
 import type { PlayerStatePatches } from "@/lib/data-access/player-state-patches";
-import { MORALE_NEUTRAL, moraleAfterGame } from "@/lib/careers/morale-rules";
+import { MORALE_NEUTRAL, clampMorale, moraleAfterGame } from "@/lib/careers/morale-rules";
+import { personalityFor, scaleMoraleDelta } from "@/lib/careers/personality-rules";
 
 // Moral individuel après un match (voir moraleAfterGame) : écrit dans
 // `patches` comme les autres étapes de résolution du match. Un joueur au
@@ -27,6 +28,9 @@ export function advanceRosterMorale(
       renown: player.renown,
       shift: moraleShift,
     });
-    if (next !== current) patches.set(player.id, { morale: next });
+    // Tempérament : un sanguin vit les résultats plus fort, un imperturbable
+    // les encaisse mieux (voir personality-rules.ts).
+    const scaled = clampMorale(current + scaleMoraleDelta(next - current, personalityFor(player.id, player.age)));
+    if (scaled !== current) patches.set(player.id, { morale: scaled });
   }
 }

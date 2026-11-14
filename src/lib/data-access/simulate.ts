@@ -1,4 +1,5 @@
 import "server-only";
+import { lockerRoom, personalityFor } from "@/lib/careers/personality-rules";
 import { prisma } from "@/lib/prisma";
 import { getRosterAndContracts } from "@/lib/data-access/players";
 import { getStandings } from "@/lib/data-access/standings";
@@ -605,10 +606,16 @@ export async function simulateAndResolveGame(
     marketAppeal: number
   ) => {
     const iq = roster.length ? roster.reduce((sum, p) => sum + p.ratings.basketballIQ, 0) / roster.length : 50;
+    // Vestiaire (voir personality-rules.ts) : leaders et têtes brûlées
+    // déplacent la cohésion visée.
+    const room = lockerRoom(roster.map((p) => ({ id: p.id, age: p.age, personality: personalityFor(p.id, p.age) })));
     return prisma.teamState.update({
       where: { id: state.id },
       data: {
-        chemistry: Math.max(0, Math.min(99, nextChemistry(state.chemistry, chemistryTarget(winPct, iq)) + chemistryBonus)),
+        chemistry: Math.max(
+          0,
+          Math.min(99, nextChemistry(state.chemistry, chemistryTarget(winPct, iq) + room.chemistryBonus) + chemistryBonus)
+        ),
         attendance: nextAttendance(state.attendance, attendanceTarget(winPct, marketAppeal, state.facilitiesLevel)),
       },
     });

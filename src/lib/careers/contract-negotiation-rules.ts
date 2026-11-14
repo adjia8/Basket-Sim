@@ -10,6 +10,7 @@
 import { SALARY_RANGES } from "./salary-rules";
 import { minAcceptableSalary } from "./player-demands";
 import { EXTENSION_MAX_OFFER_YEARS, EXTENSION_MIN_OFFER_YEARS } from "./contract-type-rules";
+import type { NegotiationTraits } from "./personality-rules";
 
 export type ContractOption = "none" | "player" | "team";
 export const CONTRACT_OPTIONS: ContractOption[] = ["none", "player", "team"];
@@ -47,6 +48,8 @@ export function playerStance(params: {
   teamAppeal: number;
   // Contrat rookie : aucun levier, accepte tout salaire valide.
   rookieScale?: boolean;
+  // Personnalité (voir personality-rules.ts) : loyauté, ambition, tempérament.
+  traits?: NegotiationTraits;
 }): PlayerStance {
   const range = SALARY_RANGES[params.leagueId] ?? SALARY_RANGES.nba;
   const age = params.age;
@@ -62,10 +65,15 @@ export function playerStance(params: {
   // Un joueur heureux chez toi (ou attiré par ton projet) fait un effort ;
   // un joueur mécontent fait payer son mécontentement.
   const moraleAdj = params.morale === null ? 0 : params.morale >= 70 ? -0.05 : params.morale <= 35 ? 0.1 : 0;
-  const appealAdj = (0.5 - Math.max(0, Math.min(1, params.teamAppeal))) * 0.1; // -5 % à +5 %
-  const minSalary = Math.max(range.min, Math.min(range.max, roundSalary(floor * (1 + moraleAdj + appealAdj))));
+  const traits = params.traits ?? { salaryMultiplier: 1, patienceDelta: 0, appealWeight: 1 };
+  // -5 % à +5 % (le double pour un ambitieux, qui veut un projet gagnant).
+  const appealAdj = (0.5 - Math.max(0, Math.min(1, params.teamAppeal))) * 0.1 * traits.appealWeight;
+  const minSalary = Math.max(
+    range.min,
+    Math.min(range.max, roundSalary(floor * (1 + moraleAdj + appealAdj) * traits.salaryMultiplier))
+  );
   const askSalary = Math.max(minSalary, Math.min(range.max, roundSalary(minSalary * (1.12 + (params.renown / 99) * 0.1))));
-  const patience = params.renown >= 70 ? 2 : 3;
+  const patience = Math.max(1, (params.renown >= 70 ? 2 : 3) + traits.patienceDelta);
   return { minSalary, askSalary, preferredYears, preferredOption, patience };
 }
 

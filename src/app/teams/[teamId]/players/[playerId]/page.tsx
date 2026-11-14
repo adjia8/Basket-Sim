@@ -2,6 +2,13 @@ import { notFound } from "next/navigation";
 import { getStaffProfiles } from "@/lib/data-access/staff";
 import { NEUTRAL_STAFF_PROFILE } from "@/lib/careers/staff-rules";
 import { estimateRating, ratingStars } from "@/lib/careers/potential-rules";
+import {
+  PERSONALITY_TRAITS,
+  growthMultiplier,
+  isMentor,
+  personalityFor,
+  personalityLabel,
+} from "@/lib/careers/personality-rules";
 import { Stars } from "@/components/ui/Stars";
 import { getPlayerAwards } from "@/lib/data-access/awards";
 import { awardName } from "@/lib/careers/news-rules";
@@ -41,7 +48,9 @@ import { SALARY_RANGES } from "@/lib/careers/salary-rules";
 import { getTranslator, type Translator } from "@/lib/i18n/translate";
 import { formatGameDate, formatSalary, teamFullName } from "@/lib/utils";
 import type { PlayerRatings } from "@/lib/types";
-import { inverseRatingTone, ratingTone, toneClass, type ScaleTone } from "@/lib/color-scale";
+import { inverseRatingTone, neutralTone, ratingTone, toneClass, type ScaleTone } from "@/lib/color-scale";
+
+const TRAIT_BAR: Record<ScaleTone, string> = { good: "bg-good", average: "bg-warn", bad: "bg-bad" };
 
 function ratingLabels(t: Translator): Record<keyof PlayerRatings, string> {
   return {
@@ -146,6 +155,24 @@ export default async function PlayerDetailPage({
   const potentialEstimate = player.potential
     ? estimateRating(player.potential, knowledge, `${membership.careerId}:${membership.teamId}:${playerId}:pot`)
     : null;
+  // Personnalité (voir personality-rules.ts) : détail des traits pour mes
+  // joueurs, simple profil si mes recruteurs sont assez bons, sinon inconnue.
+  const personality = personalityFor(player.id, player.age);
+  const personalityKind = personalityLabel(personality);
+  const personalityVisible = isMyTeam || myStaff.scouting >= 55;
+  const personalityEffects: string[] = [];
+  if (isMyTeam) {
+    const growth = Math.round((growthMultiplier(personality) - 1) * 100);
+    if (Math.abs(growth) >= 10) personalityEffects.push(t("personality.effect.growth", { value: growth > 0 ? `+${growth}` : growth }));
+    if (isMentor(personality, player.age)) personalityEffects.push(t("personality.effect.mentor"));
+    if (personality.leadership >= 16) personalityEffects.push(t("personality.effect.leader"));
+    if (personality.temperament <= 5 && personality.professionalism <= 8) personalityEffects.push(t("personality.effect.disruptive"));
+    if (personality.temperament <= 6) personalityEffects.push(t("personality.effect.volatile"));
+    if (personality.temperament >= 15) personalityEffects.push(t("personality.effect.calm"));
+    if (personality.loyalty >= 15) personalityEffects.push(t("personality.effect.loyalDiscount"));
+    if (personality.loyalty <= 6) personalityEffects.push(t("personality.effect.mercenary"));
+    if (personality.ambition >= 15) personalityEffects.push(t("personality.effect.ambitious"));
+  }
   const stats = seasonStats.get(playerId) ?? {
     gamesPlayed: 0, points: 0, rebounds: 0, assists: 0, ppg: 0, rpg: 0, apg: 0,
   };
@@ -347,6 +374,47 @@ export default async function PlayerDetailPage({
           <Stat label={t("player.reboundsPerGame")} value={stats.rpg} />
           <Stat label={t("player.assistsPerGame")} value={stats.apg} />
         </div>
+      </div>
+
+      <div className="mt-6 card p-4" data-testid="personality">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">{t("personality.title")}</h2>
+        {personalityVisible ? (
+          <>
+            <p className="text-lg font-semibold">{t(`personality.label.${personalityKind}`)}</p>
+            <p className="mt-0.5 text-sm text-soft">{t(`personality.desc.${personalityKind}`)}</p>
+            {isMyTeam ? (
+              <>
+                <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {PERSONALITY_TRAITS.map((trait) => (
+                    <div key={trait} className="flex items-center gap-2 text-sm">
+                      <span className="w-32 shrink-0 text-muted">{t(`personality.trait.${trait}`)}</span>
+                      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-3">
+                        <span
+                          className={`block h-full rounded-full ${TRAIT_BAR[neutralTone(personality[trait] * 5)]}`}
+                          style={{ width: `${personality[trait] * 5}%` }}
+                        />
+                      </span>
+                      <span className="w-6 text-right tabular">{personality[trait]}</span>
+                    </div>
+                  ))}
+                </div>
+                {personalityEffects.length > 0 && (
+                  <ul className="mt-3 flex flex-wrap gap-2 text-xs">
+                    {personalityEffects.map((e) => (
+                      <li key={e} className="rounded border border-line px-2 py-0.5 text-soft">
+                        {e}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <p className="mt-2 text-xs text-faint">{t("personality.scoutedOnly")}</p>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-muted">{t("personality.unknown")}</p>
+        )}
       </div>
 
       <div className="mt-6 card p-4">

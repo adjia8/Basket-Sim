@@ -1,4 +1,5 @@
 import "server-only";
+import { ambitiousWantsOut, personalityFor, tradeRequestChanceMultiplier } from "@/lib/careers/personality-rules";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getStandings } from "@/lib/data-access/standings";
@@ -74,7 +75,12 @@ export async function maybeFlagTradeRequest(
       teamFacilitiesLevel: teamState.facilitiesLevel,
       morale: state.morale,
     });
-    if (reasons.length === 0 || Math.random() >= TRADE_REQUEST_CHANCE) continue;
+    // Personnalité : un ambitieux ne supporte pas de perdre, même sans être
+    // une star ; un joueur fidèle le demande moins souvent.
+    const personality = personalityFor(state.playerId, state.age);
+    if (ambitiousWantsOut(personality, teamWinPct) && !reasons.includes("competitiveness")) reasons.push("competitiveness");
+    const chance = TRADE_REQUEST_CHANCE * tradeRequestChanceMultiplier(personality);
+    if (reasons.length === 0 || Math.random() >= chance) continue;
 
     await prisma.$transaction([
       prisma.playerState.update({

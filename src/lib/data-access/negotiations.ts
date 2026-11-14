@@ -4,6 +4,7 @@ import { getStandings } from "@/lib/data-access/standings";
 import { getTeamById } from "@/lib/data-access/teams";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { initialRenown } from "@/lib/careers/renown-rules";
+import { negotiationTraits, personalityFor } from "@/lib/careers/personality-rules";
 import { minAcceptableSalary, teamMeetsPlayerDemands, winPctForStandings } from "@/lib/careers/player-demands";
 import { SALARY_RANGES, baseSalaryFloor } from "@/lib/careers/salary-rules";
 import {
@@ -81,6 +82,7 @@ export async function getNegotiationView(params: {
     morale: contract ? (state?.morale ?? 60) : null,
     teamAppeal: teamAppeal(winPct, team.marketAppeal, teamState.facilitiesLevel),
     rookieScale,
+    traits: negotiationTraits(personalityFor(playerId, state?.age ?? player.age), kind === "extension"),
   });
   const refuses =
     !rookieScale &&

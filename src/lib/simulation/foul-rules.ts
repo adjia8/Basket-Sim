@@ -23,15 +23,15 @@ export function rollsPersonalFoul(defenseInside: number, defenseOutside: number)
   return Math.random() < chance;
 }
 
-// Rares, indépendantes du profil du joueur (tempérament non modélisé dans
-// cette passe) — vérifiée comme rollsPersonalFoul, une fois par joueur de la
+// Rares, modulées par le tempérament du joueur (voir personality-rules.ts :
+// ×3 pour un sanguin, ×0,4 pour un imperturbable) — vérifiée comme rollsPersonalFoul, une fois par joueur de la
 // rotation et par quart-temps (~64 vérifications/match, 8 joueurs × 2
 // équipes × 4 quart-temps). 0.015 donnait une espérance proche de 1
 // technique par match et ~62% des matchs avec au moins une — bien plus
 // fréquent qu'en NBA/WNBA réelle. Calibré pour une espérance ~0.3/match
 // (environ 1 match sur 4 avec au moins une technique).
-export function rollsTechnicalFoul(): boolean {
-  return Math.random() < 0.005;
+export function rollsTechnicalFoul(temperamentMultiplier = 1): boolean {
+  return Math.random() < 0.005 * temperamentMultiplier;
 }
 
 export function rollsFlagrantFoul(): "none" | "flagrant1" | "flagrant2" {

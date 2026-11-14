@@ -1,4 +1,5 @@
 import "server-only";
+import { MENTOR_GROWTH_BONUS, MENTOR_YOUTH_AGE, growthMultiplier, isMentor, personalityFor } from "@/lib/careers/personality-rules";
 import { growthFactor } from "@/lib/careers/potential-rules";
 import type { PlayerStatePatches } from "./player-state-patches";
 import type { BoxScoreEntry, Player } from "@/lib/types";
@@ -48,12 +49,18 @@ export async function advanceRosterDevelopment(
   staffLevel: number
 ): Promise<void> {
   const minutesById = new Map(boxScore.map((e) => [e.playerId, e.minutesPlayed]));
+  // Personnalités (voir personality-rules.ts) : le professionnalisme accélère
+  // ou freine la progression, et un vétéran mentor fait progresser les jeunes.
+  const hasMentor = roster.some((p) => isMentor(personalityFor(p.id, p.age), p.age));
   for (const player of roster) {
     if (player.injured) continue;
     // Potentiel (voir potential-rules.ts) : plus de marge = progression plus
     // rapide ; au plafond, plus de progression.
     const growth = player.potential ? growthFactor(player.overallRating, player.potential) : 1;
-    const chance = developmentChance(player.age, minutesById.get(player.id) ?? 0, intensity, staffLevel) * growth;
+    const personal =
+      growthMultiplier(personalityFor(player.id, player.age)) *
+      (hasMentor && player.age <= MENTOR_YOUTH_AGE ? MENTOR_GROWTH_BONUS : 1);
+    const chance = developmentChance(player.age, minutesById.get(player.id) ?? 0, intensity, staffLevel) * growth * personal;
     if (chance === 0 || Math.random() >= chance) continue;
     const attribute = attributeToDevelop(player.individualFocus, teamFocus);
     const progress = (player.developmentProgress ?? 0) + 1;

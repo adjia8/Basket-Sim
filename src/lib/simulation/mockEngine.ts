@@ -1,4 +1,5 @@
 import type { BoxScoreEntry, Player, PlayerRatings, Team } from "@/lib/types";
+import { personalityFor, technicalFoulMultiplier } from "@/lib/careers/personality-rules";
 import { moraleImpactFactor, MORALE_NEUTRAL } from "@/lib/careers/morale-rules";
 import type { HalfState, SimulationEngine, SimulationOptions, SimulationResult } from "./engine";
 import {
@@ -506,7 +507,7 @@ function applyQuarterFouls(
     }
     if (disqualified.has(player.id)) continue;
 
-    if (rollsTechnicalFoul()) {
+    if (rollsTechnicalFoul(technicalFoulMultiplier(personalityFor(player.id, player.age)))) {
       entry.technicalFouls += 1;
       if (entry.technicalFouls >= TECHNICAL_EJECTION_LIMIT) {
         entry.disqualifiedReason = "ejected";

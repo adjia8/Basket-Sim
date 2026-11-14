@@ -25,6 +25,7 @@ import * as inbox from "./dict/inbox";
 import * as negotiation from "./dict/negotiation";
 import * as cup from "./dict/cup";
 import * as careers from "./dict/careers";
+import * as personality from "./dict/personality";
 
 // Chaque module dict/<zone>.ts exporte { fr, en } avec les MÊMES clés (voir
 // common.ts pour le patron : un tableau `keys as const`, puis deux
@@ -60,6 +61,7 @@ const sources = [
   negotiation,
   cup,
   careers,
+  personality,
 ];
 
 export const dictionaries = {
@@ -91,6 +93,7 @@ export const dictionaries = {
     ...negotiation.fr,
     ...cup.fr,
     ...careers.fr,
+    ...personality.fr,
   },
   en: {
     ...common.en,
@@ -120,6 +123,7 @@ export const dictionaries = {
     ...negotiation.en,
     ...cup.en,
     ...careers.en,
+    ...personality.en,
   },
 };
 

@@ -24,6 +24,7 @@ import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
 import { TeamTabs } from "@/components/team/TeamTabs";
 import { ContractsPanel } from "@/components/team/ContractsPanel";
 import { MedicalPanel } from "@/components/team/MedicalPanel";
+import { lockerRoom, personalityFor } from "@/lib/careers/personality-rules";
 import { IndividualTrainingPanel } from "@/components/team/IndividualTrainingPanel";
 import { getMedicalReport } from "@/lib/data-access/medical";
 import { NBA_INITIAL_DEAD_CAP } from "@/lib/mock-data/nba-dead-cap";
@@ -92,6 +93,8 @@ export default async function TeamRosterPage({
     ]);
 
   const isMyTeam = team.id === membership.teamId;
+  // Vestiaire (voir personality-rules.ts) : leaders, mentors, perturbateurs.
+  const room = lockerRoom(roster.map((p) => ({ id: p.id, age: p.age, personality: personalityFor(p.id, p.age) })));
   const tradeDeadlinePassed = deadlineInfo.passed;
 
   const seasonStats = await getSeasonStatsForPlayers(
@@ -271,6 +274,48 @@ export default async function TeamRosterPage({
           <p className="mt-1 text-xl font-semibold">{teamState.chemistry} / 99</p>
         </div>
       </div>
+
+      {isMyTeam && (
+        <div className="mt-4 card p-4 text-sm" data-testid="locker-room">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-xs uppercase tracking-wide text-muted">{t("personality.lockerRoom")}</p>
+            <p className={room.chemistryBonus > 0 ? "text-good" : room.chemistryBonus < 0 ? "text-bad" : "text-muted"}>
+              {t("personality.chemistryEffect", {
+                value: room.chemistryBonus > 0 ? `+${room.chemistryBonus}` : room.chemistryBonus,
+              })}
+            </p>
+          </div>
+          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            {(
+              [
+                ["personality.leaders", room.leaders],
+                ["personality.mentors", room.mentors],
+                ["personality.disruptive", room.disruptive],
+              ] as const
+            ).map(([label, ids]) => (
+              <div key={label}>
+                <p className="text-xs text-faint">{t(label)}</p>
+                <p>
+                  {ids.length === 0
+                    ? t("personality.none")
+                    : ids.map((id, i) => {
+                        const p = roster.find((r) => r.id === id);
+                        return (
+                          <span key={id}>
+                            {i > 0 && ", "}
+                            <Link href={`/teams/${team.id}/players/${id}`} className="hover:underline">
+                              {p ? `${p.firstName} ${p.lastName}` : id}
+                            </Link>
+                          </span>
+                        );
+                      })}
+                </p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-faint">{t("personality.lockerRoomHint")}</p>
+        </div>
+      )}
 
       <TeamTabs baseHref={`/teams/${team.id}`} active={activeTab} tabs={tabs} />
 

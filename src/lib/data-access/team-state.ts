@@ -1,4 +1,5 @@
 import "server-only";
+import { lockerRoom, personalityFor } from "@/lib/careers/personality-rules";
 import { prisma } from "@/lib/prisma";
 import type { TeamState } from "@prisma/client";
 import type { Player } from "@/lib/types";
@@ -70,7 +71,8 @@ export async function advanceTeamChemistry(
   const averageBasketballIQ = roster.length
     ? roster.reduce((sum, p) => sum + p.ratings.basketballIQ, 0) / roster.length
     : 50;
-  const target = chemistryTarget(winPct, averageBasketballIQ);
+  const room = lockerRoom(roster.map((p) => ({ id: p.id, age: p.age, personality: personalityFor(p.id, p.age) })));
+  const target = chemistryTarget(winPct, averageBasketballIQ) + room.chemistryBonus;
   const chemistry = Math.max(0, Math.min(99, nextChemistry(state.chemistry, target) + trainingBonus));
 
   await prisma.teamState.update({
