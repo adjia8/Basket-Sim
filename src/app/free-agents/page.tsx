@@ -14,6 +14,8 @@ import {
   winPctForStandings,
 } from "@/lib/careers/player-demands";
 import { getTranslator } from "@/lib/i18n/translate";
+import { getProductionRatings } from "@/lib/data-access/player-status";
+import { marketRating } from "@/lib/careers/player-status-rules";
 import Link from "next/link";
 import { formatSalary, playerHref } from "@/lib/utils";
 import { SortableTable } from "@/components/ui/SortableTable";
@@ -46,6 +48,8 @@ export default async function FreeAgentsPage() {
   const canSign = !rosterFull && faOpen && (softCap || !capReached);
   const payrollInRed = payroll > payrollWarningLine(membership.leagueId, salaryCap);
 
+  // Exigence = même calcul que la négociation : note + production réelle.
+  const production = await getProductionRatings(membership.careerId, membership.season, freeAgents.map((p) => p.id));
   const myStandingsRow = standings.find((row) => row.teamId === membership.teamId);
   const teamWinPct = winPctForStandings(myStandingsRow?.wins ?? 0, myStandingsRow?.losses ?? 0);
   const teamMarketAppeal = myTeam?.marketAppeal ?? 50;
@@ -97,7 +101,11 @@ export default async function FreeAgentsPage() {
               teamMarketAppeal,
               teamFacilitiesLevel: myTeamState.facilitiesLevel,
             });
-            const expectedSalary = minAcceptableSalary(player.renown, player.overallRating, membership.leagueId);
+            const expectedSalary = minAcceptableSalary(
+              player.renown,
+              marketRating(player.overallRating, production.get(player.id)?.rating ?? null),
+              membership.leagueId
+            );
             const affordable = checkSalaryMove(
               membership.leagueId,
               salaryCap,

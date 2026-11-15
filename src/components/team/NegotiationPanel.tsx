@@ -23,6 +23,8 @@ export interface NegotiationLabels {
   acceptCounter: string;
   note: string | null;
   blocked: string | null;
+  demands: string;
+  basis: string;
 }
 
 export function NegotiationPanel({
@@ -54,6 +56,8 @@ export function NegotiationPanel({
     <div className="mt-4 card p-3" data-testid="negotiation">
       <p className="text-sm font-medium">{labels.title}</p>
       <p className="mt-1 text-sm text-soft">{labels.ask}</p>
+      <p className="mt-1 text-sm">{labels.demands}</p>
+      <p className="text-xs text-faint">{labels.basis}</p>
       <p className="mt-1 flex items-center gap-2 text-xs text-muted">
         {labels.patience}
         <span aria-label={`${patienceLeft}/${patienceMax}`} className="flex gap-1">

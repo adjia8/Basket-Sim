@@ -51,6 +51,11 @@ export function moraleAfterGame(params: {
   minutes: number;
   renown: number;
   shift?: number; // entraîneur principal motivant : décale la zone « normale » (±5)
+  // Minutes attendues selon son statut (voir player-status-rules.ts) : en
+  // dessous (moins la tolérance), il perd 1 point. Sans valeur : ancienne
+  // règle (joueur renommé à moins de 15 min).
+  expectedMinutes?: number;
+  tolerance?: number;
 }): number {
   const shift = params.shift ?? 0;
   let m = params.morale;
@@ -58,7 +63,9 @@ export function moraleAfterGame(params: {
     if (params.won && m < 75 + shift) m += 1;
     if (!params.won && m > 45 + shift) m -= 1;
   }
-  if (params.renown >= 70 && params.minutes < 15) m -= 1;
+  if (params.expectedMinutes !== undefined) {
+    if (params.minutes < params.expectedMinutes - (params.tolerance ?? 8)) m -= 1;
+  } else if (params.renown >= 70 && params.minutes < 15) m -= 1;
   if (m > 75 + shift) m -= 1;
   else if (m < 45 + shift) m += 1;
   return clampMorale(m);

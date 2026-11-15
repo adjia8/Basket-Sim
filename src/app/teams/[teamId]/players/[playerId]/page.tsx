@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getStaffProfiles } from "@/lib/data-access/staff";
 import { NEUTRAL_STAFF_PROFILE } from "@/lib/careers/staff-rules";
 import { estimateRating, ratingStars } from "@/lib/careers/potential-rules";
+import { EXPECTED_MINUTES, playerStatus, rankInRoster } from "@/lib/careers/player-status-rules";
 import {
   PERSONALITY_TRAITS,
   growthMultiplier,
@@ -173,6 +174,27 @@ export default async function PlayerDetailPage({
     if (personality.loyalty <= 6) personalityEffects.push(t("personality.effect.mercenary"));
     if (personality.ambition >= 15) personalityEffects.push(t("personality.effect.ambitious"));
   }
+  // Statut dans mon effectif et temps de jeu réel (voir player-status-rules.ts).
+  let statusLine: string | null = null;
+  if (isMyTeam && contract) {
+    const [mates, minuteRows] = await Promise.all([
+      prisma.contract.findMany({ where: { careerId: membership.careerId, teamId: contract.teamId, playerId: { not: playerId } }, select: { playerId: true } })
+        .then((cs) => prisma.playerState.findMany({ where: { careerId: membership.careerId, playerId: { in: cs.map((c) => c.playerId) } }, select: { overallRating: true } })),
+      prisma.playerSeasonStat.findMany({ where: { careerId: membership.careerId, season: membership.season, playerId }, select: { minutes: true, gamesPlayed: true } }),
+    ]);
+    const status = playerStatus({
+      overall: player.overallRating,
+      renown: player.renown,
+      age: player.age,
+      potential: player.potential || player.overallRating,
+      teamRank: rankInRoster(player.overallRating, mates.map((m) => m.overallRating)),
+    });
+    const gp = minuteRows.reduce((s, r) => s + r.gamesPlayed, 0);
+    const mins = minuteRows.reduce((s, r) => s + r.minutes, 0);
+    statusLine = gp > 0
+      ? t("status.playerLine", { status: t(`status.${status}`), expected: EXPECTED_MINUTES[status], actual: (mins / gp).toFixed(1) })
+      : t("status.playerLineNoGames", { status: t(`status.${status}`), expected: EXPECTED_MINUTES[status] });
+  }
   const stats = seasonStats.get(playerId) ?? {
     gamesPlayed: 0, points: 0, rebounds: 0, assists: 0, ppg: 0, rpg: 0, apg: 0,
   };
@@ -261,6 +283,22 @@ export default async function PlayerDetailPage({
           : null,
         acceptCounter: t("nego.acceptCounter"),
         note: negotiation.rookieScale ? t("nego.rookieNote") : null,
+        demands:
+          t("status.demands", {
+            status: t(`status.${negotiation.status}`).toLowerCase(),
+            minutes: negotiation.expectedMinutes,
+          }) + (negotiation.wantsContender ? `, ${t("status.contender")}` : ""),
+        basis: negotiation.production
+          ? t("status.basis", {
+              value: negotiation.marketOverall,
+              overall: player.overallRating,
+              production: negotiation.production.rating,
+              ppg: negotiation.production.line.ppg.toFixed(1),
+              rpg: negotiation.production.line.rpg.toFixed(1),
+              apg: negotiation.production.line.apg.toFixed(1),
+              season: negotiation.production.season,
+            })
+          : t("status.basisNoStats", { value: negotiation.marketOverall }),
         blocked: myRosterFull
           ? t("nego.rosterFull")
           : negotiation.refuses
@@ -381,6 +419,7 @@ export default async function PlayerDetailPage({
         {personalityVisible ? (
           <>
             <p className="text-lg font-semibold">{t(`personality.label.${personalityKind}`)}</p>
+            {statusLine && <p className="mt-0.5 text-sm text-accent-text">{statusLine}</p>}
             <p className="mt-0.5 text-sm text-soft">{t(`personality.desc.${personalityKind}`)}</p>
             {isMyTeam ? (
               <>

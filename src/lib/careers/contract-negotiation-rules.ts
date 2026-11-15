@@ -50,6 +50,8 @@ export function playerStance(params: {
   rookieScale?: boolean;
   // Personnalité (voir personality-rules.ts) : loyauté, ambition, tempérament.
   traits?: NegotiationTraits;
+  // Note « marchande » (note + production réelle, voir player-status-rules.ts).
+  marketOverall?: number;
 }): PlayerStance {
   const range = SALARY_RANGES[params.leagueId] ?? SALARY_RANGES.nba;
   const age = params.age;
@@ -61,7 +63,7 @@ export function playerStance(params: {
     return { minSalary: range.min, askSalary: range.min, preferredYears, preferredOption: "none", patience: 9 };
   }
 
-  const floor = minAcceptableSalary(params.renown, params.overallRating, params.leagueId);
+  const floor = minAcceptableSalary(params.renown, params.marketOverall ?? params.overallRating, params.leagueId);
   // Un joueur heureux chez toi (ou attiré par ton projet) fait un effort ;
   // un joueur mécontent fait payer son mécontentement.
   const moraleAdj = params.morale === null ? 0 : params.morale >= 70 ? -0.05 : params.morale <= 35 ? 0.1 : 0;

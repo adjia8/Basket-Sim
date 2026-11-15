@@ -5,6 +5,14 @@ import { getTeamById } from "@/lib/data-access/teams";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { initialRenown } from "@/lib/careers/renown-rules";
 import { negotiationTraits, personalityFor } from "@/lib/careers/personality-rules";
+import {
+  EXPECTED_MINUTES,
+  marketRating,
+  playerStatus,
+  rankInRoster,
+  type PlayerStatus,
+} from "@/lib/careers/player-status-rules";
+import { getProductionRatings, type ProductionInfo } from "@/lib/data-access/player-status";
 import { minAcceptableSalary, teamMeetsPlayerDemands, winPctForStandings } from "@/lib/careers/player-demands";
 import { SALARY_RANGES, baseSalaryFloor } from "@/lib/careers/salary-rules";
 import {
@@ -29,6 +37,12 @@ export interface NegotiationView {
   // Star non convaincue par le projet (bilan, marché, installations).
   refuses: boolean;
   rookieScale: boolean;
+  // Objectifs du joueur (voir player-status-rules.ts).
+  status: PlayerStatus;
+  expectedMinutes: number;
+  wantsContender: boolean;
+  production: ProductionInfo | null;
+  marketOverall: number;
 }
 
 // Date de jeu « courante » : celle du dernier match joué de la saison.
@@ -73,6 +87,25 @@ export async function getNegotiationView(params: {
   const myRow = standings.find((r) => r.teamId === teamId);
   const winPct = winPctForStandings(myRow?.wins ?? 0, myRow?.losses ?? 0);
   const rookieScale = !!contract?.isRookieScale;
+  const age = state?.age ?? player.age;
+  const personality = personalityFor(playerId, age);
+  // Statut qu'il aurait dans CET effectif (le sien, ou celui qu'il rejoint).
+  const [production, teamContracts] = await Promise.all([
+    getProductionRatings(careerId, season, [playerId]).then((m) => m.get(playerId) ?? null),
+    prisma.contract.findMany({ where: { careerId, teamId, playerId: { not: playerId } }, select: { playerId: true } }),
+  ]);
+  const teammates = await prisma.playerState.findMany({
+    where: { careerId, playerId: { in: teamContracts.map((c) => c.playerId) } },
+    select: { overallRating: true },
+  });
+  const status = playerStatus({
+    overall: overallRating,
+    renown,
+    age,
+    potential: state?.potential || overallRating,
+    teamRank: rankInRoster(overallRating, teammates.map((t) => t.overallRating)),
+  });
+  const marketOverall = marketRating(overallRating, production?.rating ?? null);
   const stance = playerStance({
     renown,
     overallRating,
@@ -82,7 +115,8 @@ export async function getNegotiationView(params: {
     morale: contract ? (state?.morale ?? 60) : null,
     teamAppeal: teamAppeal(winPct, team.marketAppeal, teamState.facilitiesLevel),
     rookieScale,
-    traits: negotiationTraits(personalityFor(playerId, state?.age ?? player.age), kind === "extension"),
+    traits: negotiationTraits(personality, kind === "extension"),
+    marketOverall,
   });
   const refuses =
     !rookieScale &&
@@ -118,6 +152,11 @@ export async function getNegotiationView(params: {
         : null,
     lockedDays,
     refuses,
+    status,
+    expectedMinutes: EXPECTED_MINUTES[status],
+    wantsContender: renown >= 70 || personality.ambition >= 15,
+    production,
+    marketOverall,
     rookieScale,
   };
 }
