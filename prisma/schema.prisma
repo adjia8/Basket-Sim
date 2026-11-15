@@ -49,6 +49,7 @@ model Career {
   awards            Award[]
   leagueNews        LeagueNews[]
   negotiations      ContractNegotiation[]
+  ratingSnapshots   PlayerRatingSnapshot[]
 }
 
 // Statistiques cumulées d'un joueur sur une saison (libellé du match :
@@ -249,6 +250,7 @@ model GmProfile {
   pendingReassignment    Boolean          @default(false) // vient d'être viré, doit choisir une nouvelle franchise
   pendingOfferTeamId     String? // offre de dépeçage en attente de réponse
   frontOfficeApproval    Int              @default(50) // 0-99, piloté par les réponses en conférence de presse
+  boardObjectivesJson    String? // objectifs des propriétaires de la saison en cours — voir board-objectives-rules.ts
   seasonRecords          GmSeasonRecord[]
 }
 
@@ -521,6 +523,8 @@ model PlayerState {
   injuryType           String? // blessure en cours (clé, voir INJURY_TYPES), null si sain
   individualFocus      String? // entraînement individuel (offensive/defensive/tactical/physical), null = suit l'équipe
   developmentProgress  Int     @default(0) // progrès accumulés vers le prochain point d'overall (jeunes joueurs)
+  promisedStatus       String? // promesse de temps de jeu (statut promis) — voir player-status-rules.ts
+  promiseSince         DateTime? // date de jeu de la promesse de temps de jeu
   morale               Int     @default(60) // 0-99, moral individuel (conférences de presse, résultats) — voir morale-rules.ts
   catalogOverall       Int? // note du catalogue (NBA 2K) avec laquelle ce joueur a été synchronisé — voir scripts/sync-ratings.ts
   potential            Int     @default(0) // potentiel caché (note maximale atteignable) — voir potential-rules.ts
@@ -718,4 +722,20 @@ model ContractNegotiation {
 
   @@unique([careerId, playerId, teamId])
   @@index([careerId])
+}
+
+// Relevé de la note des joueurs (un par mois de jeu, plus le départ de la
+// carrière) — alimente les courbes de progression (voir rating-history.ts).
+model PlayerRatingSnapshot {
+  id        String   @id @default(cuid())
+  careerId  String
+  career    Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  playerId  String
+  season    String
+  date      DateTime
+  overall   Int
+
+  @@unique([careerId, playerId, date])
+  @@index([careerId, playerId])
+  @@index([careerId, date])
 }

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { getBoardObjectivesProgress } from "@/lib/data-access/board-objectives";
 import Link from "next/link";
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
@@ -66,6 +67,15 @@ export default async function GmPage() {
   const myStandingsRow = standings.find((row) => row.teamId === membership.teamId);
 
   const offerTeam = gm.pendingOfferTeamId ? await getTeamById(gm.pendingOfferTeamId) : null;
+  // Objectifs des propriétaires de la saison (voir board-objectives.ts).
+  const board = await getBoardObjectivesProgress(
+    membership.careerId,
+    membership.leagueId,
+    membership.season,
+    membership.teamId,
+    gm.boardObjectivesJson
+  );
+  const fmtObjective = (type: string, v: number) => (type === "attendance" ? `${Math.round(v)}/99` : `${Math.round(v * 100)} %`);
 
   const expectationLabel = expectationLabels(t);
   const outcomeLabel = outcomeLabels(t);
@@ -104,6 +114,43 @@ export default async function GmPage() {
           </div>
         </div>
       )}
+
+      <div className="mt-6 card p-4" data-testid="board-objectives">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">{t("board.title")}</h2>
+        {!board ? (
+          <p className="text-sm text-muted">{t("board.empty")}</p>
+        ) : (
+          <ul className="space-y-3 text-sm">
+            {board.objectives.map((o) => (
+              <li key={o.type}>
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="first-letter:uppercase">{board.describe(o, locale)}</span>
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+                      o.status === "met"
+                        ? "bg-good/15 text-good"
+                        : o.status === "failed"
+                          ? "bg-bad/15 text-bad"
+                          : o.actual >= o.target
+                            ? "bg-good/10 text-good"
+                            : "bg-warn/15 text-warn"
+                    }`}
+                  >
+                    {t(`board.status.${o.status}`)}
+                  </span>
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-3">
+                  <div
+                    className={`h-full rounded-full ${o.actual >= o.target ? "bg-good" : "bg-warn"}`}
+                    style={{ width: `${Math.min(100, (o.actual / o.target) * 100)}%` }}
+                  />
+                </div>
+                <p className="mt-0.5 text-xs text-muted">{t("board.actual", { value: fmtObjective(o.type, o.actual) })}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       <div className="mt-6 card p-4">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">

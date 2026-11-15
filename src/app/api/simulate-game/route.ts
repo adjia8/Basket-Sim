@@ -1,4 +1,6 @@
 import { activeMembershipWhere } from "@/lib/auth/active-membership";
+import { maybeBoardObjectives } from "@/lib/data-access/board-objectives";
+import { maybeSnapshotRatings } from "@/lib/data-access/rating-history";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
@@ -117,6 +119,8 @@ export async function POST(request: Request) {
       await maybeLeagueMilestones(membership.careerId, career.leagueId, career.season, locale);
       await maybePlayAllStarGame(membership.careerId, career.leagueId, career.season, locale);
       await advanceNbaCup(membership.careerId, career.leagueId, career.season, locale);
+      await maybeSnapshotRatings(membership.careerId, career.season);
+      await maybeBoardObjectives(membership.careerId, career.leagueId, career.season, locale);
     }
   }
 

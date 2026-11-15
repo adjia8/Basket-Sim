@@ -75,3 +75,30 @@ export function marketRating(overall: number, production: number | null): number
 export function rankInRoster(overall: number, otherOveralls: number[]): number {
   return 1 + otherOveralls.filter((o) => o > overall).length;
 }
+
+// ---------------------------------------------------------------------------
+// Promesse de temps de jeu : le GM promet un statut (« tu seras titulaire »).
+// Jugée sur les PROMISE_GAMES matchs suivants de l'équipe : tenue si le
+// joueur a joué en moyenne au moins les minutes du statut promis (moins une
+// petite marge).
+export const PROMISABLE_STATUSES: PlayerStatus[] = ["franchise", "star", "starter", "rotation"];
+export const PROMISE_GAMES = 15;
+export const PROMISE_MARGIN = 4;
+export const PROMISE_MORALE_ON_MAKE = 5;
+export const PROMISE_MORALE_HONORED = 8;
+export const PROMISE_MORALE_BROKEN = -15;
+
+export function promiseHonored(minutesPerGame: number, promised: PlayerStatus): boolean {
+  return minutesPerGame >= EXPECTED_MINUTES[promised] - PROMISE_MARGIN;
+}
+
+// Rôles qu'on peut promettre de façon crédible : au plus deux crans
+// au-dessus du rôle actuel (un fin de banc ne devient pas joueur franchise).
+const STATUS_LADDER: PlayerStatus[] = ["bench", "prospect", "rotation", "starter", "star", "franchise"];
+export function promisableStatuses(current: PlayerStatus): PlayerStatus[] {
+  const i = STATUS_LADDER.indexOf(current);
+  return PROMISABLE_STATUSES.filter((s) => {
+    const j = STATUS_LADDER.indexOf(s);
+    return j > i && j <= i + 2;
+  });
+}

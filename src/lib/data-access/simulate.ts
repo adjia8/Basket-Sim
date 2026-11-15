@@ -1,4 +1,5 @@
 import "server-only";
+import { evaluatePlayingTimePromises } from "@/lib/data-access/playing-time-promises";
 import { lockerRoom, personalityFor } from "@/lib/careers/personality-rules";
 import { prisma } from "@/lib/prisma";
 import { getRosterAndContracts } from "@/lib/data-access/players";
@@ -747,6 +748,13 @@ export async function simulateAndResolveGame(
     awayManager
       ? maybeCreatePressConference(careerId, game.awayTeamId, game.leagueId, game.season, gameDate, locale, awayGameContext, updated?.playoffSeriesId ?? null)
       : Promise.resolve(),
+  ]);
+
+  // Promesses de temps de jeu arrivées à échéance (voir
+  // playing-time-promises.ts) — équipes humaines seulement.
+  await Promise.all([
+    homeManager ? evaluatePlayingTimePromises(careerId, game.homeTeamId, game.season, locale) : Promise.resolve(),
+    awayManager ? evaluatePlayingTimePromises(careerId, game.awayTeamId, game.season, locale) : Promise.resolve(),
   ]);
 
   // Nouvelle demande de trade éventuelle (cooldown + tirage, voir

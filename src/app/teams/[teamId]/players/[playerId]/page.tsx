@@ -2,7 +2,16 @@ import { notFound } from "next/navigation";
 import { getStaffProfiles } from "@/lib/data-access/staff";
 import { NEUTRAL_STAFF_PROFILE } from "@/lib/careers/staff-rules";
 import { estimateRating, ratingStars } from "@/lib/careers/potential-rules";
-import { EXPECTED_MINUTES, playerStatus, rankInRoster } from "@/lib/careers/player-status-rules";
+import {
+  EXPECTED_MINUTES,
+  PROMISE_MARGIN,
+  promisableStatuses,
+  playerStatus,
+  rankInRoster,
+  type PlayerStatus,
+} from "@/lib/careers/player-status-rules";
+import { getPromiseProgress } from "@/lib/data-access/playing-time-promises";
+import { promisePlayingTime } from "@/app/actions/promise";
 import {
   PERSONALITY_TRAITS,
   growthMultiplier,
@@ -11,6 +20,8 @@ import {
   personalityLabel,
 } from "@/lib/careers/personality-rules";
 import { Stars } from "@/components/ui/Stars";
+import { ProgressionChart } from "@/components/team/ProgressionChart";
+import { getCareerSeasonLines, getRatingHistory } from "@/lib/data-access/rating-history";
 import { getPlayerAwards } from "@/lib/data-access/awards";
 import { awardName } from "@/lib/careers/news-rules";
 import { moraleLevel } from "@/lib/careers/morale-rules";
@@ -176,6 +187,7 @@ export default async function PlayerDetailPage({
   }
   // Statut dans mon effectif et temps de jeu réel (voir player-status-rules.ts).
   let statusLine: string | null = null;
+  let currentStatus: PlayerStatus | null = null;
   if (isMyTeam && contract) {
     const [mates, minuteRows] = await Promise.all([
       prisma.contract.findMany({ where: { careerId: membership.careerId, teamId: contract.teamId, playerId: { not: playerId } }, select: { playerId: true } })
@@ -189,12 +201,34 @@ export default async function PlayerDetailPage({
       potential: player.potential || player.overallRating,
       teamRank: rankInRoster(player.overallRating, mates.map((m) => m.overallRating)),
     });
+    currentStatus = status;
     const gp = minuteRows.reduce((s, r) => s + r.gamesPlayed, 0);
     const mins = minuteRows.reduce((s, r) => s + r.minutes, 0);
     statusLine = gp > 0
       ? t("status.playerLine", { status: t(`status.${status}`), expected: EXPECTED_MINUTES[status], actual: (mins / gp).toFixed(1) })
       : t("status.playerLineNoGames", { status: t(`status.${status}`), expected: EXPECTED_MINUTES[status] });
   }
+  // Promesse de temps de jeu : en cours, ou rôles supérieurs promettables.
+  const promiseState = isMyTeam
+    ? await prisma.playerState.findUnique({
+        where: { careerId_playerId: { careerId: membership.careerId, playerId } },
+        select: { promisedStatus: true, promiseSince: true },
+      })
+    : null;
+  const promiseProgress =
+    promiseState?.promisedStatus && promiseState.promiseSince && contract
+      ? await getPromiseProgress(membership.careerId, contract.teamId, playerId, promiseState.promisedStatus, promiseState.promiseSince)
+      : null;
+  const promisable = currentStatus ? promisableStatuses(currentStatus) : [];
+  // Courbe de progression : relevés mensuels + la note d'aujourd'hui.
+  const [ratingHistory, careerLines] = await Promise.all([
+    getRatingHistory(membership.careerId, playerId),
+    getCareerSeasonLines(membership.careerId, playerId),
+  ]);
+  const progressPoints = [
+    ...ratingHistory,
+    { date: "today", season: membership.season, overall: player.overallRating },
+  ];
   const stats = seasonStats.get(playerId) ?? {
     gamesPlayed: 0, points: 0, rebounds: 0, assists: 0, ppg: 0, rpg: 0, apg: 0,
   };
@@ -414,12 +448,84 @@ export default async function PlayerDetailPage({
         </div>
       </div>
 
+      <div className="mt-6 card p-4" data-testid="progression">
+        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-muted">{t("progress.title")}</h2>
+        <p className="mb-2 text-xs text-faint">{t("progress.hint")}</p>
+        <ProgressionChart
+          points={progressPoints}
+          potentialMid={potentialEstimate?.mid ?? null}
+          labels={{ potential: t("progress.potential"), today: t("progress.today") }}
+        />
+        {careerLines.length > 0 && (
+          <div className="mt-3 overflow-x-auto">
+            <p className="eyebrow mb-1">{t("progress.bySeason")}</p>
+            <table className="data-table w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="py-1 text-left">{t("progress.col.season")}</th>
+                  <th className="py-1 text-right">{t("progress.col.gp")}</th>
+                  <th className="py-1 text-right">{t("progress.col.mpg")}</th>
+                  <th className="py-1 text-right">{t("progress.col.ppg")}</th>
+                  <th className="py-1 text-right">{t("progress.col.rpg")}</th>
+                  <th className="py-1 text-right">{t("progress.col.apg")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {careerLines.map((l) => (
+                  <tr key={l.season}>
+                    <td className="py-1">{l.season}</td>
+                    <td className="py-1 text-right">{l.gamesPlayed}</td>
+                    <td className="py-1 text-right">{l.mpg.toFixed(1)}</td>
+                    <td className="py-1 text-right font-medium">{l.ppg.toFixed(1)}</td>
+                    <td className="py-1 text-right">{l.rpg.toFixed(1)}</td>
+                    <td className="py-1 text-right">{l.apg.toFixed(1)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       <div className="mt-6 card p-4" data-testid="personality">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">{t("personality.title")}</h2>
         {personalityVisible ? (
           <>
             <p className="text-lg font-semibold">{t(`personality.label.${personalityKind}`)}</p>
             {statusLine && <p className="mt-0.5 text-sm text-accent-text">{statusLine}</p>}
+            {isMyTeam && currentStatus && (
+              <div className="mt-3 rounded-md border border-line p-3" data-testid="playing-time-promise">
+                <p className="text-sm font-medium">{t("ptime.title")}</p>
+                {promiseProgress ? (
+                  <p className="mt-1 text-sm">
+                    {t("ptime.active", {
+                      status: t(`status.${promiseProgress.status}`),
+                      games: promiseProgress.games,
+                      mpg: promiseProgress.minutesPerGame.toFixed(1),
+                      needed: EXPECTED_MINUTES[promiseProgress.status] - PROMISE_MARGIN,
+                    })}
+                  </p>
+                ) : promisable.length === 0 ? (
+                  <p className="mt-1 text-sm text-muted">{t("ptime.none")}</p>
+                ) : (
+                  <form action={promisePlayingTime} className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                    <input type="hidden" name="playerId" value={player.id} />
+                    <label htmlFor="ptime-status" className="text-muted">{t("ptime.promise")}</label>
+                    <select id="ptime-status" name="status" className="field px-2 py-1">
+                      {promisable.map((s) => (
+                        <option key={s} value={s}>
+                          {t(`status.${s}`)} (≈ {EXPECTED_MINUTES[s]} min)
+                        </option>
+                      ))}
+                    </select>
+                    <button type="submit" className="rounded-md bg-accent px-3 py-1 font-medium text-accent-fg hover:bg-accent-hover">
+                      {t("ptime.button")}
+                    </button>
+                  </form>
+                )}
+                <p className="mt-1 text-xs text-faint">{t("ptime.hint")}</p>
+              </div>
+            )}
             <p className="mt-0.5 text-sm text-soft">{t(`personality.desc.${personalityKind}`)}</p>
             {isMyTeam ? (
               <>

@@ -1,5 +1,7 @@
 "use server";
 
+import { maybeBoardObjectives } from "@/lib/data-access/board-objectives";
+import { maybeSnapshotRatings } from "@/lib/data-access/rating-history";
 import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/auth/dal";
@@ -89,6 +91,10 @@ async function runLeagueMilestones(
   // Calendrier réel NBA : All-Star Game pendant la pause, NBA Cup.
   await maybePlayAllStarGame(careerId, career.leagueId, career.season, locale);
   await advanceNbaCup(careerId, career.leagueId, career.season, locale);
+  // Relevé mensuel des notes (courbes de progression).
+  await maybeSnapshotRatings(careerId, career.season);
+  // Objectifs des propriétaires (fixés après 15 matchs, jugés en fin de saison).
+  await maybeBoardObjectives(careerId, career.leagueId, career.season, locale);
   // Offres d'échange à l'initiative de l'IA (voir ai-trades.ts).
   await maybeAiTradeOffers(careerId, career.leagueId, career.season, locale);
 }

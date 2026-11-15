@@ -1,5 +1,6 @@
 "use server";
 
+import { maybeSnapshotRatings } from "@/lib/data-access/rating-history";
 import {
   MAX_CAREERS_PER_USER,
   activeMembershipWhere,
@@ -274,6 +275,8 @@ export async function createCareer(
     await createUnresolvedPicksForSeason(career.id, futureSeason, leagueTeamIds);
   }
 
+  // Premier relevé des notes (courbes de progression, voir rating-history.ts).
+  await maybeSnapshotRatings(career!.id, league.season);
   // La nouvelle carrière devient la carrière active du compte.
   await setActiveMembership(userId, career!.memberships[0].id);
 
