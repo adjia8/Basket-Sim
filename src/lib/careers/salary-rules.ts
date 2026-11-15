@@ -9,27 +9,49 @@ export const SALARY_RANGES: Record<string, { min: number; max: number }> = {
   wnba: { min: 270_000, max: 1_400_000 },
 };
 
-// Nos rosters ne descendent quasiment jamais sous ~65 de overall (pas de joueurs
-// de fin de banc générés) : sans plancher, une interpolation linéaire sur 0-99
-// rend même les role players presque aussi chers que les stars. On borne sur la
-// plage réelle des ratings (60-99) et on courbe (^3) pour que seuls les tout
-// meilleurs joueurs approchent le salaire max — un roster de 8 joueurs bien notés
-// reste alors proche du cap plutôt que de le pulvériser systématiquement.
-const RATING_FLOOR = 60;
-const RATING_CEIL = 99;
-const CURVE_POWER = 3;
+// Courbe calée sur les vrais contrats NBA 2026-27 du catalogue (430 joueurs
+// avec salaire réel) : médiane du salaire par tranche de note 2K, exprimée
+// en fraction de l'écart minimum → maximum de la ligue (la WNBA, en pause,
+// reprend la même forme sur sa propre échelle). Entre deux repères,
+// interpolation linéaire. Repères NBA : 70 ≈ 2,9 M$, 78 ≈ 11 M$, 82 ≈
+// 23 M$, 84 ≈ 33 M$, 88 ≈ 42 M$, 92 ≈ 53 M$.
+const NBA_RANGE = { min: 1_358_000, max: 57_736_000 };
+const SALARY_KNOTS: [number, number][] = [
+  [60, 1_358_000],
+  [68, 1_700_000],
+  [70, 2_900_000],
+  [72, 3_300_000],
+  [74, 3_900_000],
+  [76, 6_500_000],
+  [78, 11_000_000],
+  [80, 16_000_000],
+  [82, 23_000_000],
+  [84, 33_000_000],
+  [86, 39_000_000],
+  [88, 42_000_000],
+  [90, 49_000_000],
+  [92, 53_000_000],
+  [95, 57_736_000],
+];
 
 // Valeur déterministe (sans variance aléatoire) — c'est celle-ci que
 // player-demands.ts doit utiliser pour tout ce qui représente une exigence
 // STABLE d'un joueur (plancher salarial, mécontentement) : un re-tirage à
 // chaque rendu ferait apparaître/disparaître le badge "veut être échangé" de
-// façon incohérente à chaque revalidation de page (ex: changement de
-// programme d'entraînement), sans qu'aucun état de jeu n'ait réellement
-// changé.
+// façon incohérente à chaque revalidation de page.
 function baseSalaryForRating(overallRating: number, range: { min: number; max: number }): number {
-  const clamped = Math.min(Math.max(overallRating, RATING_FLOOR), RATING_CEIL);
-  const t = (clamped - RATING_FLOOR) / (RATING_CEIL - RATING_FLOOR);
-  return range.min + Math.pow(t, CURVE_POWER) * (range.max - range.min);
+  const knots = SALARY_KNOTS;
+  let fraction: number;
+  if (overallRating <= knots[0][0]) fraction = 0;
+  else if (overallRating >= knots[knots.length - 1][0]) fraction = 1;
+  else {
+    const i = knots.findIndex(([o]) => o > overallRating);
+    const [o0, s0] = knots[i - 1];
+    const [o1, s1] = knots[i];
+    const salary = s0 + ((overallRating - o0) / (o1 - o0)) * (s1 - s0);
+    fraction = (salary - NBA_RANGE.min) / (NBA_RANGE.max - NBA_RANGE.min);
+  }
+  return range.min + Math.max(0, Math.min(1, fraction)) * (range.max - range.min);
 }
 
 // Variante avec variance aléatoire (+/- 15%) — réservée à la génération d'un

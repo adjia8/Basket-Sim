@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/active-membership";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { generateCareerPreseasonSchedule, generateCareerSchedule } from "@/lib/careers/generate-schedule";
@@ -376,10 +377,17 @@ export async function deleteCareer(formData?: FormData): Promise<void> {
 
   const remaining = await prisma.membership.count({ where: { careerId: membership.careerId } });
   if (remaining === 0) {
-    await prisma.career.delete({ where: { id: membership.careerId } });
-    // Joueurs créés par les drafts de cette carrière (voir Player.careerId) :
-    // plus rien ne les référence une fois la carrière supprimée.
-    await prisma.player.deleteMany({ where: { careerId: membership.careerId } });
+    // Effacer la partie elle-même (≈ 1 300 matchs, contrats, stats... par
+    // cascade) prend plusieurs secondes : fait APRÈS la réponse, pour que le
+    // joueur retrouve tout de suite sa liste. Plus aucun compte n'y est
+    // rattaché, elle est déjà invisible.
+    const careerId = membership.careerId;
+    after(async () => {
+      await prisma.career.delete({ where: { id: careerId } }).catch(() => {});
+      // Joueurs créés par les drafts de cette carrière (voir Player.careerId) :
+      // plus rien ne les référence une fois la carrière supprimée.
+      await prisma.player.deleteMany({ where: { careerId } }).catch(() => {});
+    });
   }
 
   // Carrière active supprimée : on bascule sur la plus récente restante.

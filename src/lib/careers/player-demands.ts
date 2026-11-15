@@ -52,7 +52,7 @@ function starRenownThresholdForAge(age: number): number {
 
 // Salaire plancher accepté par un joueur, dérivé de son renommé — nul jusqu'au
 // renommé "moyen" (50, comportement inchangé pour un joueur non renommé),
-// jusqu'à +60% de prime au renommé maximal. Utilise le barème DÉTERMINISTE
+// jusqu'à +15% de prime au renommé maximal. Utilise le barème DÉTERMINISTE
 // (baseSalaryFloor, sans variance aléatoire) : cette fonction sert à évaluer
 // un état existant (refus de signer/prolonger), pas à générer un nouveau
 // contrat — un plancher qui change à chaque appel rendrait ces décisions
@@ -64,7 +64,9 @@ export function minAcceptableSalary(
 ): number {
   const range = SALARY_RANGES[leagueId] ?? SALARY_RANGES.nba;
   const baseline = baseSalaryFloor(overallRating, range);
-  const premium = (Math.max(0, renown - 50) / 49) * 0.6;
+  // Prime de renommée modeste : la courbe (vrais contrats) intègre déjà
+  // l'essentiel de la prime des stars.
+  const premium = (Math.max(0, renown - 50) / 49) * 0.15;
   // Jamais au-delà du salaire maximum réel de la ligue, même avec la prime
   // de renommée (sans ce plafond, une star renommée exigeait ~75 M$ en NBA).
   return Math.round(Math.min(range.max, baseline * (1 + premium)));

@@ -17,8 +17,10 @@ export function playerStatus(params: {
   teamRank: number; // rang de sa note dans l'effectif (1 = meilleur)
 }): PlayerStatus {
   const { overall, renown, age, potential, teamRank } = params;
-  if (renown >= 85 || (teamRank === 1 && overall >= 88)) return "franchise";
-  if (renown >= 72 || overall >= 85) return "star";
+  // Un seul joueur franchise par équipe au plus (son meilleur), des stars
+  // seulement parmi les trois premiers : la renommée seule ne suffit pas.
+  if (teamRank === 1 && (overall >= 87 || renown >= 85)) return "franchise";
+  if (teamRank <= 3 && (overall >= 84 || renown >= 75)) return "star";
   if (teamRank <= 5) return "starter";
   if (age <= 22 && potential - overall >= 6) return "prospect";
   if (teamRank <= 9) return "rotation";
@@ -26,12 +28,13 @@ export function playerStatus(params: {
 }
 
 // Minutes par match attendues selon le statut.
+// Calées sur la répartition réelle du moteur (saison complète simulée).
 export const EXPECTED_MINUTES: Record<PlayerStatus, number> = {
   franchise: 34,
-  star: 32,
-  starter: 28,
-  rotation: 20,
-  prospect: 14,
+  star: 30,
+  starter: 26,
+  rotation: 18,
+  prospect: 12,
   bench: 8,
 };
 
@@ -50,14 +53,15 @@ export interface ProductionLine {
 
 // Production ramenée sur l'échelle des notes (40-99), à partir d'un « game
 // score » simplifié (points, rebonds, passes, interceptions, contres,
-// pertes). Repères : 8 pts / 4 reb / 2 pd ≈ 70 ; 25 / 6 / 5 ≈ 95. Null en
-// dessous de 10 matchs (échantillon trop court).
+// pertes). Repères : 8 pts / 4 reb / 2 pd ≈ 71 ; 25 / 6 / 5 ≈ 89 ; seules
+// les saisons historiques (≈ 30 / 12 / 9) touchent 99. Null en dessous de
+// 10 matchs (échantillon trop court).
 export const MIN_GAMES_FOR_PRODUCTION = 10;
 
 export function productionRating(line: ProductionLine | null | undefined): number | null {
   if (!line || line.gamesPlayed < MIN_GAMES_FOR_PRODUCTION) return null;
   const gameScore = line.ppg + 0.45 * line.rpg + 0.7 * line.apg + line.spg + 0.7 * line.bpg - 0.7 * line.tpg;
-  return Math.max(40, Math.min(99, Math.round(55 + gameScore * 1.3)));
+  return Math.max(40, Math.min(99, Math.round(60 + gameScore * 0.95)));
 }
 
 // Note « marchande » utilisée pour les exigences salariales : 60 % la note,
