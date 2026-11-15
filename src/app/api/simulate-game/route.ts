@@ -102,7 +102,20 @@ export async function POST(request: Request) {
   const opponentIsAi = side === "home" ? !awayManager : side === "away" ? !homeManager : false;
   const talk =
     side && opponentIsAi
-      ? { side, pregame, halftime, stopAtHalf: body?.mode === "half" }
+      ? {
+          side,
+          pregame,
+          halftime,
+          stopAtHalf: body?.mode === "half",
+          // Match en direct : "live" = arrêt après le prochain quart-temps
+          // (jusqu'au 3e), "finish" = jusqu'au bout.
+          stopAfterQuarter:
+            body?.mode === "live"
+              ? Math.min(3, (Number(body?.fromQuarter) || 0) + 1)
+              : undefined,
+          timeout: body?.timeout === true,
+          rest: Array.isArray(body?.rest) ? (body.rest as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 5) : undefined,
+        }
       : undefined;
 
   let updated;

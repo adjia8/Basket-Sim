@@ -293,7 +293,15 @@ export interface MatchTalkInput {
   pregame?: TalkTone;
   halftime?: TalkTone;
   stopAtHalf?: boolean;
+  // Match en direct (voir engine.ts) : arrêt après ce quart-temps, temps
+  // mort pour le prochain quart (un par mi-temps), joueurs au repos.
+  stopAfterQuarter?: number;
+  timeout?: boolean;
+  rest?: string[];
 }
+
+// Regain de concentration d'un temps mort, en points sur le quart-temps.
+export const TIMEOUT_FOCUS_POINTS = 2;
 
 export async function simulateAndResolveGame(
   careerId: string,
@@ -418,7 +426,7 @@ export async function simulateAndResolveGame(
       const situation = pregameSituation(teamLevel(mine), teamLevel(theirs), talk.side === "home");
       talks = { side: talk.side, pregame: talkOutcome(talk.pregame, situation, motivation, myState.morale) };
     }
-    if (resumeFrom && talk.halftime && (!talks || talks.side === talk.side)) {
+    if (resumeFrom && (resumeFrom.quarter ?? 2) === 2 && talk.halftime && (!talks || talks.side === talk.side)) {
       const myScore = talk.side === "home" ? resumeFrom.homeScore : resumeFrom.awayScore;
       const theirScore = talk.side === "home" ? resumeFrom.awayScore : resumeFrom.homeScore;
       talks = {
@@ -428,12 +436,23 @@ export async function simulateAndResolveGame(
     }
   }
   const focus = focusByHalf(talks);
+  // Temps mort : un par mi-temps, pour le quart-temps qui reprend.
+  const nextQuarter = (resumeFrom?.quarter ?? 0) + 1;
+  const halfOfNext = nextQuarter <= 2 ? 1 : 2;
+  const used = resumeFrom?.timeoutsUsed ?? { home: [], away: [] };
+  const timeoutAllowed = !!talk?.timeout && !!resumeFrom && !used[talk.side].includes(halfOfNext);
+  const timeoutsUsed = timeoutAllowed && talk
+    ? { ...used, [talk.side]: [...used[talk.side], halfOfNext] }
+    : used;
 
   const result = simulationEngine.simulateGame(homeTeam, homeEligibleRoster, awayTeam, awayEligibleRoster, {
     homeFocus: talks?.side === "home" ? focus : undefined,
     awayFocus: talks?.side === "away" ? focus : undefined,
     stopAtHalf: !!talk?.stopAtHalf && !resumeFrom,
-    resumeFrom,
+    stopAfterQuarter: talk?.stopAfterQuarter,
+    resumeFrom: resumeFrom ? { ...resumeFrom, timeoutsUsed } : undefined,
+    timeout: timeoutAllowed && talk ? { side: talk.side, points: TIMEOUT_FOCUS_POINTS } : undefined,
+    restNextQuarter: talk && resumeFrom ? talk.rest : undefined,
     homeChemistry:
       homeTeamState.chemistry + homeGm.chemistry + moraleBonus(homeTeamState.morale) + homeStaff.chemistryBonus,
     awayChemistry:
@@ -465,7 +484,11 @@ export async function simulateAndResolveGame(
   if (result.halftime) {
     await prisma.game.update({
       where: { id: game.id },
-      data: { halftimeJson: JSON.stringify(result.halftime), talksJson: talks ? JSON.stringify(talks) : null },
+      data: {
+        halftimeJson: JSON.stringify({ ...result.halftime, timeoutsUsed }),
+        talksJson: talks ? JSON.stringify(talks) : null,
+        liveLogJson: result.quarterLog ? JSON.stringify(result.quarterLog) : null,
+      },
     });
     return game;
   }
@@ -666,6 +689,9 @@ export async function simulateAndResolveGame(
         boxScore: JSON.stringify(result.boxScore),
         halftimeJson: null,
         ...(talks ? { talksJson: JSON.stringify(talks) } : {}),
+        // Journal du match en direct conservé pour les matchs joués depuis la
+        // page de match (pas pour les lots IA : inutile et coûteux en place).
+        ...(talk && result.quarterLog ? { liveLogJson: JSON.stringify(result.quarterLog) } : {}),
       },
     }),
     game.playoffSeriesId

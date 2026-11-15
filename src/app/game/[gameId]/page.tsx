@@ -24,8 +24,9 @@ import { endOfGameDay } from "@/lib/data-access/game-clock";
 import { DayResults, GameLeaders, PreMatchComparison, Scoreboard, type TeamSnapshot } from "@/components/game/MatchCenter";
 import type { Team } from "@/lib/types";
 import type { DictionaryKey } from "@/lib/i18n/dictionary";
-import type { HalfState } from "@/lib/simulation/engine";
-import type { TalkChoice } from "@/components/game/SimulateButton";
+import type { HalfState, QuarterEvent } from "@/lib/simulation/engine";
+import { LiveFeed } from "@/components/game/LiveFeed";
+import type { LiveControls, TalkChoice } from "@/components/game/SimulateButton";
 import {
   HALFTIME_TONES,
   PREGAME_TONES,
@@ -142,7 +143,21 @@ export default async function GamePage({
   // Causeries (voir team-talk-rules.ts) : face à une équipe IA, le match se
   // joue en deux temps avec une causerie avant le coup d'envoi et une à la
   // mi-temps.
-  const talkRow = await prisma.game.findUnique({ where: { id: game.id }, select: { halftimeJson: true, talksJson: true } });
+  const talkRow = await prisma.game.findUnique({
+    where: { id: game.id },
+    select: { halftimeJson: true, talksJson: true, liveLogJson: true },
+  });
+  const liveLog = talkRow?.liveLogJson ? (JSON.parse(talkRow.liveLogJson) as QuarterEvent[]) : null;
+  // Noms de tous les joueurs cités dans le fil (y compris ceux absents des
+  // effectifs affichés, ex. après un échange).
+  const liveIds = liveLog
+    ? [...new Set(liveLog.flatMap((e) => [...e.top.map((x) => x.playerId), ...e.foulTrouble, ...e.technicals, ...e.ejected, ...(e.fouledOut ?? [])]))]
+    : [];
+  const liveNames = new Map(
+    (await prisma.player.findMany({ where: { id: { in: liveIds } }, select: { id: true, firstName: true, lastName: true } })).map(
+      (p) => [p.id, `${p.firstName} ${p.lastName}`] as const
+    )
+  );
   const halftime = talkRow?.halftimeJson ? (JSON.parse(talkRow.halftimeJson) as HalfState) : null;
   const talks = parseTalks(talkRow?.talksJson);
   const opponentIsAi = mySide === "home" ? !awayManager : mySide === "away" ? !homeManager : false;
@@ -171,8 +186,10 @@ export default async function GamePage({
       : undefined;
   const myHalfScore = halftime && mySide ? (mySide === "home" ? halftime.homeScore : halftime.awayScore) : 0;
   const theirHalfScore = halftime && mySide ? (mySide === "home" ? halftime.awayScore : halftime.homeScore) : 0;
+  // Pause entre deux quarts-temps : la causerie n'a lieu qu'à la mi-temps.
+  const pausedQuarter = halftime ? (halftime.quarter ?? 2) : 0;
   const halftimeTalk: TalkChoice | undefined =
-    halftime && mySide
+    halftime && mySide && pausedQuarter === 2
       ? {
           field: "halftimeTalk",
           heading: `${t("talks.halftimeHeading")} · ${t(
@@ -183,6 +200,43 @@ export default async function GamePage({
         }
       : undefined;
   const nameOf = new Map([...homeRoster, ...awayRoster].map((p) => [p.id, `${p.firstName} ${p.lastName}`]));
+  // Match en direct (face à l'IA) : contrôles entre deux quarts-temps.
+  const liveControls: LiveControls | undefined =
+    mySide && opponentIsAi
+      ? {
+          fromQuarter: pausedQuarter,
+          timeoutAvailable:
+            pausedQuarter > 0 && !(halftime?.timeoutsUsed?.[mySide] ?? []).includes(pausedQuarter + 1 <= 2 ? 1 : 2),
+          restCandidates:
+            pausedQuarter > 0
+              ? (halftime?.boxScore ?? [])
+                  .filter((e) => e.teamId === membership.teamId && e.minutesPlayed > 0 && !(halftime?.disqualified ?? []).includes(e.playerId))
+                  .sort((a, b) => b.minutesPlayed - a.minutesPlayed)
+                  .slice(0, 10)
+                  .map((e) => ({
+                    id: e.playerId,
+                    label: t("live.restCandidate", {
+                      name: nameOf.get(e.playerId) ?? e.playerId,
+                      min: Math.round(e.minutesPlayed),
+                      pf: e.personalFouls,
+                    }),
+                  }))
+              : [],
+          labels: {
+            finish: pausedQuarter > 0 ? t("live.finish") : t("live.finishFromStart"),
+            timeout: t("live.timeoutLabel"),
+            timeoutHint: t("live.timeoutHint"),
+            rest: t("live.restLabel"),
+            restHint: t("live.restHint"),
+          },
+        }
+      : undefined;
+  const liveButtonLabel =
+    pausedQuarter === 0
+      ? t("live.kickoffLive")
+      : pausedQuarter >= 3
+        ? t("live.lastQuarter")
+        : t("live.nextQuarter", { n: pausedQuarter + 1 });
   const halfLeaders = (teamId: string) =>
     (halftime?.boxScore ?? [])
       .filter((e) => e.teamId === teamId)
@@ -257,9 +311,19 @@ export default async function GamePage({
           rankLabel={(rank, size) => `${rank}${ordinalSuffix(rank, locale)}/${size}`}
         />
 
+        {liveLog && liveLog.length > 0 && (
+          <LiveFeed log={liveLog} home={homeTeam} away={awayTeam} nameOf={liveNames} t={t} />
+        )}
+
         {game.status === "scheduled" && halftime && mySide && (
           <section className="card mt-6 p-4 sm:p-5">
-            <p className="eyebrow">{t("talks.halftimeTitle")}</p>
+            <p className="eyebrow">
+              {pausedQuarter === 2
+                ? t("talks.halftimeTitle")
+                : t("live.endOfQuarter", {
+                    quarter: pausedQuarter === 1 ? t("live.firstQuarter") : t("live.quarterName", { n: pausedQuarter }),
+                  })}
+            </p>
             <div className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-1">
               <p className="text-3xl font-bold tabular">
                 {awayTeam.abbreviation} {halftime.awayScore} – {halftime.homeScore} {homeTeam.abbreviation}
@@ -301,10 +365,17 @@ export default async function GamePage({
                 gameId={game.id}
                 initialWaitingFor={initialWaitingFor}
                 talk={halftime ? halftimeTalk : pregameTalk}
-                mode={halftime ? "resume" : pregameTalk ? "half" : undefined}
+                mode={liveControls ? "live" : halftime ? "resume" : pregameTalk ? "half" : undefined}
+                live={liveControls}
                 labels={{
                   ...simulateLabels,
-                  simulate: halftime ? t("talks.resume") : pregameTalk ? t("talks.kickoff") : simulateLabels.simulate,
+                  simulate: liveControls
+                    ? liveButtonLabel
+                    : halftime
+                      ? t("talks.resume")
+                      : pregameTalk
+                        ? t("talks.kickoff")
+                        : simulateLabels.simulate,
                 }}
               />
             ) : (

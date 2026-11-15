@@ -1,7 +1,7 @@
 import type { BoxScoreEntry, Player, PlayerRatings, Team } from "@/lib/types";
 import { personalityFor, technicalFoulMultiplier } from "@/lib/careers/personality-rules";
 import { moraleImpactFactor, MORALE_NEUTRAL } from "@/lib/careers/morale-rules";
-import type { HalfState, SimulationEngine, SimulationOptions, SimulationResult } from "./engine";
+import type { HalfState, QuarterEvent, SimulationEngine, SimulationOptions, SimulationResult } from "./engine";
 import {
   FLAGRANT_ONE_EJECTION_LIMIT,
   FOUL_CHECKS_PER_QUARTER,
@@ -690,23 +690,79 @@ export class MockSimulationEngine implements SimulationEngine {
     let homeScore = resume?.homeScore ?? 0;
     let awayScore = resume?.awayScore ?? 0;
     const half = QUARTERS / 2;
+    // Match en direct : reprise au quart-temps où l'on s'était arrêté, arrêt
+    // éventuel après un quart-temps donné (la mi-temps = après le 2e).
+    const startQuarter = resume ? (resume.quarter ?? half) : 0;
+    const stopAfter = options?.stopAfterQuarter ?? (options?.stopAtHalf ? half : undefined);
+    const endQuarter = stopAfter !== undefined && stopAfter > startQuarter ? Math.min(stopAfter, QUARTERS) : QUARTERS;
+    const quarterLog: QuarterEvent[] = [...(resume?.quarterLog ?? [])];
 
-    for (let q = resume ? half : 0; q < (options?.stopAtHalf ? half : QUARTERS); q++) {
+    // Instantané par joueur (points, fautes, techniques) pour le journal.
+    const snapshot = () =>
+      new Map([...totals.values()].map((e) => [e.playerId, { pts: e.points, pf: e.personalFouls, tf: e.technicalFouls }] as const));
+    const logPeriod = (
+      q: number,
+      before: ReturnType<typeof snapshot>,
+      beforeOut: Set<string>,
+      home: number,
+      away: number,
+      timeoutSide?: "home" | "away"
+    ) => {
+      const deltas = [...totals.values()].map((e) => ({
+        e,
+        pts: e.points - (before.get(e.playerId)?.pts ?? 0),
+        pf: before.get(e.playerId)?.pf ?? 0,
+        tf: before.get(e.playerId)?.tf ?? 0,
+      }));
+      quarterLog.push({
+        q,
+        home,
+        away,
+        homeTotal: homeScore,
+        awayTotal: awayScore,
+        top: deltas
+          .filter((d) => d.pts > 0)
+          .sort((a, b) => b.pts - a.pts)
+          .slice(0, 2)
+          .map((d) => ({ playerId: d.e.playerId, teamId: d.e.teamId, pts: d.pts })),
+        foulTrouble: deltas.filter((d) => d.e.personalFouls >= 4 && d.pf < 4 && !disqualified.has(d.e.playerId)).map((d) => d.e.playerId),
+        technicals: deltas.filter((d) => d.e.technicalFouls > d.tf).map((d) => d.e.playerId),
+        ejected: [...disqualified].filter((id) => !beforeOut.has(id) && totals.get(id)?.disqualifiedReason === "ejected"),
+        fouledOut: [...disqualified].filter((id) => !beforeOut.has(id) && totals.get(id)?.disqualifiedReason === "fouled_out"),
+        ...(timeoutSide ? { timeout: timeoutSide } : {}),
+      });
+    };
+
+    for (let q = startQuarter; q < endQuarter; q++) {
       // Causeries : la concentration d'une mi-temps est répartie sur ses
       // deux quart-temps.
       ctx.homeFocusPerQuarter = (q < half ? homeFocus.first : homeFocus.second) / half;
       ctx.awayFocusPerQuarter = (q < half ? awayFocus.first : awayFocus.second) / half;
+      // Temps mort et repos : seulement pour le premier quart-temps joué.
+      const firstOfCall = q === startQuarter;
+      const timeout = firstOfCall ? options?.timeout : undefined;
+      if (timeout?.side === "home") ctx.homeFocusPerQuarter += timeout.points;
+      if (timeout?.side === "away") ctx.awayFocusPerQuarter += timeout.points;
+      const rested = firstOfCall ? (options?.restNextQuarter ?? []).filter((id) => !disqualified.has(id)) : [];
+      rested.forEach((id) => disqualified.add(id));
+      const before = snapshot();
+      const beforeOut = new Set([...disqualified, ...rested]);
       const period = simulatePeriod(ctx, quarterBase, quarterHomeAdvantage, 4.5, 15, quarterMinutes);
+      rested.forEach((id) => disqualified.delete(id));
       homeScore += period.homeScore;
       awayScore += period.awayScore;
+      logPeriod(q + 1, before, beforeOut, period.homeScore, period.awayScore, timeout?.side);
     }
 
-    if (options?.stopAtHalf) {
+    if (endQuarter < QUARTERS) {
       const halftime: HalfState = {
         homeScore,
         awayScore,
         boxScore: [...totals.values()].map((e) => ({ ...e })),
         disqualified: [...disqualified],
+        quarter: endQuarter,
+        quarterLog,
+        timeoutsUsed: resume?.timeoutsUsed,
       };
       // Box score affichable à la pause (tirs reconstitués sur une copie).
       const display = new Map(halftime.boxScore.map((e) => [e.playerId, { ...e }] as const));
@@ -718,7 +774,7 @@ export class MockSimulationEngine implements SimulationEngine {
           [away.id, threePointShift(awayTactics.offense)],
         ])
       );
-      return { homeScore, awayScore, boxScore: [...display.values()], halftime };
+      return { homeScore, awayScore, boxScore: [...display.values()], halftime, quarterLog };
     }
 
     // Le basket ne finit jamais sur une égalité — prolongations successives
@@ -737,6 +793,8 @@ export class MockSimulationEngine implements SimulationEngine {
 
     let overtimePeriods = 0;
     while (homeScore === awayScore && overtimePeriods < MAX_OVERTIME_PERIODS) {
+      const before = snapshot();
+      const beforeOut = new Set(disqualified);
       const period = simulatePeriod(
         ctx,
         overtimeBase,
@@ -748,6 +806,7 @@ export class MockSimulationEngine implements SimulationEngine {
       homeScore += period.homeScore;
       awayScore += period.awayScore;
       overtimePeriods++;
+      logPeriod(QUARTERS + overtimePeriods, before, beforeOut, period.homeScore, period.awayScore);
     }
 
     applyShotStats(
@@ -795,10 +854,19 @@ export class MockSimulationEngine implements SimulationEngine {
       }
     }
 
+    // Point décisif éventuel après la dernière prolongation : le journal
+    // reflète le score final.
+    const lastEvent = quarterLog[quarterLog.length - 1];
+    if (lastEvent) {
+      lastEvent.homeTotal = homeScore;
+      lastEvent.awayTotal = awayScore;
+    }
+
     return {
       homeScore,
       awayScore,
       boxScore: [...totals.values()],
+      quarterLog,
     };
   }
 }

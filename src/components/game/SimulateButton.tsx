@@ -21,6 +21,15 @@ export interface SimulateButtonLabels {
 
 // Causerie à choisir avant de lancer (avant-match ou mi-temps), voir
 // team-talk-rules.ts.
+// Match en direct (voir engine.ts) : arrêt après chaque quart-temps, temps
+// mort et repos de joueurs pour le quart suivant.
+export interface LiveControls {
+  fromQuarter: number; // quarts-temps déjà joués (0 avant le coup d'envoi)
+  timeoutAvailable: boolean;
+  restCandidates: { id: string; label: string }[];
+  labels: { finish: string; timeout: string; timeoutHint: string; rest: string; restHint: string };
+}
+
 export interface TalkChoice {
   field: "pregameTalk" | "halftimeTalk";
   heading: string;
@@ -34,13 +43,17 @@ export function SimulateButton({
   labels,
   talk,
   mode,
+  live,
 }: {
   gameId: string;
   initialWaitingFor?: string | null;
   labels: SimulateButtonLabels;
   talk?: TalkChoice;
-  mode?: "half" | "resume";
+  mode?: "half" | "resume" | "live";
+  live?: LiveControls;
 }) {
+  const [timeout, setTimeoutCall] = useState(false);
+  const [rest, setRest] = useState<string[]>([]);
   const [tone, setTone] = useState<string>(talk?.options[0]?.value ?? "");
   const [isFetching, setIsFetching] = useState(false);
   const [isRefreshing, startTransition] = useTransition();
@@ -71,7 +84,10 @@ export function SimulateButton({
     return () => clearInterval(interval);
   }, [isPending]);
 
-  async function handleClick() {
+  async function handleClick(modeOverride?: "half" | "resume" | "live" | "full") {
+    const effectiveMode = modeOverride === "full" ? undefined : (modeOverride ?? mode);
+    // Reprise en cours de match : la ligue a déjà été rattrapée.
+    const inProgress = mode === "resume" || (live?.fromQuarter ?? 0) > 0;
     setIsFetching(true);
     setError(null);
     setElapsedSeconds(0);
@@ -82,7 +98,7 @@ export function SimulateButton({
       let played = 0;
       setLeagueGamesPlayed(0);
       for (;;) {
-        if (mode === "resume") break;
+        if (inProgress) break;
         const catchUp = await withClientTimeout(catchUpLeagueBefore(gameId));
         if (catchUp.error) throw new Error(labels.simulationFailed);
         played += catchUp.simulated;
@@ -95,7 +111,12 @@ export function SimulateButton({
         fetch("/api/simulate-game", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ gameId, mode, ...(talk ? { [talk.field]: tone } : {}) }),
+          body: JSON.stringify({
+            gameId,
+            mode: effectiveMode,
+            ...(live ? { fromQuarter: live.fromQuarter, timeout, rest } : {}),
+            ...(talk ? { [talk.field]: tone } : {}),
+          }),
         })
       );
       const data = await res.json().catch(() => null);
@@ -113,6 +134,9 @@ export function SimulateButton({
         throw new Error(data?.error ?? labels.simulationFailed);
       }
       if (data?.simulated) {
+        // Choix valables pour un seul quart-temps.
+        setTimeoutCall(false);
+        setRest([]);
         startTransition(() => router.refresh());
       } else {
         setWaitingFor(data?.waitingFor ?? labels.otherManagerFallback);
@@ -167,14 +191,60 @@ export function SimulateButton({
           </div>
         </fieldset>
       )}
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={isPending}
-        className="rounded-md bg-accent px-6 py-2 font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
-      >
-        {isPending ? `${labels.simulating} (${elapsedSeconds}s)` : labels.simulate}
-      </button>
+      {live && live.fromQuarter > 0 && (live.timeoutAvailable || live.restCandidates.length > 0) && (
+        <fieldset className="card mb-2 w-full max-w-2xl p-4 text-left text-sm" disabled={isPending} data-testid="live-controls">
+          {live.timeoutAvailable && (
+            <label className="flex cursor-pointer items-start gap-2">
+              <input type="checkbox" checked={timeout} onChange={(e) => setTimeoutCall(e.target.checked)} className="mt-1 accent-[var(--accent)]" />
+              <span>
+                <span className="font-medium">{live.labels.timeout}</span>
+                <span className="block text-xs text-muted">{live.labels.timeoutHint}</span>
+              </span>
+            </label>
+          )}
+          {live.restCandidates.length > 0 && (
+            <div className="mt-3">
+              <p className="font-medium">{live.labels.rest}</p>
+              <p className="text-xs text-muted">{live.labels.restHint}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {live.restCandidates.map((c) => {
+                  const on = rest.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setRest(on ? rest.filter((x) => x !== c.id) : rest.length < 2 ? [...rest, c.id] : rest)}
+                      className={`rounded-full border px-3 py-1 text-xs ${on ? "border-accent bg-accent/15 text-accent-text" : "border-line hover:bg-surface-2"}`}
+                    >
+                      {c.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </fieldset>
+      )}
+      <div className="flex flex-wrap justify-center gap-2">
+        <button
+          type="button"
+          onClick={() => handleClick()}
+          disabled={isPending}
+          className="rounded-md bg-accent px-6 py-2 font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
+        >
+          {isPending ? `${labels.simulating} (${elapsedSeconds}s)` : labels.simulate}
+        </button>
+        {live && !isPending && (
+          <button
+            type="button"
+            onClick={() => handleClick(live.fromQuarter > 0 ? "resume" : "full")}
+            className="rounded-md border border-line px-4 py-2 text-sm font-medium hover:bg-surface-2"
+          >
+            {live.labels.finish}
+          </button>
+        )}
+      </div>
       {isPending && (
         <p className="text-xs text-muted">
           {leagueGamesPlayed !== null

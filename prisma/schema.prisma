@@ -388,6 +388,7 @@ model Game {
   // mi-temps (HalfState JSON, null hors pause) et causeries du GM (GameTalks).
   halftimeJson String?
   talksJson    String?
+  liveLogJson  String? // journal du match en direct (événements par quart-temps, voir engine.ts QuarterEvent)
   homeReady    Boolean  @default(false)
   awayReady    Boolean  @default(false)
 

@@ -30,6 +30,7 @@ import * as scout from "./dict/scout";
 import * as status from "./dict/status";
 import * as progress from "./dict/progress";
 import * as board from "./dict/board";
+import * as live from "./dict/live";
 
 // Chaque module dict/<zone>.ts exporte { fr, en } avec les MÊMES clés (voir
 // common.ts pour le patron : un tableau `keys as const`, puis deux
@@ -70,6 +71,7 @@ const sources = [
   status,
   progress,
   board,
+  live,
 ];
 
 export const dictionaries = {
@@ -106,6 +108,7 @@ export const dictionaries = {
     ...status.fr,
     ...progress.fr,
     ...board.fr,
+    ...live.fr,
   },
   en: {
     ...common.en,
@@ -140,6 +143,7 @@ export const dictionaries = {
     ...status.en,
     ...progress.en,
     ...board.en,
+    ...live.en,
   },
 };
 
