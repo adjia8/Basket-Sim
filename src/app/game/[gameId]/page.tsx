@@ -1,6 +1,8 @@
 import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { notFound, redirect } from "next/navigation";
 import { getTacticsReport } from "@/lib/data-access/tactics";
+import { getStaffProfiles } from "@/lib/data-access/staff";
+import { ScoutingReport } from "@/components/game/ScoutingReport";
 import { PreMatchTactics } from "@/components/game/PreMatchTactics";
 import Link from "next/link";
 import { BoxScoreTable } from "@/components/game/BoxScoreTable";
@@ -335,6 +337,20 @@ export default async function GamePage({
             />
             {dayResults}
           </div>
+          {mySide && (
+            <ScoutingReport
+              opponentName={mySide === "home" ? `${awayTeam.city} ${awayTeam.name}` : `${homeTeam.city} ${homeTeam.name}`}
+              opponentTeamId={mySide === "home" ? awayTeam.id : homeTeam.id}
+              theirRoster={theirRoster}
+              myRoster={myRoster}
+              ppgById={seasonStats}
+              scouting={
+                (await getStaffProfiles(membership.careerId, [membership.teamId], membership.leagueId)).get(membership.teamId)
+                  ?.scouting ?? 50
+              }
+              t={t}
+            />
+          )}
           {tacticsReport && tacticsReport.opponent && (
             <PreMatchTactics report={tacticsReport} myTeamId={membership.teamId} t={t} />
           )}
