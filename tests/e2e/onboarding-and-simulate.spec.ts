@@ -18,8 +18,8 @@ test("onboarding through a simulated game produces a consistent box score", asyn
   expect(gameHref).toBeTruthy();
 
   await page.goto(gameHref!);
-  // Face à une équipe IA, le match se joue en deux temps avec les causeries
-  // d'équipe (voir team-talk-rules.ts) : coup d'envoi, mi-temps, reprise.
+  // Face à une équipe IA, le match se joue en direct (voir engine.ts) : coup
+  // d'envoi, arrêt après chaque quart-temps, puis jusqu'au bout.
   await expect(page.locator('button:has-text("Coup d\'envoi")')).toBeVisible({ timeout: 10_000 });
 
   // L'aperçu pré-match doit montrer les deux effectifs (voir
@@ -28,17 +28,20 @@ test("onboarding through a simulated game produces a consistent box score", asyn
   await expect(rosterTables).toHaveCount(2);
 
   await page.click('button:has-text("Coup d\'envoi")');
-  await expect(page.locator('button:has-text("Reprendre le match")')).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('button:has-text("Jouer le 2e quart-temps")')).toBeVisible({ timeout: 60_000 });
 
   const gameId = gameHref!.split("/").pop()!;
   const prisma = new PrismaClient();
   try {
-    // À la pause : match toujours à jouer, état de mi-temps enregistré.
+    // À la pause (fin du 1er quart-temps) : match toujours à jouer, état et
+    // fil du match enregistrés.
     const atHalf = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
     expect(atHalf.status).not.toBe("final");
     expect(atHalf.halftimeJson).not.toBeNull();
+    expect(JSON.parse(atHalf.halftimeJson!).quarter).toBe(1);
+    expect(atHalf.liveLogJson).not.toBeNull();
 
-    await page.click('button:has-text("Reprendre le match")');
+    await page.click('button:has-text("Jouer jusqu\'au bout")');
     // La route simulate-game enchaîne beaucoup de requêtes séquentielles
     // (rosters, standings, chimie, fatigue, conférence de presse, demandes de
     // trade...) — sous latence Neon, ça peut dépasser 20s (voir README.md).
