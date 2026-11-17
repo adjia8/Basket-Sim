@@ -22,7 +22,9 @@ import {
   type Tactics,
 } from "@/lib/careers/tactics-rules";
 
-const HOME_ADVANTAGE = 2.5;
+// Avantage du terrain, en points de force : ≈ 2 points au score par match
+// (avec STRENGTH_COEFFICIENT), soit ≈ 56 % de victoires à domicile comme en NBA.
+const HOME_ADVANTAGE = 5.5;
 // Exportée : l'UI de gestion de rotation (RotationOrderFormClient.tsx) en a
 // besoin pour savoir où s'arrête le "banc qui joue" et où commence le "hors
 // rotation" — une seule source de vérité, pas de valeur dupliquée côté UI.
@@ -32,7 +34,16 @@ const QUARTER_MINUTES: Record<string, number> = { wnba: 10, nba: 12 };
 // La force d'équipe pesait 0.9 sur le score total dans l'ancien calcul "en un
 // coup" — répartie sur 4 quart-temps pour que l'effet cumulé sur la partie
 // reste comparable.
-const STRENGTH_COEFFICIENT = 0.9 / QUARTERS;
+// Points marqués par point de force d'écart (sur un match). Recalé avec
+// QUARTER_NOISE sur une saison simulée pour retrouver l'éventail réel des
+// bilans (≈ 17 à 64 victoires).
+const STRENGTH_COEFFICIENT = 1.45 / QUARTERS;
+
+// Part de hasard par équipe et par quart-temps. Calée pour que l'écart final
+// d'un match ait un écart-type d'environ 12 points, comme en NBA (avec 4,5,
+// il n'était que d'environ 5 : la meilleure équipe gagnait presque toujours,
+// d'où des bilans de 72-10 ou 7-75 sur une saison simulée).
+const QUARTER_NOISE = 10;
 // Le basket ne finit jamais sur une égalité — durée réelle d'une
 // prolongation (5 minutes, WNBA comme NBA), bien plus courte qu'un
 // quart-temps de 10-12 minutes (voir simulateGame : tous les paramètres
@@ -154,8 +165,9 @@ function teamStrength(
   const startersAvg = average(starters.map(playerImpact));
   const benchAvg = bench.length ? average(bench.map(playerImpact)) : startersAvg;
   const rawStrength = startersAvg * depth.startersShare + benchAvg * (1 - depth.startersShare);
-  // Chimie d'équipe : modificateur ±10% autour de la force brute.
-  const chemistryMultiplier = 0.9 + (Math.max(0, Math.min(99, chemistry)) / 99) * 0.2;
+  // Chimie d'équipe : modificateur ±5 % autour de la force brute (±10 %
+  // emballait l'écart : qui gagne gagne en cohésion, donc gagne encore plus).
+  const chemistryMultiplier = 0.95 + (Math.max(0, Math.min(99, chemistry)) / 99) * 0.1;
   return rawStrength * chemistryMultiplier + gmBonus;
 }
 
@@ -747,7 +759,7 @@ export class MockSimulationEngine implements SimulationEngine {
       rested.forEach((id) => disqualified.add(id));
       const before = snapshot();
       const beforeOut = new Set([...disqualified, ...rested]);
-      const period = simulatePeriod(ctx, quarterBase, quarterHomeAdvantage, 4.5, 15, quarterMinutes);
+      const period = simulatePeriod(ctx, quarterBase, quarterHomeAdvantage, QUARTER_NOISE, 15, quarterMinutes);
       rested.forEach((id) => disqualified.delete(id));
       homeScore += period.homeScore;
       awayScore += period.awayScore;
@@ -788,7 +800,7 @@ export class MockSimulationEngine implements SimulationEngine {
     const overtimeRatio = overtimeMinutes / quarterMinutes;
     const overtimeBase = quarterBase * overtimeRatio;
     const overtimeHomeAdvantage = quarterHomeAdvantage * overtimeRatio;
-    const overtimeNoiseSpread = 4.5 * overtimeRatio;
+    const overtimeNoiseSpread = QUARTER_NOISE * overtimeRatio;
     const overtimeMinScore = Math.max(3, Math.round(15 * overtimeRatio));
 
     let overtimePeriods = 0;
