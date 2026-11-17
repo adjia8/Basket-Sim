@@ -84,3 +84,34 @@ export async function registerAndOnboardWnbaTeam(page: Page, tag: string): Promi
 
   return { email, teamHref, teamName };
 }
+
+// Inscription → ligue NBA → franchise dont le nom correspond à `team` →
+// création du GM → dashboard. `email` permet de rattacher une seconde
+// carrière au même compte (déjà connecté) : on passe alors par /onboarding.
+export async function onboardNbaTeam(page: Page, team: RegExp, opts: { email?: string; tag?: string } = {}): Promise<string> {
+  let email = opts.email;
+  if (!email) {
+    email = randomTestEmail(opts.tag ?? "nba");
+    await page.goto("/register");
+    await page.fill('input[name="email"]', email);
+    await page.fill('input[name="password"]', TEST_PASSWORD);
+    await page.locator('form:has(input[name="password"]) button[type="submit"]').first().click();
+    await page.waitForURL(/\/onboarding/, { timeout: 30_000 });
+  } else {
+    await page.goto("/onboarding");
+  }
+  await page.click('button:has-text("NBA")');
+  await page.waitForTimeout(800);
+  for (let i = 0; i < 30; i++) {
+    if (team.test(await page.locator("h3").first().innerText())) break;
+    await page.click('button:has-text("Suivant")');
+    await page.waitForTimeout(200);
+  }
+  await page.click('button:has-text("Choisir cette franchise")');
+  await page.waitForTimeout(800);
+  await page.locator('input[name="gmFirstName"]').fill("Test");
+  await page.fill('input[name="gmLastName"]', "Coach");
+  await page.click('button:has-text("Prendre les commandes")');
+  await page.waitForURL("/", { timeout: 90_000 });
+  return email;
+}

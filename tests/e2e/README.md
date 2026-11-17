@@ -32,3 +32,16 @@ The underlying Neon connection has occasionally hit transient
 the retry wrapper) — a failed run that mentions "Can't reach database
 server" or "advisory lock" is very likely transient. Re-run before
 assuming a real regression.
+
+## Unit tests
+
+The game rules (NBA Cup calendar and tie-breaks, contract negotiation,
+salary curve, personalities, player status and production, franchise
+accent contrast, ownership goals, potential) are pure functions covered by
+fast tests that need neither the database nor a browser:
+
+    npm run test:unit
+
+They use Node's built-in test runner (`node --test`) with `tsx`, and run
+in a few seconds. Run them before every commit; run the E2E suite before
+pushing.
