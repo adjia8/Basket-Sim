@@ -121,8 +121,16 @@ export async function POST(request: Request) {
   let updated;
   try {
     updated = await simulateAndResolveGame(membership.careerId, updatedGame, locale, talk);
-  } catch {
-    return NextResponse.json({ error: t("simulateAction.teamNotFound") }, { status: 404 });
+  } catch (err) {
+    // Seule une équipe introuvable est une 404 ; toute autre erreur (base
+    // indisponible, état de match corrompu, bug) est journalisée et signalée
+    // comme un échec de simulation, sans masquer sa cause.
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("team not found")) {
+      return NextResponse.json({ error: t("simulateAction.teamNotFound") }, { status: 404 });
+    }
+    console.error(`simulate-game ${gameId}:`, err);
+    return NextResponse.json({ error: t("game.simulationFailed") }, { status: 500 });
   }
 
   // All-Stars et trophées (voir awards.ts), une fois le match terminé.

@@ -29,6 +29,8 @@ export interface HalfState {
   quarter?: number;
   quarterLog?: QuarterEvent[];
   timeoutsUsed?: { home: number[]; away: number[] }; // mi-temps (1 ou 2) où le temps mort a servi
+  // Forme du soir de chaque joueur, conservée d'un quart-temps à l'autre.
+  form?: Record<string, { pts: number; reb: number; ast: number }>;
 }
 
 export interface SimulationResult {

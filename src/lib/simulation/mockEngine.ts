@@ -181,15 +181,21 @@ function averageClutch(activeRoster: Player[], rotationOrder?: string[]): number
 // lancer franc réussi (seul moyen d'ajouter exactement 1 point) — pour que
 // le score final reste toujours égal à la somme du box score, jamais un
 // point fantôme attribué à personne.
+// Joueur le plus fiable dans les moments chauds parmi la rotation active.
+function pickClutchPlayer(activeRoster: Player[], rotationOrder?: string[]): Player | null {
+  const rotation = rotationOf(activeRoster, rotationOrder);
+  if (rotation.length === 0) return null;
+  return [...rotation].sort((a, b) => b.ratings.clutch - a.ratings.clutch)[0];
+}
+
 function creditClutchPoint(
   totals: Map<string, BoxScoreEntry>,
   teamId: string,
   activeRoster: Player[],
   rotationOrder?: string[]
 ): void {
-  const rotation = rotationOf(activeRoster, rotationOrder);
-  if (rotation.length === 0) return;
-  const clutchPlayer = [...rotation].sort((a, b) => b.ratings.clutch - a.ratings.clutch)[0];
+  const clutchPlayer = pickClutchPlayer(activeRoster, rotationOrder);
+  if (!clutchPlayer) return;
   const entry = totals.get(clutchPlayer.id) ?? emptyBoxEntry(clutchPlayer.id, teamId);
   entry.points += 1;
   entry.freeThrowsMade += 1;
@@ -203,21 +209,22 @@ function creditClutchPoint(
 // rares qu'en NBA (≈ 3 % des matchs contre ≈ 6 %).
 const LATE_EQUALIZER_CHANCE = 0.3;
 
+// Renvoie le marqueur, ou null si personne ne peut tirer (aucun point
+// crédité dans ce cas : le score ne doit jamais bouger sans marqueur).
 function creditEqualizer(
   totals: Map<string, BoxScoreEntry>,
   teamId: string,
   activeRoster: Player[],
   points: number,
   rotationOrder?: string[]
-): void {
-  const rotation = rotationOf(activeRoster, rotationOrder);
-  if (rotation.length === 0) return;
-  // Le joueur le plus fiable dans les moments chauds ; les tirs sont
-  // reconstitués ensuite à partir des points (voir applyShotStats).
-  const clutchPlayer = [...rotation].sort((a, b) => b.ratings.clutch - a.ratings.clutch)[0];
+): string | null {
+  // Les tirs sont reconstitués ensuite à partir des points (applyShotStats).
+  const clutchPlayer = pickClutchPlayer(activeRoster, rotationOrder);
+  if (!clutchPlayer) return null;
   const entry = totals.get(clutchPlayer.id) ?? emptyBoxEntry(clutchPlayer.id, teamId);
   entry.points += points;
   totals.set(clutchPlayer.id, entry);
+  return clutchPlayer.id;
 }
 
 function basePointsForLeague(leagueId: string): number {
@@ -742,7 +749,10 @@ export class MockSimulationEngine implements SimulationEngine {
       fullGameBase: basePointsForLeague(home.leagueId),
       homeFocusPerQuarter: 0,
       awayFocusPerQuarter: 0,
-      form: new Map([...homeRosterFull, ...awayRosterFull].map((p) => [p.id, rollForm()] as const)),
+      // Forme du soir : tirée une fois par match, conservée à la reprise.
+      form: new Map(
+        [...homeRosterFull, ...awayRosterFull].map((p) => [p.id, resume?.form?.[p.id] ?? rollForm()] as const)
+      ),
     };
     let homeScore = resume?.homeScore ?? 0;
     let awayScore = resume?.awayScore ?? 0;
@@ -752,7 +762,8 @@ export class MockSimulationEngine implements SimulationEngine {
     const startQuarter = resume ? (resume.quarter ?? half) : 0;
     const stopAfter = options?.stopAfterQuarter ?? (options?.stopAtHalf ? half : undefined);
     const endQuarter = stopAfter !== undefined && stopAfter > startQuarter ? Math.min(stopAfter, QUARTERS) : QUARTERS;
-    const quarterLog: QuarterEvent[] = [...(resume?.quarterLog ?? [])];
+    // Copie des entrées : ne jamais modifier l'état de reprise de l'appelant.
+    const quarterLog: QuarterEvent[] = (resume?.quarterLog ?? []).map((e) => ({ ...e, top: e.top.map((t) => ({ ...t })) }));
 
     // Instantané par joueur (points, fautes, techniques) pour le journal.
     const snapshot = () =>
@@ -820,6 +831,7 @@ export class MockSimulationEngine implements SimulationEngine {
         quarter: endQuarter,
         quarterLog,
         timeoutsUsed: resume?.timeoutsUsed,
+        form: Object.fromEntries(ctx.form),
       };
       // Box score affichable à la pause (tirs reconstitués sur une copie).
       const display = new Map(halftime.boxScore.map((e) => [e.playerId, { ...e }] as const));
@@ -852,15 +864,26 @@ export class MockSimulationEngine implements SimulationEngine {
     if (Math.abs(gap) <= 2 && gap !== 0 && Math.random() < LATE_EQUALIZER_CHANCE) {
       const trailing = gap > 0 ? away : home;
       const trailingActive = (gap > 0 ? awayRosterFull : homeRosterFull).filter((p) => !disqualified.has(p.id));
-      creditEqualizer(totals, trailing.id, trailingActive, Math.abs(gap), gap > 0 ? awayRotationOrder : homeRotationOrder);
-      if (gap > 0) awayScore += gap;
-      else homeScore -= gap;
-      const last = quarterLog[quarterLog.length - 1];
-      if (last) {
-        if (gap > 0) last.away += gap;
-        else last.home -= gap;
-        last.homeTotal = homeScore;
-        last.awayTotal = awayScore;
+      const scorer = creditEqualizer(totals, trailing.id, trailingActive, Math.abs(gap), gap > 0 ? awayRotationOrder : homeRotationOrder);
+      if (scorer) {
+        if (gap > 0) awayScore += gap;
+        else homeScore -= gap;
+        const last = quarterLog[quarterLog.length - 1];
+        if (last) {
+          // Journal du dernier quart-temps : score et meilleurs marqueurs à jour.
+          const top = last.top.map((t) => ({ ...t }));
+          const mine = top.find((t) => t.playerId === scorer);
+          if (mine) mine.pts += Math.abs(gap);
+          else top.push({ playerId: scorer, teamId: trailing.id, pts: Math.abs(gap) });
+          quarterLog[quarterLog.length - 1] = {
+            ...last,
+            home: last.home + (gap < 0 ? -gap : 0),
+            away: last.away + (gap > 0 ? gap : 0),
+            homeTotal: homeScore,
+            awayTotal: awayScore,
+            top: top.sort((a, b) => b.pts - a.pts).slice(0, 2),
+          };
+        }
       }
     }
 

@@ -619,12 +619,18 @@ export default async function PlayerDetailPage({
             value={100 - Math.min(99, player.fatigue)}
             tone={ratingTone(100 - Math.min(99, player.fatigue))}
           />
-          <Stat label={t("team.medical.wear")} value={player.wear ?? 0} tone={inverseRatingTone(player.wear ?? 0)} />
+          <Stat
+            label={t("team.medical.wear")}
+            value={player.wear ?? 0}
+            tone={inverseRatingTone(player.wear ?? 0)}
+            help={t("help.wear")}
+          />
           <Stat label={t("team.medical.condition")} value={player.conditioning} tone={ratingTone(player.conditioning)} />
           <Stat
             label={t("pressPage.playerMorale")}
             value={`${t(`pressPage.moraleLevel.${moraleLevel(player.morale ?? 60)}` as "pressPage.moraleLevel.good")} · ${player.morale ?? 60}`}
             tone={ratingTone(player.morale ?? 60)}
+            help={t("help.morale")}
           />
           {!player.injured && (
             <Stat

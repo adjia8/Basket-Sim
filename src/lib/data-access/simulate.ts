@@ -1,4 +1,5 @@
 import "server-only";
+import { getGameById } from "@/lib/data-access/schedule";
 import { evaluatePlayingTimePromises } from "@/lib/data-access/playing-time-promises";
 import { lockerRoom, personalityFor } from "@/lib/careers/personality-rules";
 import { prisma } from "@/lib/prisma";
@@ -482,8 +483,8 @@ export async function simulateAndResolveGame(
   // Pause de la mi-temps : on enregistre l'état et on s'arrête là (la suite
   // — blessures, fatigue, presse… — ne se joue qu'au coup de sifflet final).
   if (result.halftime) {
-    await prisma.game.update({
-      where: { id: game.id },
+    await prisma.game.updateMany({
+      where: { id: game.id, status: { not: "final" } },
       data: {
         halftimeJson: JSON.stringify({ ...result.halftime, timeoutsUsed }),
         talksJson: talks ? JSON.stringify(talks) : null,
@@ -678,11 +679,13 @@ export async function simulateAndResolveGame(
     ]),
   });
 
-  // Toutes les écritures du match en une seule vague parallèle.
-  await Promise.all([
-    prisma.game.updateMany({
-      where: { id: game.id, careerId },
-      data: {
+  // Réservation du match : on ne le passe à « final » que s'il ne l'est pas
+  // déjà. Si une autre requête (double clic, autre onglet, lot IA) l'a
+  // terminé entre-temps, on s'arrête là sans appliquer une seconde fois
+  // blessures, fatigue, renommée, stats...
+  const claimed = await prisma.game.updateMany({
+    where: { id: game.id, careerId, status: { not: "final" } },
+    data: {
         status: "final",
         homeScore: result.homeScore,
         awayScore: result.awayScore,
@@ -692,8 +695,12 @@ export async function simulateAndResolveGame(
         // Journal du match en direct conservé pour les matchs joués depuis la
         // page de match (pas pour les lots IA : inutile et coûteux en place).
         ...(talk && result.quarterLog ? { liveLogJson: JSON.stringify(result.quarterLog) } : {}),
-      },
-    }),
+    },
+  });
+  if (claimed.count === 0) return (await getGameById(careerId, game.id)) ?? game;
+
+  // Toutes les autres écritures du match en une seule vague parallèle.
+  await Promise.all([
     game.playoffSeriesId
       ? recordPlayoffGameResult(game.playoffSeriesId, result.homeScore, result.awayScore)
       : Promise.resolve(),

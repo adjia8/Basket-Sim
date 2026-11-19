@@ -105,10 +105,18 @@ test("match en direct : arrêt après chaque quart-temps puis reprise jusqu'au b
   let state = engine.simulateGame(h, hr, a, ar, { stopAfterQuarter: 1 }).halftime!;
   assert.equal(state.quarter, 1);
   assert.equal(state.quarterLog?.length, 1);
+  const firstForm = JSON.stringify(state.form);
+  assert.ok(state.form && Object.keys(state.form).length === 26);
   for (const q of [2, 3]) {
     state = engine.simulateGame(h, hr, a, ar, { resumeFrom: state, stopAfterQuarter: q, restNextQuarter: ["h-0"] }).halftime!;
     assert.equal(state.quarter, q);
+    // Forme du soir conservée d'un quart-temps à l'autre.
+    assert.equal(JSON.stringify(state.form), firstForm);
   }
+  // La reprise ne modifie jamais l'état transmis par l'appelant.
+  const frozen = JSON.stringify(state);
+  engine.simulateGame(h, hr, a, ar, { resumeFrom: state });
+  assert.equal(JSON.stringify(state), frozen);
   const final = engine.simulateGame(h, hr, a, ar, { resumeFrom: state });
   assert.equal(final.halftime, undefined);
   assert.ok((final.quarterLog?.length ?? 0) >= 4);
