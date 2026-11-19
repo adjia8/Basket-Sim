@@ -32,3 +32,22 @@ test("objectifs des propriétaires : bilan borné, jeunes ou affluence selon l'e
   assert.equal(objectiveMet(noYouth[1], 76), true);
   assert.equal(objectiveMet(noYouth[1], 74), false);
 });
+
+import { mergeSeasonRows } from "../../src/lib/careers/season-lines-rules";
+
+test("joueur échangé : une seule ligne de saison, totaux additionnés, équipe actuelle", () => {
+  const zero = { minutes: 0, rebounds: 0, assists: 0, steals: 0, blocks: 0, turnovers: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0 };
+  const rows = [
+    { playerId: "p", teamId: "old", gamesPlayed: 30, points: 600, ...zero },
+    { playerId: "p", teamId: "new", gamesPlayed: 20, points: 500, ...zero },
+    { playerId: "q", teamId: "new", gamesPlayed: 50, points: 400, ...zero },
+  ];
+  const merged = mergeSeasonRows(rows, (id) => (id === "p" ? "new" : undefined));
+  const p = merged.find((r) => r.playerId === "p")!;
+  assert.equal(merged.length, 2);
+  assert.equal(p.gamesPlayed, 50);
+  assert.equal(p.points, 1100);
+  assert.equal(p.teamId, "new");
+  // Équipe inconnue : celle où il a joué le plus.
+  assert.equal(mergeSeasonRows(rows, () => undefined).find((r) => r.playerId === "p")!.teamId, "old");
+});

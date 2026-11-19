@@ -1,4 +1,5 @@
 import "server-only";
+import { mergeSeasonRows } from "@/lib/careers/season-lines-rules";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { BoxScoreEntry } from "@/lib/types";
@@ -136,9 +137,11 @@ export async function getSeasonStatsForPlayers(
   playerIds: string[]
 ): Promise<Map<string, SeasonStats>> {
   await ensureSeasonStats(careerId, season);
-  const rows = await prisma.playerSeasonStat.findMany({
+  const rawRows = await prisma.playerSeasonStat.findMany({
     where: { careerId, season, playerId: { in: playerIds } },
   });
+  // Joueur échangé : toutes ses équipes de la saison additionnées.
+  const rows = mergeSeasonRows(rawRows, () => undefined);
   return new Map(
     rows.map((r) => [
       r.playerId,
@@ -182,7 +185,13 @@ export interface PlayerSeasonLine {
 // âge et note du joueur dans cette carrière.
 export async function getSeasonLines(careerId: string, season: string): Promise<PlayerSeasonLine[]> {
   await ensureSeasonStats(careerId, season);
-  const rows = await prisma.playerSeasonStat.findMany({ where: { careerId, season } });
+  const [rawRows, contracts] = await Promise.all([
+    prisma.playerSeasonStat.findMany({ where: { careerId, season } }),
+    prisma.contract.findMany({ where: { careerId }, select: { playerId: true, teamId: true } }),
+  ]);
+  // Un joueur échangé a une ligne par équipe : on les fusionne.
+  const teamOf = new Map(contracts.map((c) => [c.playerId, c.teamId]));
+  const rows = mergeSeasonRows(rawRows, (id) => teamOf.get(id));
   const ids = rows.map((r) => r.playerId);
   const [players, states] = await Promise.all([
     prisma.player.findMany({ where: { id: { in: ids } }, select: { id: true, firstName: true, lastName: true } }),
