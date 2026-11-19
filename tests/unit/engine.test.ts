@@ -117,3 +117,61 @@ test("match en direct : arrêt après chaque quart-temps puis reprise jusqu'au b
   assert.equal(last.homeTotal, final.homeScore);
   assert.equal(last.awayTotal, final.awayScore);
 });
+
+// Effectif typé « NBA » : une star, un lieutenant, des titulaires, un banc,
+// avec des profils de poste (intérieurs au rebond, meneur à la passe).
+const CURVE = [90, 84, 80, 78, 76, 75, 74, 73, 72, 71, 70, 69, 68];
+const realistic = (teamId: string): Player[] =>
+  CURVE.map((r, i) => {
+    const base = player(teamId, i, 0);
+    const pos = (["PG", "SG", "SF", "PF", "C"] as const)[i % 5];
+    const big = pos === "C" || pos === "PF";
+    return {
+      ...base,
+      position: pos,
+      overallRating: r,
+      ratings: {
+        scoringInside: r + (big ? 4 : -2),
+        scoringOutside: r + (big ? -8 : 4),
+        playmaking: r + (pos === "PG" ? 8 : big ? -10 : 0),
+        defenseInside: r + (big ? 6 : -4),
+        defenseOutside: r,
+        rebounding: r + (big ? 10 : -8),
+        athleticism: r,
+        basketballIQ: r,
+        clutch: r,
+        stamina: 80,
+      },
+    };
+  });
+
+test("feuilles de stats proches de la NBA (tirs, rebonds, passes, grosses soirées, fautes)", () => {
+  const N = 1200;
+  let fortyPoint = 0;
+  let foulOuts = 0;
+  const per = { tpa: 0, reb: 0, ast: 0, tov: 0, fgm: 0, fga: 0, teams: 0 };
+  for (let g = 0; g < N; g++) {
+    const r = engine.simulateGame(team("h"), realistic("h"), team("a"), realistic("a"));
+    for (const e of r.boxScore) {
+      per.tpa += e.threePointersAttempted;
+      per.reb += e.rebounds;
+      per.ast += e.assists;
+      per.tov += e.turnovers;
+      per.fgm += e.fieldGoalsMade;
+      per.fga += e.fieldGoalsAttempted;
+      if (e.points >= 40) fortyPoint++;
+      if (e.disqualifiedReason === "fouled_out") foulOuts++;
+    }
+    per.teams += 2;
+  }
+  const avg = (v: number) => v / per.teams;
+  assert.ok(avg(per.tpa) > 30 && avg(per.tpa) < 44, `3PA ${avg(per.tpa)}`);
+  assert.ok(avg(per.reb) > 40 && avg(per.reb) < 48, `rebonds ${avg(per.reb)}`);
+  assert.ok(avg(per.ast) > 23 && avg(per.ast) < 30, `passes ${avg(per.ast)}`);
+  assert.ok(avg(per.tov) > 11 && avg(per.tov) < 17, `pertes ${avg(per.tov)}`);
+  const fgPct = per.fgm / per.fga;
+  assert.ok(fgPct > 0.44 && fgPct < 0.5, `FG% ${fgPct}`);
+  // Grosses soirées et sorties pour six fautes : rares mais présentes.
+  assert.ok(fortyPoint / N > 0.01 && fortyPoint / N < 0.15, `40 pts+ par match ${fortyPoint / N}`);
+  assert.ok(foulOuts / N > 0.04 && foulOuts / N < 0.3, `six fautes par match ${foulOuts / N}`);
+});

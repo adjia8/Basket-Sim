@@ -19,7 +19,8 @@ export const FOUL_CHECKS_PER_QUARTER = 3;
 // malchance/agressivité ("foul trouble").
 export function rollsPersonalFoul(defenseInside: number, defenseOutside: number): boolean {
   const aggression = (defenseInside + defenseOutside) / 2 / 99;
-  const chance = 0.11 + aggression * 0.08;
+  // ≈ 0,15 sortie pour six fautes par match, comme en NBA.
+  const chance = 0.1 + aggression * 0.07;
   return Math.random() < chance;
 }
 

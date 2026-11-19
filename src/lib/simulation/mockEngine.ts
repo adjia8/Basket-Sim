@@ -249,9 +249,10 @@ function emptyBoxEntry(playerId: string, teamId: string): BoxScoreEntry {
 
 // Pourcentage de réussite "de la joueuse" pour un type de tir donné, dérivé
 // d'une note (0-99) : centré sur `base`, module de ±`spread` selon la note
-// (50 = moyenne de ligue), plus un peu de variance match par match.
+// (75 = joueur moyen d'un effectif NBA sur l'échelle 2K), plus un peu de
+// variance match par match.
 function shootingPct(rating: number, base: number, spread: number): number {
-  const raw = base + ((rating - 50) / 49) * spread + noise(spread * 0.4);
+  const raw = base + ((rating - 75) / 24) * spread + noise(spread * 0.4);
   return Math.max(base - spread, Math.min(base + spread, raw));
 }
 
@@ -296,22 +297,23 @@ function deriveShotStats(
   // extérieur (scoringOutside > scoringInside), plus cette part grandit.
   const threeTendency = Math.max(
     0.05,
-    Math.min(0.7, 0.18 + threeShift + ((ratings.scoringOutside - ratings.scoringInside) / 99) * 0.45)
+    Math.min(0.75, 0.35 + threeShift + ((ratings.scoringOutside - ratings.scoringInside) / 99) * 0.45)
   );
   const threeMade = Math.min(Math.floor(points / 3), Math.round((points * threeTendency) / 3));
   const remaining = points - threeMade * 3;
 
   // Part des points restants venant des lancers francs, ajustée pour que le
   // reliquat (qui ira aux paniers à 2 points) soit toujours un nombre pair.
-  let ftMade = Math.min(remaining, Math.round(remaining * 0.18));
+  let ftMade = Math.min(remaining, Math.round(remaining * 0.22));
   if ((remaining - ftMade) % 2 !== 0) {
     if (ftMade < remaining) ftMade += 1;
     else ftMade -= 1;
   }
   const twoMade = (remaining - ftMade) / 2;
 
-  const threePct = shootingPct(ratings.scoringOutside, 0.34, 0.09);
-  const twoPct = shootingPct(ratings.scoringInside, 0.48, 0.09);
+  // Repères NBA 2024-25 : ≈ 36 % à 3 points, ≈ 54 % à 2 points.
+  const threePct = shootingPct(ratings.scoringOutside, 0.36, 0.08);
+  const twoPct = shootingPct(ratings.scoringInside, 0.54, 0.08);
   const ftPct = shootingPct((ratings.clutch + ratings.basketballIQ) / 2, 0.76, 0.1);
 
   const threeAttempted = threeMade > 0 ? Math.max(threeMade, Math.round(threeMade / threePct)) : 0;
@@ -343,6 +345,19 @@ const GAME_MINUTES_REFERENCE = 48;
 // Poids du poste pour les rebonds et les contres (les intérieurs dominent).
 const REBOUND_POSITION: Record<string, number> = { C: 1.3, PF: 1.15, SF: 0.95, SG: 0.8, PG: 0.7 };
 const BLOCK_POSITION: Record<string, number> = { C: 1.8, PF: 1.3, SF: 0.8, SG: 0.5, PG: 0.4 };
+
+// Forme du soir (une par joueur et par match) : un joueur n'a pas la même
+// réussite ni la même activité tous les soirs. Sans elle, une star faisait
+// toujours à peu près la même ligne (aucun match à 40 points, trois fois
+// moins de triple-doubles qu'en NBA).
+export interface PlayerForm {
+  pts: number;
+  reb: number;
+  ast: number;
+}
+export function rollForm(): PlayerForm {
+  return { pts: 1 + noise(0.75), reb: 1 + noise(0.5), ast: 1 + noise(0.5) };
+}
 
 // Rapport à une note de référence, élevé à une puissance : plus l'exposant
 // est fort, plus les meilleurs du domaine accaparent la statistique.
@@ -378,8 +393,10 @@ function applyQuarterBoxScore(
   minutes: number[],
   periodMinutes: number,
   // « Jeu pour la star » : le meilleur joueur prend bien plus de tirs.
-  starFocus = false
+  starFocus = false,
+  form?: Map<string, PlayerForm>
 ): void {
+  const f = (id: string) => form?.get(id) ?? { pts: 1, reb: 1, ast: 1 };
   if (rotation.length === 0) return;
 
   const starId = starFocus ? [...rotation].sort((a, b) => b.overallRating - a.overallRating)[0]?.id : undefined;
@@ -388,7 +405,8 @@ function applyQuarterBoxScore(
   const weights = rotation.map(
     (p, i) =>
       Math.max(minutes[i] ?? 0, 0.1) *
-      skill((p.ratings.scoringInside + p.ratings.scoringOutside) / 2 + noise(3), 1.8) *
+      skill((p.ratings.scoringInside + p.ratings.scoringOutside) / 2 + noise(3), 2.5) *
+      f(p.id).pts *
       (p.id === starId ? STAR_USAGE_BOOST : 1)
   );
   const totalWeight = weights.reduce((sum, w) => sum + w, 0);
@@ -416,11 +434,11 @@ function applyQuarterBoxScore(
   const m = (i: number) => Math.max(minutes[i] ?? 0, 0);
   const rebounds = distributeCount(
     teamTotal(TEAM_PER_GAME.rebounds, periodMinutes),
-    rotation.map((p, i) => m(i) * skill(p.ratings.rebounding, 2.5) * (REBOUND_POSITION[p.position] ?? 1))
+    rotation.map((p, i) => m(i) * skill(p.ratings.rebounding, 2.5) * (REBOUND_POSITION[p.position] ?? 1) * f(p.id).reb)
   );
   const assists = distributeCount(
     teamTotal(TEAM_PER_GAME.assists, periodMinutes),
-    rotation.map((p, i) => m(i) * skill(p.ratings.playmaking, 3.5))
+    rotation.map((p, i) => m(i) * skill(p.ratings.playmaking, 3.5) * f(p.id).ast)
   );
   const steals = distributeCount(
     teamTotal(TEAM_PER_GAME.steals, periodMinutes),
@@ -580,6 +598,7 @@ interface PeriodTeamsContext {
   disqualified: Set<string>;
   totals: Map<string, BoxScoreEntry>;
   fullGameBase: number; // points de base d'un match complet (pour répartir l'avantage tactique)
+  form: Map<string, PlayerForm>; // forme du soir de chaque joueur
   homeFocusPerQuarter: number; // causeries : points par quart-temps de la mi-temps en cours
   awayFocusPerQuarter: number;
 }
@@ -653,7 +672,8 @@ function simulatePeriod(
     homeScore,
     homeMinutes,
     periodMinutes,
-    ctx.homeTactics.offense === "star"
+    ctx.homeTactics.offense === "star",
+    ctx.form
   );
   applyQuarterBoxScore(
     ctx.totals,
@@ -662,7 +682,8 @@ function simulatePeriod(
     awayScore,
     awayMinutes,
     periodMinutes,
-    ctx.awayTactics.offense === "star"
+    ctx.awayTactics.offense === "star",
+    ctx.form
   );
   applyQuarterFouls(ctx.totals, ctx.home.id, homeRotation, ctx.disqualified);
   applyQuarterFouls(ctx.totals, ctx.away.id, awayRotation, ctx.disqualified);
@@ -721,6 +742,7 @@ export class MockSimulationEngine implements SimulationEngine {
       fullGameBase: basePointsForLeague(home.leagueId),
       homeFocusPerQuarter: 0,
       awayFocusPerQuarter: 0,
+      form: new Map([...homeRosterFull, ...awayRosterFull].map((p) => [p.id, rollForm()] as const)),
     };
     let homeScore = resume?.homeScore ?? 0;
     let awayScore = resume?.awayScore ?? 0;
