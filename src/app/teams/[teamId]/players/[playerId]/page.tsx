@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { getStaffProfiles } from "@/lib/data-access/staff";
 import { NEUTRAL_STAFF_PROFILE } from "@/lib/careers/staff-rules";
 import { estimateRating, ratingStars } from "@/lib/careers/potential-rules";
@@ -317,6 +318,8 @@ export default async function PlayerDetailPage({
           : null,
         acceptCounter: t("nego.acceptCounter"),
         note: negotiation.rookieScale ? t("nego.rookieNote") : null,
+        marketHelp: t("help.marketValue"),
+        patienceHelp: t("help.patience"),
         demands:
           t("status.demands", {
             status: t(`status.${negotiation.status}`).toLowerCase(),
@@ -488,11 +491,19 @@ export default async function PlayerDetailPage({
       </div>
 
       <div className="mt-6 card p-4" data-testid="personality">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">{t("personality.title")}</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+          {t("personality.title")}
+          <InfoTip text={t("help.personality")} />
+        </h2>
         {personalityVisible ? (
           <>
             <p className="text-lg font-semibold">{t(`personality.label.${personalityKind}`)}</p>
-            {statusLine && <p className="mt-0.5 text-sm text-accent-text">{statusLine}</p>}
+            {statusLine && (
+              <p className="mt-0.5 text-sm text-accent-text">
+                {statusLine}
+                <InfoTip text={t("help.status")} />
+              </p>
+            )}
             {isMyTeam && currentStatus && (
               <div className="mt-3 rounded-md border border-line p-3" data-testid="playing-time-promise">
                 <p className="text-sm font-medium">{t("ptime.title")}</p>
@@ -570,7 +581,10 @@ export default async function PlayerDetailPage({
           <Stat label={t("player.overall")} value={player.overallRating} bold tone={ratingTone(player.overallRating)} />
           {potentialEstimate && (
             <div>
-              <p className="text-xs uppercase tracking-wide text-muted">{t("player.potential")}</p>
+              <p className="text-xs uppercase tracking-wide text-muted">
+                {t("player.potential")}
+                <InfoTip text={t("help.potential")} />
+              </p>
               <p className="mt-0.5">
                 <Stars value={ratingStars(potentialEstimate.mid)} />{" "}
                 <span className="text-xs text-faint tabular">
@@ -588,7 +602,7 @@ export default async function PlayerDetailPage({
             />
           ))}
           <Stat label={t("player.injuryRisk")} value={player.injuryRisk} tone={inverseRatingTone(player.injuryRisk)} />
-          <Stat label={t("player.renown")} value={player.renown} tone={ratingTone(player.renown)} />
+          <Stat label={t("player.renown")} value={player.renown} tone={ratingTone(player.renown)} help={t("help.renown")} />
           <Stat label={t("player.fatigue")} value={player.fatigue} tone={inverseRatingTone(player.fatigue)} />
           <Stat label={t("player.conditioning")} value={player.conditioning} tone={ratingTone(player.conditioning)} />
           {player.trainingBoost > 0 && player.trainingBoostFocus && (
@@ -793,15 +807,20 @@ function Stat({
   value,
   bold = false,
   tone,
+  help,
 }: {
   label: string;
   value: number | string;
   bold?: boolean;
   tone?: ScaleTone;
+  help?: string;
 }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
+      <p className="text-xs uppercase tracking-wide text-muted">
+        {label}
+        {help && <InfoTip text={help} />}
+      </p>
       <p className={`mt-0.5 ${bold ? "text-lg font-semibold" : ""} ${tone ? toneClass(tone) : ""}`}>{value}</p>
     </div>
   );

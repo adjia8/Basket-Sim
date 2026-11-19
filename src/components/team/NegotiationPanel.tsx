@@ -1,5 +1,6 @@
 "use client";
 
+import { InfoTip } from "@/components/ui/InfoTip";
 import { useActionState, useState } from "react";
 import { negotiateContract, type NegotiationFormState } from "@/app/actions/negotiation";
 
@@ -25,6 +26,8 @@ export interface NegotiationLabels {
   blocked: string | null;
   demands: string;
   basis: string;
+  marketHelp: string;
+  patienceHelp: string;
 }
 
 export function NegotiationPanel({
@@ -57,9 +60,13 @@ export function NegotiationPanel({
       <p className="text-sm font-medium">{labels.title}</p>
       <p className="mt-1 text-sm text-soft">{labels.ask}</p>
       <p className="mt-1 text-sm">{labels.demands}</p>
-      <p className="text-xs text-faint">{labels.basis}</p>
+      <p className="text-xs text-faint">
+        {labels.basis}
+        <InfoTip text={labels.marketHelp} />
+      </p>
       <p className="mt-1 flex items-center gap-2 text-xs text-muted">
         {labels.patience}
+        <InfoTip text={labels.patienceHelp} />
         <span aria-label={`${patienceLeft}/${patienceMax}`} className="flex gap-1">
           {Array.from({ length: patienceMax }, (_, i) => (
             <span key={i} className={`inline-block h-2 w-2 rounded-full ${i < patienceLeft ? "bg-good" : "bg-muted/30"}`} />

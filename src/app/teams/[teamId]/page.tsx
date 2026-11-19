@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { getTacticsReport } from "@/lib/data-access/tactics";
 import { TacticsPanel } from "@/components/team/TacticsPanel";
 import { notFound } from "next/navigation";
@@ -270,6 +271,7 @@ export default async function TeamRosterPage({
         <div className="card p-4">
           <p className="text-xs uppercase tracking-wide text-muted">
             {t("team.chemistry")}
+            <InfoTip text={t("help.chemistry")} />
           </p>
           <p className="mt-1 text-xl font-semibold">{teamState.chemistry} / 99</p>
         </div>
@@ -278,7 +280,10 @@ export default async function TeamRosterPage({
       {isMyTeam && (
         <div className="mt-4 card p-4 text-sm" data-testid="locker-room">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-xs uppercase tracking-wide text-muted">{t("personality.lockerRoom")}</p>
+            <p className="text-xs uppercase tracking-wide text-muted">
+              {t("personality.lockerRoom")}
+              <InfoTip text={t("help.lockerRoom")} />
+            </p>
             <p className={room.chemistryBonus > 0 ? "text-good" : room.chemistryBonus < 0 ? "text-bad" : "text-muted"}>
               {t("personality.chemistryEffect", {
                 value: room.chemistryBonus > 0 ? `+${room.chemistryBonus}` : room.chemistryBonus,

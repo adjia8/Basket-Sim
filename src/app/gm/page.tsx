@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { getBoardObjectivesProgress } from "@/lib/data-access/board-objectives";
 import Link from "next/link";
 import { getCurrentMembership } from "@/lib/auth/dal";
@@ -116,7 +117,10 @@ export default async function GmPage() {
       )}
 
       <div className="mt-6 card p-4" data-testid="board-objectives">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">{t("board.title")}</h2>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+          {t("board.title")}
+          <InfoTip text={t("help.boardObjectives")} />
+        </h2>
         {!board ? (
           <p className="text-sm text-muted">{t("board.empty")}</p>
         ) : (

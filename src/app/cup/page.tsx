@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { InfoTip } from "@/components/ui/InfoTip";
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getCupState } from "@/lib/data-access/nba-cup";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
@@ -35,7 +36,10 @@ export default async function CupPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 lg:px-8">
-      <h1 className="text-2xl font-bold tracking-tight">{t("cup.title")}</h1>
+      <h1 className="text-2xl font-bold tracking-tight">
+        {t("cup.title")}
+        <InfoTip text={t("help.cup")} />
+      </h1>
       <p className="mt-1 max-w-3xl text-sm text-muted">{t("cup.subtitle")}</p>
       <p className="mt-2 text-xs text-faint">
         {t("cup.calendar", {
