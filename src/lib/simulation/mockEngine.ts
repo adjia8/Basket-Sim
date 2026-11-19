@@ -197,6 +197,29 @@ function creditClutchPoint(
   totals.set(clutchPlayer.id, entry);
 }
 
+// Fin de match serrée : l'équipe menée d'un ou deux points au buzzer
+// arrache parfois l'égalisation (tir décisif, lancers francs après faute
+// volontaire). Sans ce scénario, les prolongations étaient deux fois plus
+// rares qu'en NBA (≈ 3 % des matchs contre ≈ 6 %).
+const LATE_EQUALIZER_CHANCE = 0.3;
+
+function creditEqualizer(
+  totals: Map<string, BoxScoreEntry>,
+  teamId: string,
+  activeRoster: Player[],
+  points: number,
+  rotationOrder?: string[]
+): void {
+  const rotation = rotationOf(activeRoster, rotationOrder);
+  if (rotation.length === 0) return;
+  // Le joueur le plus fiable dans les moments chauds ; les tirs sont
+  // reconstitués ensuite à partir des points (voir applyShotStats).
+  const clutchPlayer = [...rotation].sort((a, b) => b.ratings.clutch - a.ratings.clutch)[0];
+  const entry = totals.get(clutchPlayer.id) ?? emptyBoxEntry(clutchPlayer.id, teamId);
+  entry.points += points;
+  totals.set(clutchPlayer.id, entry);
+}
+
 function basePointsForLeague(leagueId: string): number {
   return leagueId === "wnba" ? 82 : 112;
 }
@@ -802,6 +825,22 @@ export class MockSimulationEngine implements SimulationEngine {
     const overtimeHomeAdvantage = quarterHomeAdvantage * overtimeRatio;
     const overtimeNoiseSpread = QUARTER_NOISE * overtimeRatio;
     const overtimeMinScore = Math.max(3, Math.round(15 * overtimeRatio));
+
+    const gap = homeScore - awayScore;
+    if (Math.abs(gap) <= 2 && gap !== 0 && Math.random() < LATE_EQUALIZER_CHANCE) {
+      const trailing = gap > 0 ? away : home;
+      const trailingActive = (gap > 0 ? awayRosterFull : homeRosterFull).filter((p) => !disqualified.has(p.id));
+      creditEqualizer(totals, trailing.id, trailingActive, Math.abs(gap), gap > 0 ? awayRotationOrder : homeRotationOrder);
+      if (gap > 0) awayScore += gap;
+      else homeScore -= gap;
+      const last = quarterLog[quarterLog.length - 1];
+      if (last) {
+        if (gap > 0) last.away += gap;
+        else last.home -= gap;
+        last.homeTotal = homeScore;
+        last.awayTotal = awayScore;
+      }
+    }
 
     let overtimePeriods = 0;
     while (homeScore === awayScore && overtimePeriods < MAX_OVERTIME_PERIODS) {
