@@ -11,6 +11,7 @@ import {
   rushedRemaining,
   type ReturnProtocol,
 } from "@/lib/careers/return-protocol-rules";
+import { AUTO_REST_WEAR_LEVELS, MINUTES_LIMITS, isEmptyPlan, type LoadPlan } from "@/lib/careers/load-plan-rules";
 
 // Choix du protocole de retour d'un de mes joueurs blessés (modéré ou grave).
 // Le retour accéléré raccourcit l'absence une seule fois ; changer d'avis
@@ -38,6 +39,31 @@ export async function setReturnProtocol(formData: FormData): Promise<void> {
       protocolGamesLeft: PROTOCOL_GAMES[protocol],
       ...(protocol === "rushed" && !alreadyRushed ? { injuryGamesRemaining: rushedRemaining(state.injuryGamesRemaining) } : {}),
     },
+  });
+  revalidatePath("/teams/[teamId]/players/[playerId]", "page");
+  revalidatePath(`/teams/${membership.teamId}`);
+}
+
+// Plan de gestion de la charge d'un de mes joueurs (voir load-plan-rules.ts).
+export async function saveLoadPlan(formData: FormData): Promise<void> {
+  const { userId } = await verifySession();
+  const playerId = String(formData.get("playerId") ?? "");
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId) });
+  if (!membership) return;
+  const contract = await prisma.contract.findUnique({
+    where: { careerId_playerId: { careerId: membership.careerId, playerId } },
+  });
+  if (!contract || contract.teamId !== membership.teamId) return;
+  const minutes = Number(formData.get("minutesLimit"));
+  const wear = Number(formData.get("autoRestWear"));
+  const plan: LoadPlan = {
+    restOnBackToBacks: formData.get("restOnBackToBacks") === "on",
+    minutesLimit: MINUTES_LIMITS.includes(minutes) ? minutes : null,
+    autoRestWear: AUTO_REST_WEAR_LEVELS.includes(wear) ? wear : null,
+  };
+  await prisma.playerState.updateMany({
+    where: { careerId: membership.careerId, playerId },
+    data: { loadPlanJson: isEmptyPlan(plan) ? null : JSON.stringify(plan) },
   });
   revalidatePath("/teams/[teamId]/players/[playerId]", "page");
   revalidatePath(`/teams/${membership.teamId}`);

@@ -77,6 +77,7 @@ export interface Player {
   restNextGame?: boolean; // gestion de la charge : ne joue pas le prochain match
   returnProtocol?: "standard" | "progressive" | "rushed" | null; // plan de retour de blessure
   protocolGamesLeft?: number; // matchs restants sous protocole après le retour
+  loadPlanJson?: string | null; // plan de gestion de la charge (voir load-plan-rules.ts)
   injuryType?: string; // clé de INJURY_TYPES, blessure en cours
   individualFocus?: "offensive" | "defensive" | "tactical" | "physical";
   developmentProgress?: number;

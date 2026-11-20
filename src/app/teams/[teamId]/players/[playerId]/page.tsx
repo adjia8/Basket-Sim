@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { RETURN_PROTOCOLS, protocolAllowed } from "@/lib/careers/return-protocol-rules";
-import { setReturnProtocol } from "@/app/actions/medical";
+import { saveLoadPlan, setReturnProtocol } from "@/app/actions/medical";
+import { AUTO_REST_WEAR_LEVELS, MINUTES_LIMITS, parseLoadPlan } from "@/lib/careers/load-plan-rules";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { getStaffProfiles } from "@/lib/data-access/staff";
 import { NEUTRAL_STAFF_PROFILE } from "@/lib/careers/staff-rules";
@@ -231,6 +232,7 @@ export default async function PlayerDetailPage({
     isMyTeam && contract
       ? await getConversationSetup(membership.careerId, membership.season, contract.teamId, playerId)
       : null;
+  const loadPlan = parseLoadPlan(player.loadPlanJson);
   // Courbe de progression : relevés mensuels + la note d'aujourd'hui.
   const [ratingHistory, careerLines] = await Promise.all([
     getRatingHistory(membership.careerId, playerId),
@@ -709,6 +711,57 @@ export default async function PlayerDetailPage({
           <p className="mt-3 text-sm text-warn">
             {t(`protocol.active.${player.returnProtocol}`, { count: player.protocolGamesLeft ?? 0 })}
           </p>
+        )}
+        {isMyTeam && contract && (
+          <form action={saveLoadPlan} className="mt-3 rounded-md border border-line p-3 text-sm" data-testid="load-plan">
+            <input type="hidden" name="playerId" value={player.id} />
+            <p className="font-medium">{t("loadplan.title")}</p>
+            <p className="text-xs text-faint">{t("loadplan.hint")}</p>
+            {loadPlan && (
+              <p className="mt-1 text-xs font-medium text-accent-text">
+                {t("loadplan.active", {
+                  summary: [
+                    loadPlan.restOnBackToBacks ? t("loadplan.summary.b2b") : null,
+                    loadPlan.minutesLimit ? t("loadplan.summary.minutes", { count: loadPlan.minutesLimit }) : null,
+                    loadPlan.autoRestWear ? t("loadplan.summary.wear", { count: loadPlan.autoRestWear }) : null,
+                  ]
+                    .filter(Boolean)
+                    .join(", "),
+                })}
+              </p>
+            )}
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="restOnBackToBacks" defaultChecked={loadPlan?.restOnBackToBacks ?? false} className="accent-[var(--accent)]" />
+                {t("loadplan.b2b")}
+              </label>
+              <label className="flex items-center gap-2">
+                <span className="text-xs text-muted">{t("loadplan.minutes")}</span>
+                <select name="minutesLimit" defaultValue={loadPlan?.minutesLimit ?? ""} className="field px-2 py-1">
+                  <option value="">{t("loadplan.none")}</option>
+                  {MINUTES_LIMITS.map((m) => (
+                    <option key={m} value={m}>
+                      {t("loadplan.minutesValue", { count: m })}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2">
+                <span className="text-xs text-muted">{t("loadplan.wear")}</span>
+                <select name="autoRestWear" defaultValue={loadPlan?.autoRestWear ?? ""} className="field px-2 py-1">
+                  <option value="">{t("loadplan.none")}</option>
+                  {AUTO_REST_WEAR_LEVELS.map((w) => (
+                    <option key={w} value={w}>
+                      {w}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button type="submit" className="rounded-md border border-line px-3 py-1 hover:bg-surface-2">
+                {t("loadplan.save")}
+              </button>
+            </div>
+          </form>
         )}
         {!player.injured && (player.wear ?? 0) >= WEAR_NEEDS_REST && (
           <p className="mt-3 text-sm text-warn">{t("team.medical.needRest")}</p>

@@ -1,4 +1,5 @@
 import "server-only";
+import { effectiveMinutesCap, parseLoadPlan, planRests } from "@/lib/careers/load-plan-rules";
 import { PROGRESSIVE_MINUTES_CAP } from "@/lib/careers/return-protocol-rules";
 import { parseCalendar, sessionsBetween, summarizeSessions } from "@/lib/careers/training-calendar-rules";
 import { maybePlayerRequests } from "@/lib/data-access/player-requests";
@@ -266,10 +267,22 @@ async function notifyHumanTeamNews(
 // (restNextGame) ; côté IA, en plus, les plus usés (usure ≥
 // WEAR_AI_AUTO_REST), au plus AI_MAX_RESTED_PER_GAME, sans jamais descendre
 // sous 9 joueurs disponibles.
-function restedForGame(roster: Player[], isAi: boolean): string[] {
+function restedForGame(roster: Player[], isAi: boolean, restDays = 3): string[] {
   const healthy = roster.filter((p) => !p.injured);
   const manual = healthy.filter((p) => p.restNextGame).map((p) => p.id);
-  if (!isAi) return manual;
+  if (!isAi) {
+    // Plans de charge du GM (back-to-back, seuil d'usure), sans jamais
+    // descendre sous 9 joueurs disponibles.
+    let room = Math.max(0, healthy.length - manual.length - 9);
+    const planned: string[] = [];
+    for (const p of healthy) {
+      if (room <= 0) break;
+      if (p.restNextGame || !planRests(parseLoadPlan(p.loadPlanJson), { restDays, wear: p.wear ?? 0 })) continue;
+      planned.push(p.id);
+      room--;
+    }
+    return [...manual, ...planned];
+  }
   const room = Math.max(0, healthy.length - manual.length - 9);
   const auto = healthy
     .filter((p) => !p.restNextGame && (p.wear ?? 0) >= WEAR_AI_AUTO_REST)
@@ -391,8 +404,8 @@ export async function simulateAndResolveGame(
   // Gestion de la charge : joueurs mis au repos par leur manager
   // (restNextGame) et, côté IA, les plus usés (voir restedForGame).
   const restingIds = new Set([
-    ...restedForGame(homeRoster, !homeManager),
-    ...restedForGame(awayRoster, !awayManager),
+    ...restedForGame(homeRoster, !homeManager, homeRestDays),
+    ...restedForGame(awayRoster, !awayManager, awayRestDays),
   ]);
   const makeCanPlay =
     (contractByPlayerId: Map<string, (typeof homeContracts)[number]>) =>
@@ -471,10 +484,15 @@ export async function simulateAndResolveGame(
     awayCoachTactics: awayProfile.tactics,
     // Retour progressif de blessure : minutes plafonnées (voir
     // return-protocol-rules.ts).
+    // ... et plan de charge (limite de minutes) : le plus strict des deux.
     minutesCap: Object.fromEntries(
       [...homeEligibleRoster, ...awayEligibleRoster]
-        .filter((p) => p.returnProtocol === "progressive" && (p.protocolGamesLeft ?? 0) > 0 && !p.injured)
-        .map((p) => [p.id, PROGRESSIVE_MINUTES_CAP])
+        .map((p) => {
+          const protocolCap =
+            p.returnProtocol === "progressive" && (p.protocolGamesLeft ?? 0) > 0 && !p.injured ? PROGRESSIVE_MINUTES_CAP : null;
+          return [p.id, effectiveMinutesCap(parseLoadPlan(p.loadPlanJson), protocolCap)] as const;
+        })
+        .filter((e): e is readonly [string, number] => e[1] !== null)
     ),
   });
 

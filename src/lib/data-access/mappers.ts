@@ -129,6 +129,7 @@ export function toDomainPlayerWithState(
     restNextGame: state?.restNextGame ?? false,
     returnProtocol: (state?.returnProtocol as "standard" | "progressive" | "rushed" | null) ?? null,
     protocolGamesLeft: state?.protocolGamesLeft ?? 0,
+    loadPlanJson: state?.loadPlanJson ?? null,
     injuryType: state?.injuryType ?? undefined,
     individualFocus: (state?.individualFocus as Player["individualFocus"]) ?? undefined,
     developmentProgress: state?.developmentProgress ?? 0,

@@ -73,3 +73,18 @@ test("plafond de minutes : l'excédent va aux autres, total inchangé", () => {
   assert.ok(Math.abs(out.reduce((s, x) => s + x, 0) - 20) < 1e-9);
   assert.ok(out[1] > 6 && out[2] > 4);
 });
+
+import { effectiveMinutesCap, parseLoadPlan, planRests } from "../../src/lib/careers/load-plan-rules";
+
+test("plan de charge : repos sur back-to-back et au-delà d'une usure, plafond le plus strict", () => {
+  const plan = parseLoadPlan(JSON.stringify({ restOnBackToBacks: true, minutesLimit: 28, autoRestWear: 70 }))!;
+  assert.equal(planRests(plan, { restDays: 1, wear: 10 }), true);
+  assert.equal(planRests(plan, { restDays: 2, wear: 75 }), true);
+  assert.equal(planRests(plan, { restDays: 2, wear: 40 }), false);
+  assert.equal(effectiveMinutesCap(plan, 20), 20);
+  assert.equal(effectiveMinutesCap(plan, null), 28);
+  assert.equal(effectiveMinutesCap(null, null), null);
+  // Valeurs hors liste ignorées, plan vide = pas de plan.
+  assert.equal(parseLoadPlan(JSON.stringify({ minutesLimit: 7 })), null);
+  assert.equal(planRests(null, { restDays: 0, wear: 99 }), false);
+});
