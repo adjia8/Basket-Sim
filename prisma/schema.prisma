@@ -528,6 +528,8 @@ model PlayerState {
   promisedStatus       String? // promesse de temps de jeu (statut promis) — voir player-status-rules.ts
   promiseSince         DateTime? // date de jeu de la promesse de temps de jeu
   lastConversationAt   DateTime? // date de jeu de la dernière discussion avec le GM — voir player-conversation-rules.ts
+  returnProtocol       String? // plan de retour de blessure : "standard" | "progressive" | "rushed" — voir return-protocol-rules.ts
+  protocolGamesLeft    Int       @default(0) // matchs restants sous protocole après le retour
   pendingRequest       String? // le joueur demande à parler au GM : "minutes" | "contract" | "support" — voir player-request-rules.ts
   requestAt            DateTime? // date de jeu de la demande en attente
   lastRequestAt        DateTime? // date de jeu de sa dernière demande (délai entre deux)

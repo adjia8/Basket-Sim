@@ -1,4 +1,5 @@
 import "server-only";
+import { PROGRESSIVE_MINUTES_CAP } from "@/lib/careers/return-protocol-rules";
 import { parseCalendar, sessionsBetween, summarizeSessions } from "@/lib/careers/training-calendar-rules";
 import { maybePlayerRequests } from "@/lib/data-access/player-requests";
 import { getGameById } from "@/lib/data-access/schedule";
@@ -468,6 +469,13 @@ export async function simulateAndResolveGame(
     awayTactics,
     homeCoachTactics: homeProfile.tactics,
     awayCoachTactics: awayProfile.tactics,
+    // Retour progressif de blessure : minutes plafonnées (voir
+    // return-protocol-rules.ts).
+    minutesCap: Object.fromEntries(
+      [...homeEligibleRoster, ...awayEligibleRoster]
+        .filter((p) => p.returnProtocol === "progressive" && (p.protocolGamesLeft ?? 0) > 0 && !p.injured)
+        .map((p) => [p.id, PROGRESSIVE_MINUTES_CAP])
+    ),
   });
 
   // Activation comptée pour CHAQUE joueuse en contrat de développement

@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { RETURN_PROTOCOLS, protocolAllowed } from "@/lib/careers/return-protocol-rules";
+import { setReturnProtocol } from "@/app/actions/medical";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { getStaffProfiles } from "@/lib/data-access/staff";
 import { NEUTRAL_STAFF_PROFILE } from "@/lib/careers/staff-rules";
@@ -675,6 +677,37 @@ export default async function PlayerDetailPage({
           <p className="mt-3 text-sm text-bad">
             {t(`domain.injuryType.${player.injuryType}` as "domain.injuryType.illness")} ·{" "}
             {t("team.medical.games", { count: player.injuryGamesRemaining })}
+          </p>
+        )}
+        {isMyTeam && player.injured && protocolAllowed(player.injurySeverity) && (
+          <div className="mt-3 rounded-md border border-line p-3" data-testid="return-protocol">
+            <p className="text-sm font-medium">{t("protocol.title")}</p>
+            <p className="text-xs text-faint">{t("protocol.hint")}</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              {RETURN_PROTOCOLS.map((pr) => {
+                const selected = (player.returnProtocol ?? "standard") === pr;
+                return (
+                  <form key={pr} action={setReturnProtocol} className={`rounded-md border p-2 text-xs ${selected ? "border-accent bg-accent/5" : "border-line"}`}>
+                    <input type="hidden" name="playerId" value={player.id} />
+                    <input type="hidden" name="protocol" value={pr} />
+                    <p className="font-semibold">{t(`protocol.${pr}`)}</p>
+                    <p className="mt-0.5 text-muted">{t(`protocol.${pr}.desc`)}</p>
+                    {selected ? (
+                      <p className="mt-1 font-medium text-accent-text">{t("protocol.current")}</p>
+                    ) : (
+                      <button type="submit" className="mt-1 rounded border border-line px-2 py-0.5 hover:bg-surface-2">
+                        {t("protocol.choose")}
+                      </button>
+                    )}
+                  </form>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {!player.injured && (player.protocolGamesLeft ?? 0) > 0 && player.returnProtocol && player.returnProtocol !== "standard" && (
+          <p className="mt-3 text-sm text-warn">
+            {t(`protocol.active.${player.returnProtocol}`, { count: player.protocolGamesLeft ?? 0 })}
           </p>
         )}
         {!player.injured && (player.wear ?? 0) >= WEAR_NEEDS_REST && (

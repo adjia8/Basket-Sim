@@ -1,4 +1,5 @@
 import type { BoxScoreEntry, Player, PlayerRatings, Team } from "@/lib/types";
+import { capMinutes } from "@/lib/careers/return-protocol-rules";
 import { personalityFor, technicalFoulMultiplier } from "@/lib/careers/personality-rules";
 import { moraleImpactFactor, MORALE_NEUTRAL } from "@/lib/careers/morale-rules";
 import type { HalfState, QuarterEvent, SimulationEngine, SimulationOptions, SimulationResult } from "./engine";
@@ -606,6 +607,7 @@ interface PeriodTeamsContext {
   totals: Map<string, BoxScoreEntry>;
   fullGameBase: number; // points de base d'un match complet (pour répartir l'avantage tactique)
   form: Map<string, PlayerForm>; // forme du soir de chaque joueur
+  minutesCap: Record<string, number>; // minutes maximales par match (retour progressif)
   homeFocusPerQuarter: number; // causeries : points par quart-temps de la mi-temps en cours
   awayFocusPerQuarter: number;
 }
@@ -670,8 +672,22 @@ function simulatePeriod(
     )
   );
 
-  const homeMinutes = quarterMinutes(homeRotation, periodMinutes, homeDepth.startersShare);
-  const awayMinutes = quarterMinutes(awayRotation, periodMinutes, awayDepth.startersShare);
+  // Retour progressif de blessure : plafond de minutes réparti sur les
+  // périodes (au prorata de leur durée), excédent redonné aux coéquipiers.
+  const capPerPeriod = (id: string) => {
+    const cap = ctx.minutesCap[id];
+    return cap === undefined ? undefined : (cap * periodMinutes) / (periodMinutes * QUARTERS);
+  };
+  const homeMinutes = capMinutes(
+    homeRotation.map((p) => p.id),
+    quarterMinutes(homeRotation, periodMinutes, homeDepth.startersShare),
+    capPerPeriod
+  );
+  const awayMinutes = capMinutes(
+    awayRotation.map((p) => p.id),
+    quarterMinutes(awayRotation, periodMinutes, awayDepth.startersShare),
+    capPerPeriod
+  );
   applyQuarterBoxScore(
     ctx.totals,
     ctx.home.id,
@@ -750,6 +766,7 @@ export class MockSimulationEngine implements SimulationEngine {
       homeFocusPerQuarter: 0,
       awayFocusPerQuarter: 0,
       // Forme du soir : tirée une fois par match, conservée à la reprise.
+      minutesCap: options?.minutesCap ?? {},
       form: new Map(
         [...homeRosterFull, ...awayRosterFull].map((p) => [p.id, resume?.form?.[p.id] ?? rollForm()] as const)
       ),

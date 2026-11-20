@@ -75,6 +75,8 @@ export interface Player {
   // wear-rules.ts, injury-rules.ts, development-rules.ts.
   wear?: number; // 0-99, usure de fond
   restNextGame?: boolean; // gestion de la charge : ne joue pas le prochain match
+  returnProtocol?: "standard" | "progressive" | "rushed" | null; // plan de retour de blessure
+  protocolGamesLeft?: number; // matchs restants sous protocole après le retour
   injuryType?: string; // clé de INJURY_TYPES, blessure en cours
   individualFocus?: "offensive" | "defensive" | "tactical" | "physical";
   developmentProgress?: number;

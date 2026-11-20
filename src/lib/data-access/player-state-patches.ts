@@ -34,6 +34,8 @@ export interface PlayerStatePatch extends Partial<Record<(typeof ATTRIBUTE_COLUM
   developmentProgress?: number;
   overallRating?: number;
   morale?: number;
+  returnProtocol?: string | null;
+  protocolGamesLeft?: number;
 }
 
 type Column = keyof PlayerStatePatch;
@@ -49,6 +51,8 @@ const COLUMNS: { name: Column; sqlType: "boolean" | "int" | "text" }[] = [
   { name: "fatigue", sqlType: "int" },
   { name: "wear", sqlType: "int" },
   { name: "restNextGame", sqlType: "boolean" },
+  { name: "returnProtocol", sqlType: "text" },
+  { name: "protocolGamesLeft", sqlType: "int" },
   { name: "injuryType", sqlType: "text" },
   { name: "developmentProgress", sqlType: "int" },
   { name: "overallRating", sqlType: "int" },

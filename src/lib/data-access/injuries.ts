@@ -1,4 +1,5 @@
 import "server-only";
+import { protocolRiskMultiplier } from "@/lib/careers/return-protocol-rules";
 import { prisma } from "@/lib/prisma";
 import type { PlayerStatePatches } from "./player-state-patches";
 import type { BoxScoreEntry, Player } from "@/lib/types";
@@ -132,6 +133,7 @@ export async function advanceRosterInjuries(
       }
     } else if (
       Math.random() <
+      protocolRiskMultiplier(player.returnProtocol ?? null, player.protocolGamesLeft ?? 0) *
       injuryChance({
         injuryRisk: player.injuryRisk,
         fatigue: player.fatigue,
@@ -146,12 +148,17 @@ export async function advanceRosterInjuries(
       // Risque du jour (prédisposition × fatigue × usure × âge ×
       // entraînement × staff) : une blessure nommée, de durée réaliste.
       const injury = rollInjury();
+      // Rechute après un retour accéléré : plus grave.
+      const rushedRelapse = player.returnProtocol === "rushed" && (player.protocolGamesLeft ?? 0) > 0;
+      const severity = rushedRelapse ? escalateSeverity(injury.severity) : injury.severity;
       patches.set(player.id, {
         injured: true,
-        injuryGamesRemaining: injury.games,
-        injurySeverity: injury.severity,
+        injuryGamesRemaining: rushedRelapse ? injury.games + rollInjuryDurationGames() : injury.games,
+        injurySeverity: severity,
         injuryType: injury.type,
-        conditioning: clampConditioning(player.conditioning - conditioningLossOnInjury(injury.severity)),
+        conditioning: clampConditioning(player.conditioning - conditioningLossOnInjury(severity)),
+        returnProtocol: null,
+        protocolGamesLeft: 0,
       });
       newInjuries.push({
         playerId: player.id,
@@ -163,6 +170,11 @@ export async function advanceRosterInjuries(
       patches.set(player.id, {
         conditioning: clampConditioning(player.conditioning + CONDITIONING_RECOVERY_PER_GAME),
       });
+    }
+    // Protocole de retour : un match de moins à chaque match joué une fois guéri.
+    if (!player.injured && (player.protocolGamesLeft ?? 0) > 0 && playedIds.has(player.id)) {
+      const left = (player.protocolGamesLeft ?? 0) - 1;
+      patches.set(player.id, { protocolGamesLeft: left, ...(left === 0 ? { returnProtocol: null } : {}) });
     }
   }
 

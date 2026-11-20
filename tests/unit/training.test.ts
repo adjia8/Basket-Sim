@@ -54,3 +54,22 @@ test("affichage : jours de match repérés, séances du modèle et choix du GM",
   assert.equal(days[2].custom, true);
   assert.equal(days[3].session, "tactical"); // veille de match
 });
+
+import { capMinutes, protocolAllowed, protocolRiskMultiplier, rushedRemaining } from "../../src/lib/careers/return-protocol-rules";
+
+test("retour de blessure : accéléré plus tôt mais plus risqué, progressif plus sûr", () => {
+  assert.equal(rushedRemaining(10), 7);
+  assert.equal(rushedRemaining(1), 1);
+  assert.ok(protocolRiskMultiplier("rushed", 3) > 1);
+  assert.ok(protocolRiskMultiplier("progressive", 3) < 1);
+  assert.equal(protocolRiskMultiplier("rushed", 0), 1);
+  assert.equal(protocolAllowed("minor"), false);
+  assert.equal(protocolAllowed("severe"), true);
+});
+
+test("plafond de minutes : l'excédent va aux autres, total inchangé", () => {
+  const out = capMinutes(["a", "b", "c"], [10, 6, 4], (id) => (id === "a" ? 5 : undefined));
+  assert.equal(out[0], 5);
+  assert.ok(Math.abs(out.reduce((s, x) => s + x, 0) - 20) < 1e-9);
+  assert.ok(out[1] > 6 && out[2] > 4);
+});

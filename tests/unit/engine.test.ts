@@ -183,3 +183,14 @@ test("feuilles de stats proches de la NBA (tirs, rebonds, passes, grosses soiré
   assert.ok(fortyPoint / N > 0.01 && fortyPoint / N < 0.15, `40 pts+ par match ${fortyPoint / N}`);
   assert.ok(foulOuts / N > 0.04 && foulOuts / N < 0.3, `six fautes par match ${foulOuts / N}`);
 });
+
+test("retour progressif : minutes plafonnées, box score toujours cohérent", () => {
+  for (let i = 0; i < 100; i++) {
+    const r = engine.simulateGame(team("h"), roster("h", 80), team("a"), roster("a", 80), { minutesCap: { "h-0": 20 } });
+    const star = r.boxScore.find((e) => e.playerId === "h-0")!;
+    // 20 min sur 48, plus au plus 5 min par prolongation (un quart du plafond).
+    const ot = Math.max(0, (r.quarterLog?.length ?? 4) - 4);
+    assert.ok(star.minutesPlayed <= 20 + 5 * ot + 0.5, `${star.minutesPlayed} min`);
+    assertConsistent(r);
+  }
+});

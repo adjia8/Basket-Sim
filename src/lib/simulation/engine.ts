@@ -77,6 +77,9 @@ export interface SimulationOptions {
   timeout?: { side: "home" | "away"; points: number };
   // Joueurs mis au repos pendant le prochain quart-temps seulement.
   restNextQuarter?: string[];
+  // Minutes maximales par match de certains joueurs (retour progressif de
+  // blessure, voir return-protocol-rules.ts).
+  minutesCap?: Record<string, number>;
 }
 
 export interface SimulationEngine {

@@ -127,6 +127,8 @@ export function toDomainPlayerWithState(
     trainingBoostFocus: (state?.trainingBoostFocus as Player["trainingBoostFocus"]) ?? undefined,
     wear: state?.wear ?? 0,
     restNextGame: state?.restNextGame ?? false,
+    returnProtocol: (state?.returnProtocol as "standard" | "progressive" | "rushed" | null) ?? null,
+    protocolGamesLeft: state?.protocolGamesLeft ?? 0,
     injuryType: state?.injuryType ?? undefined,
     individualFocus: (state?.individualFocus as Player["individualFocus"]) ?? undefined,
     developmentProgress: state?.developmentProgress ?? 0,
