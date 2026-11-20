@@ -37,7 +37,8 @@ import {
   talkOutcome,
   type TalkTone,
 } from "@/lib/careers/team-talk-rules";
-import type { HalfState } from "@/lib/simulation/engine";
+import type { HalfState, QuarterEvent } from "@/lib/simulation/engine";
+import { GAMES_PER_SEASON } from "@/lib/careers/finance-rules";
 import { clampMorale } from "@/lib/careers/morale-rules";
 
 // Niveau d'un effectif pour juger favori / outsider : moyenne des 8 meilleurs.
@@ -116,6 +117,12 @@ function pressContextFor(params: {
   leagueSize: number;
   newInjuries: NewInjury[];
   locale: Locale;
+  opponentRoster: Player[];
+  isHome: boolean;
+  quarterLog?: QuarterEvent[];
+  restDays: number;
+  cupStage?: string | null;
+  gamesInSeason: number;
 }): PressGameContext {
   const { roster, boxScore, teamId } = params;
   const byId = new Map(roster.map((p) => [p.id, p]));
@@ -149,6 +156,7 @@ function pressContextFor(params: {
     teamCity: params.team.city,
     women: params.team.leagueId === "wnba",
     opponentName: teamFullName(params.opponent),
+    opponentId: params.opponent.id,
     won: params.teamScore > params.opponentScore,
     teamScore: params.teamScore,
     opponentScore: params.opponentScore,
@@ -184,6 +192,55 @@ function pressContextFor(params: {
         }
       : undefined,
     wornPlayer: worn ? { id: worn.id, name: name(worn) } : undefined,
+    ...pressEventsFor(params, entries, byId, name),
+  };
+}
+
+// Événements du match pour la presse : prolongations, remontée, triple-double,
+// star adverse, back-to-back, retour de blessure, NBA Cup, superstar en
+// course pour le MVP.
+function pressEventsFor(
+  params: Parameters<typeof pressContextFor>[0],
+  entries: BoxScoreEntry[],
+  byId: Map<string, Player>,
+  name: (p: Player) => string
+): Partial<PressGameContext> {
+  const log = params.quarterLog ?? [];
+  const overtimes = log.filter((q) => q.q > 4).length;
+  // Plus gros retard à la fin d'un quart-temps, remonté pour gagner.
+  const deficits = log.map((q) => (params.isHome ? q.awayTotal - q.homeTotal : q.homeTotal - q.awayTotal));
+  const comebackFrom = params.teamScore > params.opponentScore ? Math.max(0, ...deficits) : 0;
+
+  const td = entries
+    .filter((e) => e.points >= 10 && e.rebounds >= 10 && e.assists >= 10)
+    .sort((a, b) => b.points - a.points)[0];
+  const tdPlayer = td ? byId.get(td.playerId) : undefined;
+
+  const opponentIds = new Set(params.opponentRoster.map((p) => p.id));
+  const oppBest = params.boxScore
+    .filter((e) => e.teamId !== params.teamId && opponentIds.has(e.playerId))
+    .sort((a, b) => b.points - a.points)[0];
+  const oppPlayer = oppBest ? params.opponentRoster.find((p) => p.id === oppBest.playerId) : undefined;
+
+  const played = new Set(entries.filter((e) => e.minutesPlayed > 0).map((e) => e.playerId));
+  const returning = params.roster
+    .filter((p) => played.has(p.id) && (p.protocolGamesLeft ?? 0) > 0 && p.renown >= 55)
+    .sort((a, b) => b.renown - a.renown)[0];
+
+  const mvp = [...params.roster].sort((a, b) => b.renown - a.renown)[0];
+  const cupStage = params.cupStage;
+
+  return {
+    overtimes,
+    comebackFrom,
+    tripleDouble:
+      td && tdPlayer ? { id: tdPlayer.id, name: name(tdPlayer), points: td.points, rebounds: td.rebounds, assists: td.assists } : undefined,
+    opponentStar: oppBest && oppPlayer ? { name: name(oppPlayer), points: oppBest.points } : undefined,
+    backToBack: params.restDays <= 1,
+    returningPlayer: returning ? { id: returning.id, name: name(returning) } : undefined,
+    cupStage: cupStage === "group" || cupStage === "qf" || cupStage === "sf" || cupStage === "final" ? cupStage : undefined,
+    gamesInSeason: params.gamesInSeason,
+    mvpCandidate: mvp && mvp.renown >= 85 ? { id: mvp.id, name: name(mvp) } : undefined,
   };
 }
 
@@ -835,6 +892,12 @@ export async function simulateAndResolveGame(
     leagueSize: standings.length,
     newInjuries: homeNewInjuries,
     locale,
+    opponentRoster: awayRoster,
+    isHome: true,
+    quarterLog: result.quarterLog,
+    restDays: homeRestDays,
+    cupStage: game.cupStage,
+    gamesInSeason: GAMES_PER_SEASON[game.leagueId] ?? 82,
   });
   const awayGameContext = pressContextFor({
     team: awayTeam,
@@ -849,6 +912,12 @@ export async function simulateAndResolveGame(
     leagueSize: standings.length,
     newInjuries: awayNewInjuries,
     locale,
+    opponentRoster: homeRoster,
+    isHome: false,
+    quarterLog: result.quarterLog,
+    restDays: awayRestDays,
+    cupStage: game.cupStage,
+    gamesInSeason: GAMES_PER_SEASON[game.leagueId] ?? 82,
   });
   await Promise.all([
     homeManager

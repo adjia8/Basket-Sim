@@ -12,6 +12,9 @@ import {
   refereeFineMessageText,
 } from "@/lib/careers/inbox-rules";
 import { clampMorale } from "@/lib/careers/morale-rules";
+import { NBA_TAX_LINE } from "@/lib/careers/cap-rules";
+import { getPayrollForTeam } from "@/lib/data-access/contracts";
+import { parseBoardObjectives, type BoardObjective } from "@/lib/careers/board-objectives-rules";
 import { calendarDay, nbaTradeDeadline } from "@/lib/careers/schedule-rules";
 import { PlayerStatePatches } from "@/lib/data-access/player-state-patches";
 import type { Locale } from "@/lib/i18n/locale";
@@ -131,9 +134,13 @@ async function enrichContext(
   lastConferenceAt: Date | null,
   base: PressGameContext
 ): Promise<PressGameContext> {
-  const contracts = await prisma.contract.findMany({ where: { careerId, teamId }, select: { playerId: true } });
+  const contracts = await prisma.contract.findMany({
+    where: { careerId, teamId },
+    select: { playerId: true, yearsRemaining: true, contractType: true },
+  });
   const rosterIds = contracts.map((c) => c.playerId);
-  const [requester, arrival, series] = await Promise.all([
+  const baseSeasonLabel = season.replace(/-(playoffs|preseason|cup)$/, "");
+  const [requester, arrival, series, states, allStarAwards, teamState, membership, former] = await Promise.all([
     prisma.playerState.findFirst({
       where: { careerId, playerId: { in: rosterIds }, wantsTrade: true },
       include: { player: { select: { firstName: true, lastName: true } } },
@@ -150,7 +157,68 @@ async function enrichContext(
       include: { player: { select: { firstName: true, lastName: true } } },
     }),
     playoffSeriesId ? prisma.playoffSeries.findUnique({ where: { id: playoffSeriesId } }) : null,
+    prisma.playerState.findMany({
+      where: { careerId, playerId: { in: rosterIds } },
+      select: { playerId: true, renown: true, pendingRequest: true, player: { select: { firstName: true, lastName: true } } },
+    }),
+    // Sélection All-Star tombée depuis la dernière conférence.
+    prisma.award.findMany({
+      where: {
+        careerId,
+        season: baseSeasonLabel,
+        type: "all_star",
+        ...(lastConferenceAt ? { createdAt: { gt: lastConferenceAt } } : {}),
+      },
+      select: { playerId: true, teamId: true },
+    }),
+    prisma.teamState.findUnique({ where: { careerId_teamId: { careerId, teamId } } }),
+    prisma.membership.findUnique({ where: { careerId_teamId: { careerId, teamId } }, include: { gmProfile: true } }),
+    // Ancien joueur de l'équipe aujourd'hui chez l'adversaire.
+    base.opponentId
+      ? prisma.contract
+          .findMany({ where: { careerId, teamId: base.opponentId }, select: { playerId: true } })
+          .then((rows) =>
+            prisma.playerTeamStint.findFirst({
+              where: { careerId, teamId, playerId: { in: rows.map((r) => r.playerId) } },
+              include: { player: { select: { firstName: true, lastName: true } } },
+            })
+          )
+      : null,
   ]);
+
+  const nameOf = (p: { player: { firstName: string; lastName: string } }) => `${p.player.firstName} ${p.player.lastName}`;
+  const stateById = new Map(states.map((st) => [st.playerId, st]));
+  const ref = (playerId: string) => {
+    const st = stateById.get(playerId);
+    return st ? { id: playerId, name: nameOf(st) } : undefined;
+  };
+
+  // Joueur majeur (renommée 65+) en dernière année de contrat.
+  const expiring = contracts
+    .filter((c) => c.yearsRemaining <= 1 && c.contractType === "standard" && (stateById.get(c.playerId)?.renown ?? 0) >= 65)
+    .sort((a, b) => (stateById.get(b.playerId)?.renown ?? 0) - (stateById.get(a.playerId)?.renown ?? 0))[0];
+
+  // Joueur qui a demandé à voir le coach (voir player-requests.ts).
+  const unhappy = states
+    .filter((st) => st.pendingRequest === "minutes" || st.pendingRequest === "contract" || st.pendingRequest === "support")
+    .sort((a, b) => b.renown - a.renown)[0];
+
+  // All-Star : nos sélectionnés, ou l'oubli de notre meilleur joueur.
+  let allStars: PressGameContext["allStars"];
+  if (allStarAwards.length > 0) {
+    const selected = allStarAwards
+      .filter((a) => a.teamId === teamId && a.playerId)
+      .map((a) => ref(a.playerId!))
+      .filter((r): r is { id: string; name: string } => !!r);
+    const best = [...states].sort((a, b) => b.renown - a.renown)[0];
+    const snub = selected.length === 0 && best && best.renown >= 78 ? ref(best.playerId) : undefined;
+    if (selected.length > 0 || snub) allStars = { selected, snub };
+  }
+
+  // Même masse salariale que la page équipe (argent mort compris).
+  const payroll = await getPayrollForTeam(careerId, teamId);
+  const objectives = parseBoardObjectives(membership?.gmProfile?.boardObjectivesJson);
+  const goal = objectives?.objectives.find((o) => o.status === "active" && objectiveBehind(o, base, teamState?.attendance ?? 50));
 
   // Saison régulière NBA uniquement (les labels de playoffs/pré-saison ont
   // un suffixe : "2026-2027-playoffs").
@@ -170,11 +238,32 @@ async function enrichContext(
     newArrival: arrival ? { id: arrival.playerId, name: `${arrival.player.firstName} ${arrival.player.lastName}` } : undefined,
     playoffSeries: series
       ? series.homeTeamId === teamId
-        ? { teamWins: series.homeWins, opponentWins: series.awayWins }
-        : { teamWins: series.awayWins, opponentWins: series.homeWins }
+        ? { teamWins: series.homeWins, opponentWins: series.awayWins, bestOf: series.bestOf }
+        : { teamWins: series.awayWins, opponentWins: series.homeWins, bestOf: series.bestOf }
       : undefined,
     tradeDeadlineDays,
+    expiringStar: expiring ? ref(expiring.playerId) : undefined,
+    unhappyPlayer:
+      unhappy && ref(unhappy.playerId)
+        ? { ...ref(unhappy.playerId)!, request: unhappy.pendingRequest as "minutes" | "contract" | "support" }
+        : undefined,
+    allStars,
+    arena: teamState ? { attendance: teamState.attendance, ticketLevel: teamState.ticketPriceLevel } : undefined,
+    luxuryTax: leagueId === "nba" && payroll > NBA_TAX_LINE,
+    ownerGoal: goal ? { type: goal.type, behind: true } : undefined,
+    formerPlayer: former ? { name: nameOf(former) } : undefined,
   };
+}
+
+// Objectif des propriétaires en retard : bilan sous la cible, ou affluence
+// sous la cible (le développement des jeunes se juge en fin de saison).
+function objectiveBehind(o: BoardObjective, ctx: PressGameContext, attendance: number): boolean {
+  if (o.type === "win_pct") {
+    const games = ctx.wins + ctx.losses;
+    return games > 0 && ctx.wins / games < o.target - 0.03;
+  }
+  if (o.type === "attendance") return attendance < o.target - 3;
+  return false;
 }
 
 // Appelé une fois par équipe humaine juste après la résolution d'un match :

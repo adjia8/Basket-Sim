@@ -19,6 +19,9 @@
 
 import type { Locale } from "@/lib/i18n/locale";
 import { ordinalSuffix } from "@/lib/utils";
+import { e, gn, margin, pickOne, score, streakCount, tr, winPct, type TopicBuilder, type TopicCandidate } from "./press-helpers";
+import { EVENT_TOPIC_BUILDERS } from "./press-event-topics";
+import { withVariants } from "./press-variants";
 
 // Attitudes façon FM. Les 4 dernières sont celles de l'ancien système,
 // conservées pour relire les conférences déjà en base.
@@ -58,7 +61,28 @@ export type PressTopic =
   | "leader"
   | "rotation"
   | "locker_room"
-  | "front_office";
+  | "front_office"
+  // Événements (voir press-event-topics.ts)
+  | "overtime"
+  | "comeback"
+  | "triple_double"
+  | "opponent_star"
+  | "back_to_back"
+  | "injury_return"
+  | "nba_cup"
+  | "season_opener"
+  | "playoff_race"
+  | "tanking"
+  | "mvp_race"
+  | "contract_year"
+  | "unhappy_player"
+  | "all_star"
+  | "all_star_snub"
+  | "attendance"
+  | "luxury_tax"
+  | "owner_goals"
+  | "former_player"
+  | "series_over";
 
 export interface PressEffects {
   morale: number; // moral de l'équipe (TeamState.morale)
@@ -103,6 +127,7 @@ export interface PressGameContext {
   teamCity: string; // "Milwaukee"
   women?: boolean; // WNBA : accords au féminin (joueuses, elle/she)
   opponentName: string;
+  opponentId?: string;
   won: boolean;
   teamScore: number;
   opponentScore: number;
@@ -118,8 +143,26 @@ export interface PressGameContext {
   wornPlayer?: PressPlayerRef;
   tradeRequester?: PressPlayerRef;
   newArrival?: PressPlayerRef;
-  playoffSeries?: { teamWins: number; opponentWins: number };
+  playoffSeries?: { teamWins: number; opponentWins: number; bestOf?: number };
   tradeDeadlineDays?: number;
+  // --- Événements du match (simulate.ts) ---
+  overtimes?: number; // prolongations jouées
+  comebackFrom?: number; // plus gros retard (fin de quart-temps) remonté pour gagner
+  tripleDouble?: PressPlayerRef & { points: number; rebounds: number; assists: number };
+  opponentStar?: { name: string; points: number };
+  backToBack?: boolean; // deuxième match en deux soirs
+  returningPlayer?: PressPlayerRef; // de retour de blessure (protocole en cours)
+  cupStage?: "group" | "qf" | "sf" | "final"; // match de NBA Cup
+  gamesInSeason?: number; // longueur de la saison régulière
+  mvpCandidate?: PressPlayerRef; // superstar d'une équipe qui gagne
+  // --- Actualité de l'équipe (press.ts) ---
+  expiringStar?: PressPlayerRef; // joueur majeur en dernière année de contrat
+  unhappyPlayer?: PressPlayerRef & { request: "minutes" | "contract" | "support" };
+  allStars?: { selected: PressPlayerRef[]; snub?: PressPlayerRef };
+  arena?: { attendance: number; ticketLevel: number };
+  luxuryTax?: boolean;
+  ownerGoal?: { type: "win_pct" | "develop_youth" | "attendance"; behind: boolean };
+  formerPlayer?: { name: string }; // ancien joueur de l'équipe chez l'adversaire
 }
 
 // ---------------------------------------------------------------------------
@@ -156,46 +199,8 @@ function withStyle(effects: PressEffects, style: JournalistStyle): PressEffects 
 // ---------------------------------------------------------------------------
 // Sujets
 
-interface TopicCandidate {
-  topic: PressTopic;
-  category: QuestionCategory;
-  family?: "result" | "streak";
-  priority: number; // plus c'est haut, plus la question a de chances d'être posée
-  playerId?: string;
-  preferredStyle?: JournalistStyle;
-  prompts: string[];
-  options: { tone: AnswerTone; label: string; effects: PressEffects }[];
-}
-
-type TopicBuilder = (ctx: PressGameContext, locale: Locale) => TopicCandidate | null;
-
-const e = (
-  morale: number,
-  publicOpinion: number,
-  frontOfficeApproval: number,
-  extra: Partial<PressEffects> = {}
-): PressEffects => ({ morale, publicOpinion, frontOfficeApproval, ...extra });
-
-function tr(locale: Locale) {
-  return (fr: string, en: string) => (locale === "fr" ? fr : en);
-}
-
-// Accord masculin / féminin selon la ligue (NBA / WNBA).
-function gn(ctx: PressGameContext) {
-  return (m: string, f: string) => (ctx.women ? f : m);
-}
-
-const margin = (ctx: PressGameContext) => ctx.teamScore - ctx.opponentScore;
-const score = (ctx: PressGameContext) => `${ctx.teamScore}-${ctx.opponentScore}`;
-const winPct = (ctx: PressGameContext) => (ctx.wins + ctx.losses === 0 ? 0.5 : ctx.wins / (ctx.wins + ctx.losses));
 const rankLabel = (ctx: PressGameContext, locale: Locale) =>
   locale === "fr" ? `${ctx.rank}e` : `${ctx.rank}${ordinalSuffix(ctx.rank, locale)}`;
-
-function streakCount(ctx: PressGameContext, kind: "W" | "L"): number {
-  if (ctx.streak[0] !== kind) return 0;
-  const n = Number(ctx.streak.slice(1));
-  return Number.isFinite(n) ? n : 0;
-}
 
 const result: TopicBuilder = (ctx, locale) => {
   const t = tr(locale);
@@ -1151,6 +1156,9 @@ const tradeDeadline: TopicBuilder = (ctx, locale) => {
 const playoffSeries: TopicBuilder = (ctx, locale) => {
   const s = ctx.playoffSeries;
   if (!s) return null;
+  // Série terminée : c'est le sujet « series_over » qui prend le relais.
+  const need = Math.ceil((s.bestOf ?? 7) / 2);
+  if (s.teamWins >= need || s.opponentWins >= need) return null;
   const t = tr(locale);
   const state =
     s.teamWins > s.opponentWins
@@ -1478,7 +1486,14 @@ export function isMajorPressEvent(ctx: PressGameContext): boolean {
       Math.abs(margin(ctx)) >= 25 ||
       streakCount(ctx, "W") >= 5 ||
       streakCount(ctx, "L") >= 4 ||
-      ctx.tradeRequester
+      ctx.tradeRequester ||
+      (ctx.cupStage && ctx.cupStage !== "group") ||
+      (ctx.overtimes ?? 0) >= 2 ||
+      (ctx.comebackFrom ?? 0) >= 18 ||
+      ctx.tripleDouble ||
+      (ctx.allStars?.selected.length ?? 0) > 0 ||
+      ctx.allStars?.snub ||
+      ctx.wins + ctx.losses === 1
   );
 }
 
@@ -1513,8 +1528,10 @@ export function generateQuestions(
   ctx: PressGameContext,
   avoid: Set<string> = new Set()
 ): GeneratedQuestion[] {
-  const candidates = TOPIC_BUILDERS.map((build) => build(ctx, locale))
+  const candidates = [...TOPIC_BUILDERS, ...EVENT_TOPIC_BUILDERS]
+    .map((build) => build(ctx, locale))
     .filter((c): c is TopicCandidate => c !== null)
+    .map((c) => withVariants(c, ctx, locale))
     .filter((c) => !avoid.has(topicKey(c.topic, c.playerId)))
     .map((c) => ({ c, score: c.priority + Math.random() * 25 }))
     .sort((a, b) => b.score - a.score);
@@ -1532,8 +1549,11 @@ export function generateQuestions(
   const used = new Set<string>();
   return picked.map((c) => {
     const journalist = pickJournalist(c.preferredStyle, used, ctx.teamCity);
+    // Un journaliste à sensation (ou de la presse locale) pose la question à
+    // sa manière quand le sujet le prévoit.
+    const styled = c.stylePrompts?.[journalist.style] ?? [];
     return {
-      prompt: c.prompts[Math.floor(Math.random() * c.prompts.length)],
+      prompt: styled.length > 0 && Math.random() < 0.6 ? pickOne(styled) : pickOne(c.prompts),
       category: c.category,
       topic: c.topic,
       playerId: c.options.some((o) => o.effects.playerMorale) ? c.playerId : undefined,
@@ -1541,7 +1561,7 @@ export function generateQuestions(
       outlet: journalist.outlet,
       options: c.options.map((o, i) => ({
         id: `o${i}`,
-        label: o.label,
+        label: pickOne([o.label, ...(o.alt ?? [])]),
         tone: o.tone,
         effects: withStyle(o.effects, journalist.style),
       })),
