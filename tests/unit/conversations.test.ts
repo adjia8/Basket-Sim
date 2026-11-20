@@ -95,3 +95,21 @@ test("répondre à sa demande : il apprécie d'être écouté", () => {
   const answered = conversationOutcome("patience", "calm", { ...base, underExpectedMinutes: true, answeringRequest: true }, mid);
   assert.ok(answered.moraleDelta > plain.moraleDelta, `${answered.reaction} vs ${plain.reaction}`);
 });
+
+import { answerQuestion, bandOf, interviewError } from "../../src/lib/careers/draft-interview-rules";
+
+test("entretiens : une réponse stable, plus fiable avec de bons recruteurs", () => {
+  const p = { professionalism: 18, ambition: 4, loyalty: 10, temperament: 10, leadership: 10 };
+  assert.deepEqual(answerQuestion("work", p, 50, "s"), answerQuestion("work", p, 50, "s"));
+  assert.ok(interviewError(99) < interviewError(20));
+  // Excellents recruteurs : le niveau révélé est le bon.
+  for (let i = 0; i < 50; i++) {
+    assert.equal(answerQuestion("work", p, 99, `seed${i}`).band, "high");
+    assert.equal(answerQuestion("motivation", p, 99, `seed${i}`).band, "low");
+  }
+  // Recrutement faible : on se trompe parfois sur un trait moyen.
+  const bands = new Set(Array.from({ length: 200 }, (_, i) => answerQuestion("team", p, 0, `x${i}`).band));
+  assert.ok(bands.size >= 2);
+  assert.equal(bandOf(5), "low");
+  assert.equal(bandOf(15), "high");
+});

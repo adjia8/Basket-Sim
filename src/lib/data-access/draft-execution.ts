@@ -1,5 +1,4 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import type { Prospect } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -17,7 +16,10 @@ export async function performDraftPick(
   leagueId: string
 ): Promise<boolean> {
   const terms = rookieScaleContract(currentPick.pickNumber, picksPerRound, leagueId);
-  const newPlayerId = randomUUID();
+  // Le joueur garde l'identifiant du prospect : sa personnalité (dérivée de
+  // l'identifiant, voir personality-rules.ts) est donc la même avant et après
+  // la draft — ce que révèlent les entretiens d'avant-draft reste vrai.
+  const newPlayerId = prospect.id;
 
   try {
     await prisma.$transaction(async (tx) => {

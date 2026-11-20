@@ -14,6 +14,14 @@ import { ensureCareerStaff, getStaffProfiles } from "@/lib/data-access/staff";
 import { NEUTRAL_STAFF_PROFILE } from "@/lib/careers/staff-rules";
 import { estimateError, estimateRating, ratingStars } from "@/lib/careers/potential-rules";
 import { Stars } from "@/components/ui/Stars";
+import { DraftInterviewForm } from "@/components/draft/DraftInterviewForm";
+import {
+  INTERVIEWS_PER_DRAFT,
+  INTERVIEW_QUESTIONS,
+  QUESTIONS_PER_INTERVIEW,
+  QUESTION_TRAIT,
+  type InterviewAnswer,
+} from "@/lib/careers/draft-interview-rules";
 
 export default async function DraftPage() {
   const membership = await getCurrentMembership();
@@ -74,6 +82,14 @@ export default async function DraftPage() {
     }))
     .sort((a, b) => b.current.mid - a.current.mid);
   const pickTerms = rookieScaleContract(currentPick.pickNumber, picksPerRound, membership.leagueId);
+  // Entretiens d'avant-draft (voir draft-interview-rules.ts).
+  const interviews = await prisma.prospectInterview.findMany({
+    where: { careerId: membership.careerId, teamId: membership.teamId, season: membership.season },
+    orderBy: { createdAt: "asc" },
+  });
+  const interviewed = new Set(interviews.map((i) => i.prospectId));
+  const prospectById = new Map(prospects.map((p) => [p.id, p]));
+  const interviewsLeft = Math.max(0, INTERVIEWS_PER_DRAFT - interviews.length);
 
   return (
     <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
@@ -117,6 +133,64 @@ export default async function DraftPage() {
         <p className="mt-4 text-xs text-muted">
           {t("draft.scoutingHint", { level: scouting, error: Math.round(estimateError(scouting) / 2) })}
         </p>
+      )}
+
+      {prospects.length > 0 && (
+        <section className="mt-6 card p-4" data-testid="draft-interviews">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{t("interview.title")}</h2>
+          <p className="mt-1 text-xs text-faint">
+            {t("interview.subtitle", { count: INTERVIEWS_PER_DRAFT, questions: QUESTIONS_PER_INTERVIEW })}
+          </p>
+          <p className="mt-2 text-sm font-medium">{t("interview.remaining", { count: interviewsLeft })}</p>
+          {interviewsLeft > 0 && (
+            <DraftInterviewForm
+              prospects={scouted
+                .filter((s) => !interviewed.has(s.prospect.id))
+                .map((s) => ({
+                  id: s.prospect.id,
+                  label: `${s.prospect.firstName} ${s.prospect.lastName} · ${s.prospect.position} · ${s.current.low}-${s.current.high}`,
+                }))}
+              questions={INTERVIEW_QUESTIONS.map((q) => ({ value: q, label: t(`interview.q.${q}`) }))}
+              labels={{
+                prospect: t("interview.prospect"),
+                questions: t("interview.questions"),
+                submit: t("interview.submit"),
+                sending: t("interview.sending"),
+              }}
+            />
+          )}
+          <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted">{t("interview.done")}</h3>
+          {interviews.length === 0 ? (
+            <p className="mt-1 text-sm text-muted">{t("interview.none")}</p>
+          ) : (
+            <ul className="mt-2 space-y-3 text-sm">
+              {interviews.map((iv) => {
+                const p = prospectById.get(iv.prospectId);
+                const answers = JSON.parse(iv.answersJson) as InterviewAnswer[];
+                return (
+                  <li key={iv.id} className="rounded-md border border-line p-3">
+                    <p className="font-medium">{p ? `${p.firstName} ${p.lastName}` : iv.prospectId}</p>
+                    <ul className="mt-1 space-y-1">
+                      {answers.map((a) => (
+                        <li key={a.question}>
+                          <span className="text-muted">{t(`interview.q.${a.question}`)} </span>
+                          <span className="italic">{t(`interview.a.${a.question}.${a.band}`)}</span>{" "}
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${
+                              a.band === "high" ? "bg-good/15 text-good" : a.band === "low" ? "bg-bad/15 text-bad" : "bg-surface-3 text-soft"
+                            }`}
+                          >
+                            {t(`personality.trait.${QUESTION_TRAIT[a.question]}`)} : {t(`interview.band.${a.band}`)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
       )}
 
       {prospects.length === 0 ? (

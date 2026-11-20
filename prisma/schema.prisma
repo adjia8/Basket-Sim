@@ -50,6 +50,7 @@ model Career {
   leagueNews        LeagueNews[]
   negotiations      ContractNegotiation[]
   ratingSnapshots   PlayerRatingSnapshot[]
+  prospectInterviews ProspectInterview[]
 }
 
 // Statistiques cumulées d'un joueur sur une saison (libellé du match :
@@ -744,4 +745,22 @@ model PlayerRatingSnapshot {
   @@unique([careerId, playerId, date])
   @@index([careerId, playerId])
   @@index([careerId, date])
+}
+
+// Entretien d'avant-draft d'un GM avec un prospect (voir
+// draft-interview-rules.ts) : réponses révélées, par équipe et par draft.
+// Pas de lien vers Prospect (les prospects non draftés sont supprimés à
+// l'intersaison) : l'identifiant suffit, le joueur drafté le garde.
+model ProspectInterview {
+  id          String   @id @default(cuid())
+  careerId    String
+  career      Career   @relation(fields: [careerId], references: [id], onDelete: Cascade)
+  teamId      String
+  season      String
+  prospectId  String
+  answersJson String
+  createdAt   DateTime @default(now())
+
+  @@unique([careerId, teamId, prospectId])
+  @@index([careerId, teamId, season])
 }
