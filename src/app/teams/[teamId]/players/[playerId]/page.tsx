@@ -13,6 +13,9 @@ import {
 } from "@/lib/careers/player-status-rules";
 import { getPromiseProgress } from "@/lib/data-access/playing-time-promises";
 import { promisePlayingTime } from "@/app/actions/promise";
+import { PlayerConversation } from "@/components/team/PlayerConversation";
+import { getConversationSetup } from "@/lib/data-access/player-conversations";
+import { CONVERSATION_TONES } from "@/lib/careers/player-conversation-rules";
 import {
   PERSONALITY_TRAITS,
   growthMultiplier,
@@ -221,6 +224,11 @@ export default async function PlayerDetailPage({
       ? await getPromiseProgress(membership.careerId, contract.teamId, playerId, promiseState.promisedStatus, promiseState.promiseSince)
       : null;
   const promisable = currentStatus ? promisableStatuses(currentStatus) : [];
+  // Discussion avec le joueur (mes joueurs seulement).
+  const conversation =
+    isMyTeam && contract
+      ? await getConversationSetup(membership.careerId, membership.season, contract.teamId, playerId)
+      : null;
   // Courbe de progression : relevés mensuels + la note d'aujourd'hui.
   const [ratingHistory, careerLines] = await Promise.all([
     getRatingHistory(membership.careerId, playerId),
@@ -450,6 +458,25 @@ export default async function PlayerDetailPage({
           <Stat label={t("player.assistsPerGame")} value={stats.apg} />
         </div>
       </div>
+
+      {conversation && (
+        <PlayerConversation
+          playerId={player.id}
+          playerName={`${player.firstName} ${player.lastName}`}
+          topics={conversation.topics.map((topic) => ({ value: topic, label: t(`talk.topic.${topic}`) }))}
+          tones={CONVERSATION_TONES.map((tone) => ({ value: tone, label: t(`talk.tone.${tone}`) }))}
+          labels={{
+            title: t("talk.title"),
+            subtitle: t("talk.subtitle"),
+            topicLabel: t("talk.topicLabel"),
+            toneLabel: t("talk.toneLabel"),
+            submit: t("talk.submit"),
+            sending: t("talk.sending"),
+            you: t("talk.you"),
+            cooldown: conversation.cooldownDays > 0 ? t("talk.cooldown", { days: conversation.cooldownDays }) : null,
+          }}
+        />
+      )}
 
       <div className="mt-6 card p-4" data-testid="progression">
         <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-muted">{t("progress.title")}</h2>

@@ -33,6 +33,7 @@ import * as board from "./dict/board";
 import * as live from "./dict/live";
 import * as help from "./dict/help";
 import * as futureDraft from "./dict/futureDraft";
+import * as playerTalk from "./dict/playerTalk";
 
 // Chaque module dict/<zone>.ts exporte { fr, en } avec les MÊMES clés (voir
 // common.ts pour le patron : un tableau `keys as const`, puis deux
@@ -76,6 +77,7 @@ const sources = [
   live,
   help,
   futureDraft,
+  playerTalk,
 ];
 
 export const dictionaries = {
@@ -115,6 +117,7 @@ export const dictionaries = {
     ...live.fr,
     ...help.fr,
     ...futureDraft.fr,
+    ...playerTalk.fr,
   },
   en: {
     ...common.en,
@@ -152,6 +155,7 @@ export const dictionaries = {
     ...live.en,
     ...help.en,
     ...futureDraft.en,
+    ...playerTalk.en,
   },
 };
 
