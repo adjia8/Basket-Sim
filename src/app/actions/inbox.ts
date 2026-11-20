@@ -50,6 +50,19 @@ export async function openMessage(formData: FormData): Promise<void> {
   redirect(href.startsWith("/") && !href.startsWith("//") ? href : "/inbox");
 }
 
+// Ouvrir un message dans la boîte (liste à gauche, lecture à droite) : marqué
+// lu AVANT l'affichage, pour que les compteurs (menu, onglets) soient à jour.
+export async function openInboxMessage(formData: FormData): Promise<void> {
+  const { userId } = await verifySession();
+  const messageId = String(formData.get("messageId") ?? "");
+  const back = String(formData.get("back") ?? "/inbox");
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId) });
+  if (membership && messageId) await markInboxMessageRead(membership.careerId, messageId);
+  revalidatePath("/", "layout");
+  const base = back.startsWith("/inbox") ? back : "/inbox";
+  redirect(`${base}${base.includes("?") ? "&" : "?"}m=${encodeURIComponent(messageId)}`);
+}
+
 // Offre d'une autre franchise (message "poach_offer") : accepter ou refuser
 // directement depuis le message.
 export async function respondToPoachFromInbox(formData: FormData): Promise<void> {

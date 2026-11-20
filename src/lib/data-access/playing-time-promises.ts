@@ -99,7 +99,8 @@ export async function evaluatePlayingTimePromises(
           ? `Tu lui avais promis un rôle de ${label} (≈ ${EXPECTED_MINUTES[progress.status]} min), il n'a joué que ${mpg} min par match. Il se sent trahi et demande à partir.`
           : `You promised him a ${label} role (≈ ${EXPECTED_MINUTES[progress.status]} min); he only played ${mpg} min per game. He feels betrayed and wants out.`,
       `/teams/${teamId}/players/${s.playerId}`,
-      { playerId: s.playerId }
+      // Promesse rompue : le joueur veut partir — à traiter.
+      { playerId: s.playerId, priority: kept ? "info" : "urgent" }
     );
   }
 }

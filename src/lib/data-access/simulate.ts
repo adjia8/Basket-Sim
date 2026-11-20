@@ -39,6 +39,7 @@ import {
 } from "@/lib/careers/team-talk-rules";
 import type { HalfState, QuarterEvent } from "@/lib/simulation/engine";
 import { GAMES_PER_SEASON } from "@/lib/careers/finance-rules";
+import { injuryPriority } from "@/lib/careers/inbox-priority-rules";
 import { clampMorale } from "@/lib/careers/morale-rules";
 
 // Niveau d'un effectif pour juger favori / outsider : moyenne des 8 meilleurs.
@@ -279,6 +280,7 @@ async function notifyHumanTeamNews(
     await createInboxMessage(careerId, teamId, season, "injury", title, body, `/teams/${teamId}/players/${player.id}`, {
       gameDate,
       playerId: player.id,
+      priority: injuryPriority(injury.severity, injury.durationGames, player.renown),
     });
   }
 

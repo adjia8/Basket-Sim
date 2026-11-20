@@ -15,7 +15,7 @@ import { maybeAiTradeOffers } from "@/lib/data-access/ai-trades";
 import { getTranslator } from "@/lib/i18n/translate";
 import { endOfGameDay } from "@/lib/data-access/game-clock";
 import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
-import { createInboxMessage, markAllInboxMessagesRead } from "@/lib/data-access/inbox";
+import { countUrgentUnread, createInboxMessage, markUrgentInboxMessagesRead } from "@/lib/data-access/inbox";
 import { freeAgencyOpenMessageText } from "@/lib/careers/inbox-rules";
 import { aiRosterTarget, runAiDraft, runAiFreeAgency } from "@/lib/data-access/ai-offseason";
 import { isFreeAgencyOpen } from "@/lib/data-access/season-windows";
@@ -318,10 +318,6 @@ export async function simulateNextMyGames(): Promise<SimulateNextMyGamesResult> 
   };
 }
 
-// Messages qui arrêtent « Continuer » (une décision ou une info qui compte) —
-// pas le classement ni la presse (déjà imposée par une redirection, voir
-// getCurrentMembership).
-const CONTINUE_STOPPING_MESSAGE_TYPES = ["injury", "trade_request", "free_agent", "poach_offer", "free_agency"];
 
 export type ContinueResult =
   | { kind: "advanced"; simulated: number } // lot de matchs IA joué : rappeler
@@ -350,14 +346,16 @@ export async function continueGame(options: { acknowledgeInbox?: boolean } = {})
   // important sans l'avoir vu : « Continuer » mène d'abord à la boîte de
   // réception ; relancé depuis celle-ci (acknowledgeInbox), il vaut lecture.
   const [unreadImportant, pendingTradeOffers] = await Promise.all([
-    prisma.inboxMessage.count({
-      where: { careerId, teamId, status: "unread", type: { in: CONTINUE_STOPPING_MESSAGE_TYPES } },
-    }),
+    // Messages urgents (voir inbox-priority-rules.ts) : joueur qui veut
+    // partir ou te parler, offre, blessure grave d'un joueur important…
+    countUrgentUnread(careerId, teamId),
     prisma.tradeOffer.count({ where: { careerId, toTeamId: teamId, status: "pending" } }),
   ]);
   if (unreadImportant + pendingTradeOffers > 0) {
     if (!options.acknowledgeInbox) return { kind: "inbox", count: unreadImportant + pendingTradeOffers };
-    await markAllInboxMessagesRead(careerId, teamId);
+    // Relancé depuis la boîte (où les urgents sont épinglés en tête) : vaut
+    // lecture des seuls messages urgents, pas des autres.
+    await markUrgentInboxMessagesRead(careerId, teamId);
   }
   // Intersaison : l'IA drafte jusqu'à mon tour (ou la fin de la draft)...
   const pendingDraftPicks = await prisma.draftPick.count({

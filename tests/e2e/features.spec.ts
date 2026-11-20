@@ -82,6 +82,37 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       await expect(page.getByTestId("scouting-report")).toBeVisible();
     });
 
+    await test.step("boîte de réception façon FM : urgents, catégories, infos regroupées", async () => {
+      const season = (await prisma.career.findUniqueOrThrow({ where: { id: careerId } })).season;
+      const teamId = membership.teamId;
+      const day = new Date("2026-10-20T00:00:00Z");
+      const contract = await prisma.contract.findFirstOrThrow({ where: { careerId, teamId } });
+      await prisma.playerState.updateMany({ where: { careerId, playerId: contract.playerId }, data: { pendingRequest: "minutes" } });
+      await prisma.inboxMessage.createMany({
+        data: [
+          { careerId, teamId, season, type: "player_request", priority: "urgent", title: "Un joueur veut te parler", body: "Minutes.", gameDate: day, playerId: contract.playerId },
+          { careerId, teamId, season, type: "injury", priority: "important", title: "Blessure test", body: "Entorse.", gameDate: day },
+          ...[1, 2, 3].map((i) => ({ careerId, teamId, season, type: "standings", priority: "info", title: `Classement ${i}`, body: "…", gameDate: day })),
+        ],
+      });
+      await expectPageOk(page, "/inbox");
+      await expect(page.getByTestId("inbox-urgent")).toBeVisible();
+      await expect(page.getByText("3 infos")).toBeVisible();
+      // L'urgent est en tête de liste.
+      await expect(page.getByTestId("inbox-row").first()).toContainText("Un joueur veut te parler");
+      await page.getByTestId("inbox-row").first().click();
+      await expect(page.getByTestId("inbox-message")).toContainText("Action requise");
+      // Lu à l'ouverture : plus de bandeau urgent.
+      await page.goto("/inbox");
+      await expect(page.getByTestId("inbox-urgent")).toHaveCount(0);
+      await page.getByTestId("inbox-tabs").getByRole("link", { name: /Médical/ }).click();
+      await expect(page.getByTestId("inbox-row")).toHaveCount(1);
+      await expect(page.getByTestId("inbox-row")).toContainText("Blessure test");
+      await page.getByTestId("inbox-tabs").getByRole("link", { name: /Ligue/ }).click();
+      await expect(page.getByTestId("inbox-league")).toBeVisible();
+      await prisma.playerState.updateMany({ where: { careerId, playerId: contract.playerId }, data: { pendingRequest: null } });
+    });
+
     await test.step("négociation de prolongation jusqu'à la signature", async () => {
       // Un joueur sans exigence de star (renommée < 70), en dernière année.
       const contracts = await prisma.contract.findMany({

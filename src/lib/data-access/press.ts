@@ -590,6 +590,9 @@ async function resolveConference(
     await createInboxMessage(careerId, teamId, season, "player_reaction", msg.title, msg.body, `/teams/${teamId}/players/${r.playerId}`, {
       gameDate,
       playerId: r.playerId,
+      // Une réaction hostile (réponse publique, demande d'entretien, leader
+      // qui défend le groupe) mérite d'être vue ; un merci, beaucoup moins.
+      priority: r.kind === "public_reply" || r.kind === "wants_meeting" || r.kind === "leader_defends_group" ? "important" : "info",
     });
   }
   if (fine > 0) {

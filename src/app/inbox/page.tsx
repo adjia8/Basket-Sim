@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { getCurrentMembership } from "@/lib/auth/dal";
-import { getInboxMessages } from "@/lib/data-access/inbox";
-import { markMessageRead, markAllMessagesRead, openMessage, respondToPoachFromInbox } from "@/app/actions/inbox";
+import { getInbox, getInboxMessage, markInboxMessageRead } from "@/lib/data-access/inbox";
+import { INBOX_CATEGORIES, withDigests, type InboxCategory, type InboxPriority } from "@/lib/careers/inbox-priority-rules";
+import type { DictionaryKey } from "@/lib/i18n/dictionary";
+import { markMessageRead, markAllMessagesRead, openInboxMessage, openMessage, respondToPoachFromInbox } from "@/app/actions/inbox";
 import { prisma } from "@/lib/prisma";
 import { getTranslator, type Translator } from "@/lib/i18n/translate";
 import { formatGameDate, playerHref } from "@/lib/utils";
@@ -89,81 +91,247 @@ function actionsFor(message: InboxMessageView, teamId: string, t: Translator): M
   }
 }
 
-export default async function InboxPage() {
+const PRIORITY_DOT: Record<InboxPriority, string> = {
+  urgent: "bg-bad",
+  important: "bg-warn",
+  info: "bg-faint",
+};
+
+type InboxSearch = { cat?: string; season?: string; m?: string };
+
+function inboxHref(params: InboxSearch): string {
+  const q = new URLSearchParams();
+  if (params.cat) q.set("cat", params.cat);
+  if (params.season) q.set("season", params.season);
+  if (params.m) q.set("m", params.m);
+  const qs = q.toString();
+  return qs ? `/inbox?${qs}` : "/inbox";
+}
+
+export default async function InboxPage({ searchParams }: { searchParams: Promise<InboxSearch> }) {
   const membership = await getCurrentMembership();
   const { t, locale } = await getTranslator();
+  const params = await searchParams;
+  const category = INBOX_CATEGORIES.includes(params.cat as InboxCategory) ? (params.cat as InboxCategory) : null;
+  const season = params.season && /^\d{4}-\d{4}$/.test(params.season) ? params.season : membership.season;
 
-  const [{ unread, read }, pendingTradeOffers, gmProfile] = await Promise.all([
-    getInboxMessages(membership.careerId, membership.teamId),
+  // Ouvrir un message (?m=…) le marque comme lu, comme dans Football Manager.
+  const opened = params.m ? await getInboxMessage(membership.careerId, membership.teamId, params.m) : null;
+  if (opened?.unread) await markInboxMessageRead(membership.careerId, opened.id);
+
+  const [inbox, pendingTradeOffers, gmProfile, pendingPress] = await Promise.all([
+    getInbox(membership.careerId, membership.teamId, { season, category }),
     prisma.tradeOffer.count({
       where: { careerId: membership.careerId, toTeamId: membership.teamId, status: "pending" },
     }),
     prisma.gmProfile.findUnique({ where: { membershipId: membership.id }, select: { pendingOfferTeamId: true } }),
+    prisma.pressConference.count({ where: { careerId: membership.careerId, teamId: membership.teamId, status: "pending" } }),
   ]);
   const hasPendingPoachOffer = Boolean(gmProfile?.pendingOfferTeamId);
 
-  const card = (message: InboxMessageView, isUnread: boolean) => (
-    <MessageCard
-      key={message.id}
-      message={message}
-      isUnread={isUnread}
-      locale={locale}
-      t={t}
-      actions={actionsFor(message, membership.teamId, t)}
-      poachDecision={message.type === "poach_offer" && hasPendingPoachOffer}
-    />
-  );
+  // « Action requise » : le message attend encore une décision (joueur qui
+  // veut te parler ou partir, offre d'échange, conférence, offre de poste).
+  const playerIds = inbox.messages
+    .filter((m) => (m.type === "player_request" || m.type === "trade_request") && m.playerId)
+    .map((m) => m.playerId!);
+  const states = playerIds.length
+    ? await prisma.playerState.findMany({
+        where: { careerId: membership.careerId, playerId: { in: playerIds } },
+        select: { playerId: true, pendingRequest: true, wantsTrade: true },
+      })
+    : [];
+  const stateById = new Map(states.map((s) => [s.playerId, s]));
+  const newest = new Map<string, string>();
+  for (const m of [...inbox.messages].sort((a, b) => b.date.localeCompare(a.date))) {
+    const key = `${m.type}:${m.playerId ?? ""}`;
+    if (!newest.has(key)) newest.set(key, m.id);
+  }
+  const actionRequired = (m: InboxMessageView): boolean => {
+    if (newest.get(`${m.type}:${m.playerId ?? ""}`) !== m.id) return false;
+    switch (m.type) {
+      case "player_request":
+        return !!m.playerId && !!stateById.get(m.playerId)?.pendingRequest;
+      case "trade_request":
+        return !!m.playerId && !!stateById.get(m.playerId)?.wantsTrade;
+      case "press":
+        return pendingPress > 0;
+      case "trade_offer":
+        return pendingTradeOffers > 0;
+      case "poach_offer":
+        return hasPendingPoachOffer;
+      default:
+        return false;
+    }
+  };
+
+  const selected = opened ? { ...opened, unread: false } : null;
+  const totalUnread = Object.values(inbox.unreadByCategory).reduce((s, n) => s + (n ?? 0), 0);
+  const base = { cat: category ?? undefined, season: season === membership.season ? undefined : season };
+  const rows = withDigests(inbox.messages);
+
+  const row = (m: InboxMessageView) => {
+    const active = selected?.id === m.id;
+    return (
+      <form key={m.id} action={openInboxMessage}>
+        <input type="hidden" name="messageId" value={m.id} />
+        <input type="hidden" name="back" value={inboxHref(base)} />
+        <button
+          type="submit"
+          data-testid="inbox-row"
+          className={`flex w-full items-start gap-3 px-3 py-2.5 text-left transition hover:bg-surface-2 ${active ? "bg-surface-2" : ""}`}
+        >
+        <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${PRIORITY_DOT[m.priority]}`} title={t(`inbox.priority.${m.priority}` as DictionaryKey)} />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2 text-[11px] text-faint">
+            <span className="uppercase tracking-wide">{typeLabel(m.type, t)}</span>
+            <span>{m.gameDate ? formatGameDate(m.gameDate, locale) : t("inbox.offseason")}</span>
+            {actionRequired(m) && <span className="rounded bg-accent/15 px-1.5 font-semibold text-accent-text">{t("inbox.actionRequired")}</span>}
+          </span>
+          <span className={`block truncate text-sm ${m.unread ? "font-semibold" : "text-soft"}`}>{m.title}</span>
+        </span>
+        </button>
+      </form>
+    );
+  };
+
+  const tabs: { key: InboxCategory | null; label: string }[] = [
+    { key: null, label: t("inbox.category.all") },
+    ...INBOX_CATEGORIES.map((c) => ({ key: c, label: t(`inbox.category.${c}` as DictionaryKey) })),
+  ];
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">{t("inbox.title")}</h1>
-        {unread.length > 0 && (
-          <form action={markAllMessagesRead}>
-            <button
-              type="submit"
-              className="rounded-md bg-surface-2 px-3 py-1.5 text-sm transition hover:bg-surface-3"
-            >
-              {t("inbox.markAllRead")}
-            </button>
-          </form>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {inbox.seasons.length > 1 && (
+            <nav className="flex gap-1 text-xs" aria-label={t("inbox.season")}>
+              {inbox.seasons.map((s) => (
+                <Link
+                  key={s}
+                  href={inboxHref({ cat: base.cat, season: s === membership.season ? undefined : s })}
+                  className={`rounded px-2 py-1 ${s === inbox.season ? "bg-surface-3 font-semibold" : "text-muted hover:bg-surface-2"}`}
+                >
+                  {s}
+                </Link>
+              ))}
+            </nav>
+          )}
+          {totalUnread > 0 && (
+            <form action={markAllMessagesRead}>
+              <button type="submit" className="rounded-md bg-surface-2 px-3 py-1.5 text-sm transition hover:bg-surface-3">
+                {t("inbox.markAllRead")}
+              </button>
+            </form>
+          )}
+        </div>
       </div>
 
-      {pendingTradeOffers > 0 && (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3">
-          <p className="text-sm font-medium">{t("inbox.pendingTradeOffers", { count: pendingTradeOffers })}</p>
-          <Link
-            href="/trades"
-            className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-fg hover:bg-accent-hover"
-          >
-            {t("inbox.action.viewTrades")}
-          </Link>
+      {(inbox.urgentUnread > 0 || pendingTradeOffers > 0) && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-bad/40 bg-bad/10 px-4 py-3" data-testid="inbox-urgent">
+          <p className="text-sm font-medium">
+            {inbox.urgentUnread > 0 && t("inbox.urgentBanner", { count: inbox.urgentUnread })}
+            {inbox.urgentUnread > 0 && pendingTradeOffers > 0 && " · "}
+            {pendingTradeOffers > 0 && t("inbox.pendingTradeOffers", { count: pendingTradeOffers })}
+          </p>
+          {pendingTradeOffers > 0 && (
+            <Link href="/trades" className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-fg hover:bg-accent-hover">
+              {t("inbox.action.viewTrades")}
+            </Link>
+          )}
         </div>
       )}
 
-      <section className="mt-6">
-        <h2 className="eyebrow mb-3">
-          {t("inbox.unreadHeading")} · {unread.length}
-        </h2>
-        {unread.length === 0 ? (
-          <p className="text-sm text-muted">{t("inbox.noUnread")}</p>
-        ) : (
-          <div className="space-y-3">{unread.map((m) => card(m, true))}</div>
-        )}
-      </section>
+      <nav className="mt-5 flex gap-1 overflow-x-auto border-b border-line-soft pb-px text-sm" data-testid="inbox-tabs">
+        {tabs.map((tab) => {
+          const count = tab.key ? inbox.unreadByCategory[tab.key] ?? 0 : totalUnread;
+          const active = tab.key === category;
+          return (
+            <Link
+              key={tab.key ?? "all"}
+              href={inboxHref({ cat: tab.key ?? undefined, season: base.season })}
+              className={`shrink-0 border-b-2 px-3 py-2 ${active ? "border-accent font-semibold" : "border-transparent text-muted hover:text-fg"}`}
+            >
+              {tab.label}
+              {count > 0 && <span className="ml-1.5 rounded-full bg-accent px-1.5 text-[10px] font-bold text-accent-fg">{count}</span>}
+            </Link>
+          );
+        })}
+      </nav>
 
-      <section className="mt-8">
-        <h2 className="eyebrow mb-3">{t("inbox.readHeading")}</h2>
-        {read.length === 0 ? (
-          <p className="text-sm text-muted">{t("inbox.noRead")}</p>
-        ) : (
-          <div className="space-y-2">{read.map((m) => card(m, false))}</div>
-        )}
-      </section>
+      {category === "league" ? (
+        <section className="mt-4 space-y-3" data-testid="inbox-league">
+          {inbox.leagueNews.length === 0 ? (
+            <p className="text-sm text-muted">{t("inbox.leagueEmpty")}</p>
+          ) : (
+            inbox.leagueNews.map((n) => (
+              <div key={n.id} className="card p-4">
+                <p className="text-[11px] text-faint">{formatGameDate(n.date, locale)}</p>
+                <p className="mt-1 font-semibold">{n.title}</p>
+                <p className="mt-1 whitespace-pre-line text-sm text-soft">{n.body}</p>
+              </div>
+            ))
+          )}
+        </section>
+      ) : (
+        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          <section className={`card overflow-hidden ${selected ? "hidden lg:block" : ""}`} data-testid="inbox-list">
+            {rows.length === 0 ? (
+              <p className="p-4 text-sm text-muted">{t("inbox.empty")}</p>
+            ) : (
+              <div className="divide-y divide-line-soft">
+                {rows.map((r) =>
+                  r.kind === "message" ? (
+                    row(r.message)
+                  ) : (
+                    <details key={`digest-${r.day}`} className="group" open={r.messages.some((m) => m.id === selected?.id)}>
+                      <summary className="flex cursor-pointer list-none items-center gap-3 px-3 py-2.5 text-sm text-muted hover:bg-surface-2">
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${PRIORITY_DOT.info}`} />
+                        <span className="flex-1">
+                          {t("inbox.digest", { count: r.messages.length })} · {formatGameDate(r.messages[0].date, locale)}
+                          {r.messages.some((m) => m.unread) && <span className="ml-2 text-accent-text">●</span>}
+                        </span>
+                        <span className="transition group-open:rotate-90">›</span>
+                      </summary>
+                      <div className="divide-y divide-line-soft bg-surface-1/40 pl-3">{r.messages.map(row)}</div>
+                    </details>
+                  )
+                )}
+              </div>
+            )}
+          </section>
+
+          <section className={selected ? "" : "hidden lg:block"}>
+            {selected ? (
+              <div className="space-y-3">
+                <Link href={inboxHref(base)} scroll={false} className="text-sm text-muted hover:text-fg lg:hidden">
+                  ← {t("inbox.back")}
+                </Link>
+                <MessageCard
+                  message={selected}
+                  isUnread={false}
+                  locale={locale}
+                  t={t}
+                  actions={actionsFor(selected, membership.teamId, t)}
+                  poachDecision={selected.type === "poach_offer" && hasPendingPoachOffer}
+                  actionRequired={actionRequired(selected)}
+                />
+              </div>
+            ) : (
+              <div className="card flex h-40 items-center justify-center p-4 text-sm text-muted">{t("inbox.selectMessage")}</div>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }
+
+function typeLabel(type: string, t: Translator): string {
+  return KNOWN_TYPES.includes(type) ? t(`inbox.type.${type}` as DictionaryKey) : type;
+}
+
+const KNOWN_TYPES = ["press", "injury", "trade_request", "free_agent", "free_agency", "standings", "poach_offer", "press_review", "player_reaction", "fine", "staff", "trade_offer", "award", "contract", "cup", "board", "player_request"];
 
 function MessageCard({
   message,
@@ -172,6 +340,7 @@ function MessageCard({
   t,
   actions,
   poachDecision,
+  actionRequired,
 }: {
   message: InboxMessageView;
   isUnread: boolean;
@@ -179,19 +348,20 @@ function MessageCard({
   t: Translator;
   actions: MessageAction[];
   poachDecision: boolean;
+  actionRequired: boolean;
 }) {
-  const typeLabel = ["press", "injury", "trade_request", "free_agent", "free_agency", "standings", "poach_offer", "press_review", "player_reaction", "fine", "staff", "trade_offer", "award", "contract", "cup", "board", "player_request"].includes(message.type)
-    ? t(`inbox.type.${message.type}` as "inbox.type.press")
-    : message.type;
   return (
-    <div
-      className={`card relative overflow-hidden p-4 ${isUnread ? "" : "opacity-75"}`}
-    >
+    <div className="card relative overflow-hidden p-4" data-testid="inbox-message">
       {isUnread && <span className="absolute inset-y-0 left-0 w-1 bg-accent" aria-hidden />}
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className={`rounded px-2 py-0.5 font-semibold uppercase tracking-wide ${TYPE_TONE[message.type] ?? "bg-surface-3 text-soft"}`}>
-          {typeLabel}
+          {typeLabel(message.type, t)}
         </span>
+        <span className="flex items-center gap-1 text-faint">
+          <span className={`h-2 w-2 rounded-full ${PRIORITY_DOT[message.priority]}`} />
+          {t(`inbox.priority.${message.priority}` as DictionaryKey)}
+        </span>
+        {actionRequired && <span className="rounded bg-accent/15 px-1.5 py-0.5 font-semibold text-accent-text">{t("inbox.actionRequired")}</span>}
         <span className="text-faint">
           {message.gameDate ? formatGameDate(message.gameDate, locale) : t("inbox.offseason")}
         </span>

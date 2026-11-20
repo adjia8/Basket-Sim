@@ -165,9 +165,11 @@ model InboxMessage {
   gameDate  DateTime? // date du jeu à laquelle le message est arrivé (null : intersaison / messages antérieurs)
   playerId  String? // joueur concerné (blessure, demande de transfert, agent libre) — pas de relation, simple repère
   status    String    @default("unread") // "unread" | "read"
+  priority  String    @default("info") // "urgent" | "important" | "info" — voir inbox-priority-rules.ts
   createdAt DateTime  @default(now())
 
   @@index([careerId, teamId, status])
+  @@index([careerId, teamId, season])
 }
 
 // Une conférence = 3-4 questions générées ensemble, répondues en un seul
