@@ -1,0 +1,124 @@
+import { test, expect, type Page } from "@playwright/test";
+import { PrismaClient } from "@prisma/client";
+import { onboardNbaTeam } from "./helpers";
+
+// Parcours des fonctionnalités de gestion (une carrière NBA, sans simuler
+// de saison) : chaque page clé s'affiche sans erreur avec ses éléments
+// propres, une négociation de contrat va jusqu'à la signature, et un compte
+// peut gérer plusieurs carrières. Les règles elles-mêmes sont couvertes par
+// les tests unitaires (tests/unit, `npm run test:unit`).
+
+async function expectPageOk(page: Page, path: string) {
+  await page.goto(path);
+  await expect(page.getByText("This page couldn’t load")).toHaveCount(0);
+  await expect(page.locator("nextjs-portal")).toHaveCount(0);
+}
+
+test("pages de gestion, négociation et carrières multiples", async ({ page }) => {
+  test.setTimeout(600_000);
+  const prisma = new PrismaClient();
+  try {
+    const email = await test.step("créer une carrière NBA (Lakers)", () => onboardNbaTeam(page, /Lakers/, { tag: "features" }));
+    const membership = await prisma.membership.findFirstOrThrow({ where: { user: { email } } });
+    const careerId = membership.careerId;
+
+    await test.step("pages principales", async () => {
+      await expectPageOk(page, "/teams/lal");
+      await expect(page.getByTestId("locker-room")).toBeVisible();
+      // Aide en jeu : l'info-bulle de la cohésion s'affiche au survol.
+      const tip = page.getByRole("button", { name: /Cohésion de l'équipe/ });
+      await tip.hover();
+      await expect(page.getByRole("tooltip").filter({ hasText: "Cohésion de l'équipe" })).toBeVisible();
+
+      // Calendrier d'entraînement : activation puis 14 jours affichés.
+      await expectPageOk(page, "/teams/lal?tab=training");
+      const cal = page.getByTestId("training-calendar");
+      await cal.locator('button[value="save"]').click();
+      await expect(cal.getByText("Calendrier enregistré.")).toBeVisible({ timeout: 30_000 });
+      await expect(cal.locator("li")).toHaveCount(14);
+
+      await expectPageOk(page, "/teams/lal/players/luka-doncic");
+      await expect(page.getByTestId("personality")).toBeVisible();
+      await expect(page.getByTestId("progression")).toBeVisible();
+      // Plan de charge : repos sur les back-to-backs, plan actif affiché.
+      const plan = page.getByTestId("load-plan");
+      await plan.locator('input[name="restOnBackToBacks"]').check();
+      await plan.locator('button[type="submit"]').click();
+      await expect(page.getByTestId("load-plan").getByText("Plan actif")).toBeVisible({ timeout: 30_000 });
+
+      // Discussion avec un joueur : le féliciter, sa réponse s'affiche.
+      const talk = page.getByTestId("player-conversation");
+      await talk.locator('select[name="topic"]').selectOption("praise");
+      await talk.locator('button[type="submit"]').click();
+      await expect(talk.getByText("Toi")).toBeVisible({ timeout: 30_000 });
+
+      await expectPageOk(page, "/cup");
+      await expect(page.getByText("Phase de groupes")).toBeVisible();
+      await expect(page.getByText("Ouest C")).toBeVisible();
+
+      await expectPageOk(page, "/schedule");
+      expect(await page.getByText("🏆").count()).toBeGreaterThanOrEqual(4); // 4 matchs de groupe de NBA Cup
+
+      await expectPageOk(page, "/draft/future");
+      await expect(page.getByTestId("future-class").first()).toBeVisible();
+      await expect(page.getByText("Joaquim Boumtje Boumtje")).toBeVisible();
+
+      await expectPageOk(page, "/franchise");
+      await expect(page.getByTestId("finances")).toBeVisible();
+
+      await expectPageOk(page, "/gm");
+      await expect(page.getByTestId("board-objectives")).toBeVisible();
+
+      for (const path of ["/", "/awards", "/news", "/stats", "/staff", "/free-agents", "/standings", "/inbox"]) {
+        await expectPageOk(page, path);
+      }
+
+      await page.goto("/schedule");
+      await page.locator('a[href^="/game/"]').first().click();
+      await page.waitForURL(/\/game\//);
+      await expect(page.getByTestId("scouting-report")).toBeVisible();
+    });
+
+    await test.step("négociation de prolongation jusqu'à la signature", async () => {
+      // Un joueur sans exigence de star (renommée < 70), en dernière année.
+      const contracts = await prisma.contract.findMany({
+        where: { careerId, teamId: "lal", contractType: "standard", isRookieScale: false },
+      });
+      const states = await prisma.playerState.findMany({ where: { careerId, playerId: { in: contracts.map((c) => c.playerId) } } });
+      const target = contracts.find((c) => (states.find((s) => s.playerId === c.playerId)?.renown ?? 99) < 70)!;
+      await prisma.contract.update({ where: { id: target.id }, data: { yearsRemaining: 1 } });
+
+      await page.goto(`/teams/lal/players/${target.playerId}`);
+      const panel = page.getByTestId("negotiation");
+      await expect(panel).toBeVisible();
+      await panel.locator('input[name="salary"]').fill("1400000");
+      await panel.locator('button:has-text("Faire l\'offre")').click();
+      const accept = panel.locator('form:has(input[name="mode"][value="acceptCounter"]) button');
+      await expect(accept).toBeVisible({ timeout: 30_000 });
+      const negotiation = await prisma.contractNegotiation.findFirstOrThrow({ where: { careerId, playerId: target.playerId } });
+      await accept.click();
+      await expect
+        .poll(async () => (await prisma.contract.findUniqueOrThrow({ where: { id: target.id } })).salary, { timeout: 30_000 })
+        .toBe(negotiation.counterSalary);
+    });
+
+    await test.step("plusieurs carrières sur un même compte", async () => {
+      await onboardNbaTeam(page, /Celtics/, { email });
+      await page.goto("/careers");
+      await expect(page.getByTestId("career-row")).toHaveCount(2);
+      // La nouvelle carrière est active ; on reprend les Lakers.
+      await page.getByTestId("career-row").filter({ hasText: "Lakers" }).locator('button:has-text("Reprendre")').click();
+      await page.waitForURL("/");
+      await expect(page.getByText("Los Angeles Lakers").first()).toBeVisible();
+      // Puis on supprime les Celtics.
+      await page.goto("/careers");
+      const celtics = page.getByTestId("career-row").filter({ hasText: "Celtics" });
+      await celtics.locator('button:has-text("Supprimer la carrière")').click();
+      await celtics.locator('button:has-text("Confirmer la suppression")').click();
+      await expect(page.getByTestId("career-row")).toHaveCount(1, { timeout: 60_000 });
+      expect(await prisma.membership.count({ where: { user: { email } } })).toBe(1);
+    });
+  } finally {
+    await prisma.$disconnect();
+  }
+});

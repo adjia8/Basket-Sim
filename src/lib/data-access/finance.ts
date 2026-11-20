@@ -1,4 +1,5 @@
 import "server-only";
+import { starPower } from "@/lib/careers/attendance-rules";
 import { prisma } from "@/lib/prisma";
 import { getPayrollForTeam } from "@/lib/data-access/contracts";
 import { NBA_TAX_LINE } from "@/lib/careers/cap-rules";
@@ -92,6 +93,10 @@ export async function computeGameFinances(p: {
     financeLedgerJson: string | null;
   };
   roster: Player[];
+  // Joueurs réellement disponibles ce soir (ni blessés, ni au repos), des
+  // deux côtés : les stars présentes ou absentes pèsent sur le remplissage.
+  available: Player[];
+  opponentAvailable: Player[];
 }): Promise<{ finances: number; financeLedgerJson: string } | null> {
   if (p.gameSeason.endsWith("-preseason")) return null;
   const season = baseSeason(p.gameSeason);
@@ -130,7 +135,16 @@ export async function computeGameFinances(p: {
       ticketLevel: p.state.ticketPriceLevel,
       concessionLevel: p.state.concessionPriceLevel,
       arenaLevel: p.state.arenaLevel,
-      starRenown: Math.max(0, ...p.roster.map((r) => r.renown)),
+      starRenown: Math.max(0, ...p.available.map((r) => r.renown)),
+      stars: (() => {
+        const full = starPower(p.roster.map((r) => r.renown));
+        const homeAvailable = starPower(p.available.map((r) => r.renown));
+        return {
+          homeAvailable,
+          homeMissing: Math.max(0, full - homeAvailable),
+          awayAvailable: starPower(p.opponentAvailable.map((r) => r.renown)),
+        };
+      })(),
       playoff: p.gameSeason.endsWith("-playoffs"),
     });
     cur.homeGames += 1;

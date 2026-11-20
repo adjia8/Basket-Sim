@@ -24,7 +24,7 @@ import { PlayerStatePatches } from "@/lib/data-access/player-state-patches";
 import { recordGameStats } from "@/lib/data-access/season-stats";
 import { leagueNewsForGame } from "@/lib/data-access/league-news";
 import { chemistryTarget, nextChemistry } from "@/lib/careers/chemistry-rules";
-import { attendanceTarget, nextAttendance } from "@/lib/careers/attendance-rules";
+import { attendanceTarget, nextAttendance, starPower } from "@/lib/careers/attendance-rules";
 import { advanceRosterMorale } from "@/lib/data-access/morale";
 import { ensureCareerStaff, getStaffProfiles } from "@/lib/data-access/staff";
 import { NEUTRAL_STAFF_PROFILE, staffEffects } from "@/lib/careers/staff-rules";
@@ -659,6 +659,17 @@ export async function simulateAndResolveGame(
     }
     return { wins, losses };
   };
+  // Forme récente (10 derniers matchs, celui-ci compris) pour l'affluence.
+  const recentWinPctOf = (teamId: string): number => {
+    const games = [
+      ...priorGames,
+      { homeTeamId: game.homeTeamId, awayTeamId: game.awayTeamId, homeScore: result.homeScore, awayScore: result.awayScore },
+    ].filter((g) => g.homeScore !== null && g.awayScore !== null && (g.homeTeamId === teamId || g.awayTeamId === teamId));
+    const last = games.slice(-10);
+    if (last.length === 0) return 0.5;
+    const wins = last.filter((g) => (g.homeTeamId === teamId ? g.homeScore! > g.awayScore! : g.awayScore! > g.homeScore!)).length;
+    return wins / last.length;
+  };
   const homeRecord = recordOf(game.homeTeamId);
   const awayRecord = recordOf(game.awayTeamId);
   const homeWinPct = winPctForStandings(homeRecord.wins, homeRecord.losses);
@@ -670,8 +681,13 @@ export async function simulateAndResolveGame(
     chemistryBonus: number,
     marketAppeal: number,
     teamId: string,
-    home: boolean
+    home: boolean,
+    opponentRoster: Player[]
   ) => {
+    // Présents ce soir : ni au repos, ni blessés (sauf blessure mineure jouée).
+    const availableOf = (r: Player[]) =>
+      r.filter((x) => !restingIds.has(x.id) && !(x.injured && !(x.playingThroughInjury && x.injurySeverity === "minor")));
+    const available = availableOf(roster);
     // Finances du match (voir finance.ts) : recettes et dépenses à l'échelle réelle.
     const money = await computeGameFinances({
       careerId,
@@ -683,6 +699,8 @@ export async function simulateAndResolveGame(
       winPct,
       state,
       roster,
+      available,
+      opponentAvailable: availableOf(opponentRoster),
     });
     const iq = roster.length ? roster.reduce((sum, p) => sum + p.ratings.basketballIQ, 0) / roster.length : 50;
     // Vestiaire (voir personality-rules.ts) : leaders et têtes brûlées
@@ -695,7 +713,10 @@ export async function simulateAndResolveGame(
           0,
           Math.min(99, nextChemistry(state.chemistry, chemistryTarget(winPct, iq) + room.chemistryBonus) + chemistryBonus)
         ),
-        attendance: nextAttendance(state.attendance, attendanceTarget(winPct, marketAppeal, state.facilitiesLevel)),
+        attendance: nextAttendance(
+          state.attendance,
+          attendanceTarget(winPct, marketAppeal, state.facilitiesLevel, starPower(roster.map((p) => p.renown)), recentWinPctOf(teamId))
+        ),
         ...(money ?? {}),
       },
     });
@@ -785,8 +806,8 @@ export async function simulateAndResolveGame(
           })),
         })
       : Promise.resolve(),
-    teamStateUpdate(homeTeamState, homeWinPct, homeRoster, chemistryTrainingBonus(homeFocus, homeIntensity), homeTeam.marketAppeal, game.homeTeamId, true),
-    teamStateUpdate(awayTeamState, awayWinPct, awayRoster, chemistryTrainingBonus(awayFocus, awayIntensity), awayTeam.marketAppeal, game.awayTeamId, false),
+    teamStateUpdate(homeTeamState, homeWinPct, homeRoster, chemistryTrainingBonus(homeFocus, homeIntensity), homeTeam.marketAppeal, game.homeTeamId, true, awayRoster),
+    teamStateUpdate(awayTeamState, awayWinPct, awayRoster, chemistryTrainingBonus(awayFocus, awayIntensity), awayTeam.marketAppeal, game.awayTeamId, false, homeRoster),
   ]);
 
   // Match entre deux équipes IA : rien d'autre à faire (presse, demandes de

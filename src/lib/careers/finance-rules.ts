@@ -8,6 +8,8 @@
 // Les recettes et dépenses tombent match par match (voir finance.ts), la
 // taxe de luxe et la part des propriétaires en fin de saison.
 
+import { nightStarFactor } from "./attendance-rules";
+
 export const GAMES_PER_SEASON: Record<string, number> = { nba: 82, wnba: 44 };
 
 interface LeagueEconomy {
@@ -107,12 +109,15 @@ export function homeGameRevenue(p: {
   ticketLevel: number;
   concessionLevel: number;
   arenaLevel: number; // confort de la salle 0-99
-  starRenown: number; // renommée de la plus grande star de l'équipe
+  starRenown: number; // renommée de la plus grande star présente ce soir
+  // Pouvoir d'attraction des stars ce soir (voir starPower, attendance-rules.ts).
+  stars?: { homeAvailable: number; homeMissing: number; awayAvailable: number };
   playoff?: boolean;
 }): HomeGameRevenue {
   const e = eco(p.leagueId);
   const arena = (p.arenaLevel - 50) / 100; // -0,5 à +0,5
-  const fillRate = Math.max(0.3, Math.min(1, (p.attendance / 100) * priceDemand(p.ticketLevel) * (1 + arena * 0.2)));
+  const night = p.stars ? nightStarFactor(p.stars.homeAvailable, p.stars.homeMissing, p.stars.awayAvailable) : 1;
+  const fillRate = Math.max(0.3, Math.min(1, (p.attendance / 100) * priceDemand(p.ticketLevel) * (1 + arena * 0.2) * night));
   const attendees = Math.round(e.capacity * fillRate);
   const price = lerp(e.ticketPrice, market01(p.marketAppeal)) * (p.ticketLevel / 100) * (p.playoff ? 1.6 : 1);
   const tickets = attendees * price;
