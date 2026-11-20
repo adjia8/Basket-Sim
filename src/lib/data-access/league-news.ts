@@ -4,10 +4,10 @@ import { translatorFor } from "@/lib/i18n/translate";
 import type { Locale } from "@/lib/i18n/locale";
 import type { BoxScoreEntry, Player, Team } from "@/lib/types";
 import { performanceNews, starInjuryNews, streakNews, tradeNews } from "@/lib/careers/news-rules";
+import { isNotableInjury } from "@/lib/careers/injury-report-rules";
 
 // Seuils d'actualité : on ne garde que le vraiment marquant.
 const BIG_GAME_POINTS: Record<string, number> = { nba: 45, wnba: 35 };
-const STAR_OVERALL = 82;
 const STREAK_MILESTONE = 10; // puis tous les 5 matchs (10, 15, 20…)
 
 export interface NewsRow {
@@ -55,7 +55,12 @@ export function leagueNewsForGame(params: {
   const t = translatorFor(locale);
   for (const injury of params.injuries) {
     const player = byId.get(injury.playerId);
-    if (!player || injury.severity !== "severe" || player.overallRating < STAR_OVERALL) continue;
+    // Star absente longtemps (voir isNotableInjury) : l'info intéresse toute la ligue.
+    if (
+      !player ||
+      !isNotableInjury({ overall: player.overallRating, renown: player.renown, severity: injury.severity, gamesOut: injury.durationGames })
+    )
+      continue;
     const text = starInjuryNews(
       locale,
       name(injury.playerId),

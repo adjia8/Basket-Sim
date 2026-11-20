@@ -13,6 +13,7 @@ import type { InboxMessageView } from "@/lib/data-access/inbox";
 // Couleur de la pastille de type (repère visuel façon Football Manager).
 const TYPE_TONE: Record<string, string> = {
   injury: "bg-bad/15 text-bad",
+  league_injury: "bg-bad/10 text-bad",
   trade_request: "bg-warn/15 text-warn",
   poach_offer: "bg-accent/15 text-accent-text",
   free_agent: "bg-info/15 text-info",
@@ -43,6 +44,11 @@ function actionsFor(message: InboxMessageView, teamId: string, t: Translator): M
           ? [{ label: t("inbox.action.viewPlayer"), href: playerHref(message.playerId, teamId), primary: true }]
           : []),
         { label: t("inbox.action.manageRotation"), href: `/teams/${teamId}?tab=rotation` },
+      ];
+    case "league_injury":
+      return [
+        { label: t("inbox.action.injuryReport"), href: "/injuries", primary: true },
+        ...(message.playerId ? [{ label: t("inbox.action.viewPlayer"), href: playerHref(message.playerId) }] : []),
       ];
     case "trade_request":
       return message.playerId
@@ -331,7 +337,7 @@ function typeLabel(type: string, t: Translator): string {
   return KNOWN_TYPES.includes(type) ? t(`inbox.type.${type}` as DictionaryKey) : type;
 }
 
-const KNOWN_TYPES = ["press", "injury", "trade_request", "free_agent", "free_agency", "standings", "poach_offer", "press_review", "player_reaction", "fine", "staff", "trade_offer", "award", "contract", "cup", "board", "player_request"];
+const KNOWN_TYPES = ["league_injury", "press", "injury", "trade_request", "free_agent", "free_agency", "standings", "poach_offer", "press_review", "player_reaction", "fine", "staff", "trade_offer", "award", "contract", "cup", "board", "player_request"];
 
 function MessageCard({
   message,

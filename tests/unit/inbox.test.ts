@@ -51,3 +51,33 @@ test("boîte de réception : importance et catégories par type", () => {
   assert.equal(categoryOf("cup"), "competitions");
   assert.equal(categoryOf("staff"), "board");
 });
+
+// ---------------------------------------------------------------------------
+// Infirmerie de la ligue
+
+import { estimatedReturn, injuryTier, isNotableInjury, sortInjured } from "../../src/lib/careers/injury-report-rules";
+
+test("infirmerie : les joueurs importants d'abord, puis les absences les plus longues", () => {
+  assert.equal(injuryTier(88, 70), "star");
+  assert.equal(injuryTier(70, 85), "star");
+  assert.equal(injuryTier(77, 50), "starter");
+  assert.equal(injuryTier(68, 40), "role");
+  const sorted = sortInjured([
+    { id: "role-long", tier: "role" as const, gamesRemaining: 40, overall: 65 },
+    { id: "star-short", tier: "star" as const, gamesRemaining: 2, overall: 90 },
+    { id: "starter", tier: "starter" as const, gamesRemaining: 5, overall: 78 },
+    { id: "star-long", tier: "star" as const, gamesRemaining: 20, overall: 84 },
+  ]);
+  assert.deepEqual(sorted.map((p) => p.id), ["star-long", "star-short", "starter", "role-long"]);
+});
+
+test("infirmerie : blessure notable = star absente longtemps ; retour estimé d'après le calendrier", () => {
+  assert.ok(isNotableInjury({ overall: 90, renown: 90, severity: "moderate", gamesOut: 10 }));
+  assert.ok(isNotableInjury({ overall: 84, renown: 60, severity: "severe", gamesOut: 3 }));
+  assert.ok(!isNotableInjury({ overall: 90, renown: 90, severity: "minor", gamesOut: 2 }));
+  assert.ok(!isNotableInjury({ overall: 72, renown: 50, severity: "severe", gamesOut: 30 }));
+  const dates = ["2026-12-01", "2026-12-03", "2026-12-05"];
+  assert.equal(estimatedReturn(dates, 0), "2026-12-01");
+  assert.equal(estimatedReturn(dates, 2), "2026-12-05");
+  assert.equal(estimatedReturn(dates, 3), null); // saison terminée avant
+});

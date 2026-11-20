@@ -113,6 +113,34 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       await prisma.playerState.updateMany({ where: { careerId, playerId: contract.playerId }, data: { pendingRequest: null } });
     });
 
+    await test.step("infirmerie de la ligue : stars blessées de toutes les équipes", async () => {
+      const mine = await prisma.contract.findFirstOrThrow({ where: { careerId, teamId: membership.teamId }, orderBy: { salary: "asc" } });
+      const otherStar = await prisma.playerState.findFirstOrThrow({
+        where: { careerId, overallRating: { gte: 85 }, player: { contracts: { some: { careerId, teamId: { not: membership.teamId } } } } },
+        orderBy: { overallRating: "desc" },
+      });
+      await prisma.playerState.updateMany({
+        where: { careerId, playerId: otherStar.playerId },
+        data: { injured: true, injuryGamesRemaining: 12, injurySeverity: "moderate", injuryType: "ankle_sprain" },
+      });
+      await prisma.playerState.updateMany({
+        where: { careerId, playerId: mine.playerId },
+        data: { injured: true, injuryGamesRemaining: 3, injurySeverity: "minor", injuryType: "illness" },
+      });
+      await expectPageOk(page, "/injuries");
+      await expect(page.getByTestId("injury-row").first()).toContainText("Star");
+      await page.getByRole("link", { name: "Mon équipe" }).last().click();
+      await page.waitForURL(/view=mine/);
+      await expect(page.getByTestId("injury-row")).toHaveCount(1);
+      await page.getByRole("link", { name: "Tous", exact: true }).click();
+      await page.waitForURL(/view=all/);
+      await expect.poll(() => page.getByTestId("injury-row").count()).toBeGreaterThanOrEqual(2);
+      await prisma.playerState.updateMany({
+        where: { careerId, playerId: { in: [otherStar.playerId, mine.playerId] } },
+        data: { injured: false, injuryGamesRemaining: 0, injurySeverity: null, injuryType: null },
+      });
+    });
+
     await test.step("négociation de prolongation jusqu'à la signature", async () => {
       // Un joueur sans exigence de star (renommée < 70), en dernière année.
       const contracts = await prisma.contract.findMany({

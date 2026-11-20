@@ -869,6 +869,24 @@ export async function simulateAndResolveGame(
     teamStateUpdate(awayTeamState, awayWinPct, awayRoster, chemistryTrainingBonus(awayFocus, awayIntensity), awayTeam.marketAppeal, game.awayTeamId, false, homeRoster),
   ]);
 
+  // Star blessée pour longtemps, quelle que soit l'équipe (voir
+  // isNotableInjury) : chaque GM humain est averti dans l'onglet Médical de sa
+  // boîte — sauf celui de l'équipe du joueur, déjà prévenu par son staff.
+  const starInjuries = news.filter((n) => n.type === "injury" && n.teamId);
+  if (starInjuries.length > 0) {
+    const humans = await prisma.membership.findMany({ where: { careerId }, select: { teamId: true } });
+    for (const n of starInjuries) {
+      for (const h of humans) {
+        if (h.teamId === n.teamId) continue;
+        await createInboxMessage(careerId, h.teamId, game.season, "league_injury", n.title, n.body, "/injuries", {
+          gameDate,
+          playerId: n.playerId,
+          priority: "important",
+        });
+      }
+    }
+  }
+
   // Match entre deux équipes IA : rien d'autre à faire (presse, demandes de
   // transfert et boîte de réception ne concernent que les GM humains).
   if (!homeManager && !awayManager) return updated;

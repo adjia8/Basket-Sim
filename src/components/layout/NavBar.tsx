@@ -62,6 +62,7 @@ export async function NavBar() {
         { href: "/stats", label: t("league.nav.stats") },
         { href: "/awards", label: t("league.nav.awards") },
         { href: "/news", label: t("league.nav.news") },
+        { href: "/injuries", label: t("injuries.nav") },
         { href: "/playoffs", label: t("common.nav.playoffs") },
         { href: "/season-recap", label: t("common.nav.recap") },
       ],
