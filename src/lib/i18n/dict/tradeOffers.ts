@@ -23,6 +23,9 @@ export const keys = [
   "tradeAction.salaryMatching",
   "tradeAction.exceedsApron",
   "tradeAction.aiRefuses",
+  "tradeAction.aiRefusesRebuild",
+  "tradeAction.aiRefusesContender",
+  "tradeAction.aiRefusesSalary",
   "tradeAction.accepted",
   "tradeAction.sentAwaitingResponse",
 ] as const;
@@ -52,6 +55,11 @@ export const fr: Record<TradeOffersKey, string> = {
   "tradeAction.salaryMatching": "Au-dessus du plafond, une équipe ne peut pas recevoir plus de {limit} de salaire dans cet échange (125 % de ce qu'elle envoie).",
   "tradeAction.exceedsApron": "Cet échange ferait dépasser le 2e apron ({limit}) pour l'une des deux équipes.",
   "tradeAction.aiRefuses": "L'IA refuse : échange trop déséquilibré en ta faveur.",
+  "tradeAction.aiRefusesRebuild":
+    "{team} se reconstruit : elle veut des jeunes et des choix de draft, pas des vétérans ni des gros salaires.",
+  "tradeAction.aiRefusesContender":
+    "{team} joue le titre : des choix de draft ou des jeunes encore tendres ne l'aident pas cette saison.",
+  "tradeAction.aiRefusesSalary": "{team} refuse d'alourdir sa masse salariale (ou de passer la taxe de luxe) pour cet échange.",
   "tradeAction.accepted": "Échange accepté !",
   "tradeAction.sentAwaitingResponse": "Proposition envoyée à {email}, en attente de réponse.",
 };
@@ -79,6 +87,9 @@ export const en: Record<TradeOffersKey, string> = {
   "tradeAction.salaryMatching": "Over the cap, a team can take back at most {limit} in salary in this trade (125% of what it sends).",
   "tradeAction.exceedsApron": "This trade would put one of the two teams over the second apron ({limit}).",
   "tradeAction.aiRefuses": "The AI refuses: trade too unbalanced in your favor.",
+  "tradeAction.aiRefusesRebuild": "{team} are rebuilding: they want young players and draft picks, not veterans or big contracts.",
+  "tradeAction.aiRefusesContender": "{team} are chasing the title: picks or raw young players don't help them this season.",
+  "tradeAction.aiRefusesSalary": "{team} won't take on that much salary (or go into the luxury tax) for this trade.",
   "tradeAction.accepted": "Trade accepted!",
   "tradeAction.sentAwaitingResponse": "Offer sent to {email}, awaiting response.",
 };

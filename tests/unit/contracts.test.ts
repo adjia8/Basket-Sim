@@ -70,3 +70,68 @@ test("une option exige au moins 2 ans de contrat", () => {
   assert.equal(validOffer({ salary: 5_000_000, years: 1, option: "player" }, "nba"), false);
   assert.equal(validOffer({ salary: 5_000_000, years: 2, option: "player" }, "nba"), true);
 });
+
+import {
+  assetValueFor,
+  capSalary,
+  evaluateTradeForAi,
+  rosterMoveAllowed,
+  teamOutlook,
+  type TradeAsset,
+} from "../../src/lib/careers/trade-rules";
+
+const TAX = 200_428_000;
+const vet = (overall: number, salary = 20_000_000, age = 32): TradeAsset => ({ kind: "player", overall, age, salary, standard: true });
+const young = (overall: number, salary = 3_000_000): TradeAsset => ({ kind: "player", overall, age: 21, salary, standard: true });
+const firstRound: TradeAsset = { kind: "pick", round: 1, pickNumber: null };
+
+test("profil : bilan après 15 matchs, objectif de début de saison avant", () => {
+  assert.equal(teamOutlook({ winPct: 0.7, gamesPlayed: 30, expectation: "rebuild" }), "contender");
+  assert.equal(teamOutlook({ winPct: 0.3, gamesPlayed: 30, expectation: "champion" }), "rebuild");
+  assert.equal(teamOutlook({ winPct: 1, gamesPlayed: 3, expectation: "rebuild" }), "rebuild");
+  assert.equal(teamOutlook({ winPct: 0.5, gamesPlayed: 3, expectation: "nba_finals" }), "contender");
+});
+
+test("une équipe en reconstruction paie plus cher les choix de draft et les jeunes, moins les vétérans", () => {
+  assert.ok(assetValueFor("rebuild", firstRound, 30) > assetValueFor("contender", firstRound, 30));
+  assert.ok(assetValueFor("rebuild", young(74), 30) > assetValueFor("contender", young(74), 30));
+  assert.ok(assetValueFor("rebuild", vet(80), 30) < assetValueFor("contender", vet(80), 30));
+});
+
+test("vétéran contre choix de draft : accepté par une équipe en reconstruction, refusé par un prétendant", () => {
+  // L'IA cède un titulaire de 82 (29 ans) ; on lui offre un 1er tour et un jeune.
+  const deal = { received: [firstRound, young(72, 4_000_000)], given: [vet(82, 18_000_000, 29)], picksPerRound: 30, payrollBefore: 150_000_000, taxLine: TAX };
+  assert.equal(evaluateTradeForAi({ ...deal, outlook: "rebuild" }).accept, true);
+  const contender = evaluateTradeForAi({ ...deal, outlook: "contender" });
+  assert.equal(contender.accept, false);
+  assert.equal(contender.reason, "contender");
+});
+
+test("une équipe en reconstruction refuse d'absorber un gros salaire de vétéran", () => {
+  const d = evaluateTradeForAi({
+    outlook: "rebuild",
+    received: [vet(80, 40_000_000)],
+    given: [young(70, 2_000_000), { kind: "pick", round: 2, pickNumber: null }],
+    picksPerRound: 30,
+    payrollBefore: 140_000_000,
+    taxLine: TAX,
+  });
+  assert.equal(d.accept, false);
+});
+
+test("passer la taxe de luxe coûte : un échange équitable devient refusé", () => {
+  const base = { outlook: "contender" as const, received: [vet(80, 35_000_000)], given: [vet(80, 10_000_000)], picksPerRound: 30, taxLine: TAX };
+  assert.equal(evaluateTradeForAi({ ...base, payrollBefore: 120_000_000 }).accept, true);
+  const taxed = evaluateTradeForAi({ ...base, payrollBefore: 195_000_000 });
+  assert.equal(taxed.accept, false);
+  assert.equal(taxed.reason, "salary");
+});
+
+test("effectif : contrats standard et places two-way contrôlés séparément", () => {
+  const m = { standardBefore: 15, altBefore: 3, standardOut: 1, altOut: 0, standardIn: 1, altIn: 0 };
+  assert.equal(rosterMoveAllowed(m, 13, 15, 3), true);
+  assert.equal(rosterMoveAllowed({ ...m, standardIn: 2 }, 13, 15, 3), false); // 16 standard
+  assert.equal(rosterMoveAllowed({ ...m, altIn: 1 }, 13, 15, 3), false); // 4 two-way
+  assert.equal(rosterMoveAllowed({ ...m, standardBefore: 13, standardOut: 2, standardIn: 1 }, 13, 15, 3), false); // 12
+  assert.equal(capSalary([{ salary: 5, contractType: "standard" }, { salary: 1, contractType: "two_way" }]), 5);
+});

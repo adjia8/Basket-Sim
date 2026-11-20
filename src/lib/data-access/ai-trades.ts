@@ -84,7 +84,8 @@ async function loadMarket(careerId: string, leagueId: string, season: string, lo
     getStandings(careerId, leagueId, season),
     getLeagueById(leagueId),
     prisma.draftPick.findMany({ where: { careerId, status: "pending" }, include: { originalTeam: true } }),
-    prisma.contract.groupBy({ by: ["teamId"], where: { careerId }, _count: true }),
+    // Effectif = contrats standard (les two-way ont leurs propres places).
+    prisma.contract.groupBy({ by: ["teamId"], where: { careerId, contractType: "standard" }, _count: true }),
   ]);
   const teamCount = standings.length || 30;
   const byTeam = new Map<string, PlayerAsset[]>();

@@ -57,3 +57,136 @@ export const TRADE_ACCEPT_TOLERANCE = 0.9;
 // saison en cours plutôt que sur une date — comme la vraie date limite NBA,
 // qui tombe aux alentours des deux tiers de la saison régulière.
 export const TRADE_DEADLINE_SEASON_FRACTION = 0.65;
+
+// ---------------------------------------------------------------------------
+// Effectif et masse salariale autour d'un échange
+
+// Seuls les contrats standard comptent dans la masse salariale et l'effectif
+// (les two-way / développement ont leurs propres places, hors plafond).
+export function capSalary(contracts: { salary: number; contractType: string }[]): number {
+  return contracts.filter((c) => c.contractType === "standard").reduce((s, c) => s + c.salary, 0);
+}
+
+export interface RosterMove {
+  standardBefore: number;
+  altBefore: number;
+  standardOut: number;
+  altOut: number;
+  standardIn: number;
+  altIn: number;
+}
+
+// Effectif après échange : bloque seulement si l'échange AGGRAVE un
+// dépassement (une équipe déjà hors limites peut échanger à effectif
+// constant), pour les contrats standard comme pour les places two-way.
+export function rosterMoveAllowed(m: RosterMove, min: number, max: number, altSlots: number): boolean {
+  const std = m.standardBefore - m.standardOut + m.standardIn;
+  const alt = m.altBefore - m.altOut + m.altIn;
+  const exceeds = std > max && std > m.standardBefore;
+  const below = std < min && std < m.standardBefore;
+  const altOver = alt > altSlots && alt > m.altBefore;
+  return !exceeds && !below && !altOver;
+}
+
+// ---------------------------------------------------------------------------
+// Intérêt de l'IA selon sa situation
+
+export type TeamOutlook = "contender" | "middle" | "rebuild";
+
+// Profil d'une équipe : son bilan dès 15 matchs, avant cela l'objectif fixé
+// en début de saison (calculé d'après la force de l'effectif).
+export function teamOutlook(params: { winPct: number; gamesPlayed: number; expectation: string | null }): TeamOutlook {
+  if (params.gamesPlayed >= 15) {
+    if (params.winPct >= 0.58) return "contender";
+    if (params.winPct <= 0.42) return "rebuild";
+    return "middle";
+  }
+  if (params.expectation === "rebuild") return "rebuild";
+  if (params.expectation && ["conf_finals", "nba_finals", "champion"].includes(params.expectation)) return "contender";
+  return "middle";
+}
+
+export type TradeAsset =
+  | { kind: "player"; overall: number; age: number; salary: number; standard: boolean }
+  | { kind: "pick"; round: number; pickNumber: number | null };
+
+// Valeur d'un élément pour une équipe donnée : une équipe en reconstruction
+// paie cher les jeunes et les choix de draft et boude les vétérans ; une
+// équipe qui joue le titre veut des joueurs utiles tout de suite.
+export function assetValueFor(outlook: TeamOutlook, asset: TradeAsset, picksPerRound: number): number {
+  if (asset.kind === "pick") {
+    const base = pickTradeValue(asset.round, asset.pickNumber, picksPerRound);
+    if (outlook === "rebuild") return base * (asset.round === 1 ? 1.4 : 1.2);
+    if (outlook === "contender") return base * 0.7;
+    return base;
+  }
+  const base = playerTradeValue(asset.overall, asset.age);
+  if (outlook === "rebuild") {
+    if (asset.age <= 24) return base * 1.25;
+    if (asset.age >= 30) return base * 0.65;
+    if (asset.age >= 27) return base * 0.9;
+    return base;
+  }
+  if (outlook === "contender") {
+    if (asset.age >= 26 && asset.overall >= 76) return base * 1.15;
+    if (asset.age <= 22 && asset.overall < 74) return base * 0.8;
+  }
+  return base;
+}
+
+export type TradeRefusal = "value" | "rebuild" | "contender" | "salary";
+
+export interface AiTradeDecision {
+  accept: boolean;
+  reason: TradeRefusal | null;
+  received: number; // valeur reçue, ajustée (profil + masse salariale)
+  given: number;
+}
+
+// Décision de l'IA : valeur reçue (selon son profil, corrigée de l'impact
+// sur sa masse salariale) contre valeur cédée, avec la tolérance habituelle.
+// Masse salariale : une équipe en reconstruction fuit les salaires en plus
+// et apprécie d'en libérer ; toute équipe rechigne à passer la taxe de luxe.
+export function evaluateTradeForAi(params: {
+  outlook: TeamOutlook;
+  received: TradeAsset[];
+  given: TradeAsset[];
+  picksPerRound: number;
+  payrollBefore: number;
+  taxLine: number;
+}): AiTradeDecision {
+  const { outlook, picksPerRound } = params;
+  const sum = (list: TradeAsset[]) => list.reduce((s, a) => s + assetValueFor(outlook, a, picksPerRound), 0);
+  const salaryOf = (list: TradeAsset[]) =>
+    list.reduce((s, a) => s + (a.kind === "player" && a.standard ? a.salary : 0), 0);
+  const salaryIn = salaryOf(params.received);
+  const salaryOut = salaryOf(params.given);
+  const netMillions = (salaryIn - salaryOut) / 1_000_000;
+  const payrollAfter = params.payrollBefore - salaryOut + salaryIn;
+  let salaryAdjust = 0;
+  if (outlook === "rebuild") salaryAdjust += netMillions > 0 ? -5 * netMillions : -3 * netMillions;
+  else if (outlook === "middle" && netMillions > 0) salaryAdjust -= 1.5 * netMillions;
+  // Taxe de luxe : seulement la part de salaire ajoutée au-dessus de la ligne.
+  const overTaxAdded = Math.max(0, payrollAfter - Math.max(params.taxLine, params.payrollBefore)) / 1_000_000;
+  salaryAdjust -= 4 * overTaxAdded;
+
+  const rawReceived = sum(params.received);
+  const received = rawReceived + salaryAdjust;
+  const given = sum(params.given);
+  const accept = received >= given * TRADE_ACCEPT_TOLERANCE;
+  if (accept) return { accept, reason: null, received, given };
+  // Raison principale du refus, pour l'expliquer au joueur.
+  const neutralReceived = params.received.reduce(
+    (s, a) => s + (a.kind === "pick" ? pickTradeValue(a.round, a.pickNumber, picksPerRound) : playerTradeValue(a.overall, a.age)),
+    0
+  );
+  const neutralGiven = params.given.reduce(
+    (s, a) => s + (a.kind === "pick" ? pickTradeValue(a.round, a.pickNumber, picksPerRound) : playerTradeValue(a.overall, a.age)),
+    0
+  );
+  const fairOnValue = neutralReceived >= neutralGiven * TRADE_ACCEPT_TOLERANCE;
+  let reason: TradeRefusal = "value";
+  if (fairOnValue && rawReceived >= given * TRADE_ACCEPT_TOLERANCE) reason = "salary";
+  else if (fairOnValue) reason = outlook === "rebuild" ? "rebuild" : outlook === "contender" ? "contender" : "value";
+  return { accept, reason, received, given };
+}
