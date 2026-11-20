@@ -51,3 +51,25 @@ test("joueur échangé : une seule ligne de saison, totaux additionnés, équipe
   // Équipe inconnue : celle où il a joué le plus.
   assert.equal(mergeSeasonRows(rows, () => undefined).find((r) => r.playerId === "p")!.teamId, "old");
 });
+
+import { NBA_REAL_PROSPECTS } from "../../src/lib/mock-data/real-prospects-nba";
+import { playersNba } from "../../src/lib/mock-data/players-nba";
+
+test("classes de prospects réels : 3 drafts, pas de doublon, absents du catalogue NBA, données plausibles", () => {
+  assert.deepEqual(Object.keys(NBA_REAL_PROSPECTS).sort(), ["2027-2028", "2028-2029", "2029-2030"]);
+  const inCatalog = new Set(playersNba.map((p) => `${p.firstName} ${p.lastName}`));
+  const seen = new Set<string>();
+  for (const [season, list] of Object.entries(NBA_REAL_PROSPECTS)) {
+    assert.ok(list.length >= 10, `${season} : ${list.length}`);
+    for (const p of list) {
+      const name = `${p.firstName} ${p.lastName}`;
+      assert.ok(!seen.has(name), `doublon ${name}`);
+      seen.add(name);
+      assert.ok(!inCatalog.has(name), `${name} déjà dans le catalogue NBA`);
+      assert.ok(["PG", "SG", "SF", "PF", "C"].includes(p.position));
+      assert.ok(p.heightCm >= 170 && p.heightCm <= 230, `${name} ${p.heightCm} cm`);
+      assert.ok(p.age >= 17 && p.age <= 23, `${name} ${p.age} ans`);
+      assert.ok(p.overallRating >= 60 && p.overallRating <= 82, `${name} ${p.overallRating}`);
+    }
+  }
+});

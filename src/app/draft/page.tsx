@@ -42,6 +42,11 @@ export default async function DraftPage() {
     return (
       <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
         <h1 className="text-2xl font-bold tracking-tight">{t("draft.title")}</h1>
+        {membership.leagueId === "nba" && (
+          <Link href="/draft/future" className="mt-1 inline-block text-sm text-accent-text hover:underline">
+            {t("futureDraft.link")}
+          </Link>
+        )}
         <p className="mt-4 text-sm text-muted">
           {hasDraftPicks > 0 ? t("draft.overForSeason") : t("draft.noneInProgress")}
         </p>
@@ -73,6 +78,11 @@ export default async function DraftPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
       <h1 className="text-2xl font-bold tracking-tight">{t("draft.title")}</h1>
+        {membership.leagueId === "nba" && (
+          <Link href="/draft/future" className="mt-1 inline-block text-sm text-accent-text hover:underline">
+            {t("futureDraft.link")}
+          </Link>
+        )}
       <p className="mt-1 text-soft">
         {t("draft.pickLinePrefix", { number: currentPick.pickNumber, round: currentPick.round })}{" "}
         {pickTeam ? (
