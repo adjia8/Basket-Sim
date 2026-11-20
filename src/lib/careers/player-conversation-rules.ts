@@ -7,6 +7,7 @@
 // de jeu ou d'échange (jugées ensuite comme les autres promesses), demande
 // d'échange apaisée… ou déclenchée.
 
+import { ANSWERED_REQUEST_BONUS } from "./player-request-rules";
 import type { Personality } from "./personality-rules";
 import type { PlayerStatus } from "./player-status-rules";
 
@@ -50,6 +51,7 @@ export interface ConversationContext {
   hasActivePromise: boolean;
   recentIncident: boolean; // faute technique ou expulsion lors des derniers matchs
   recentGoodForm: boolean; // meilleurs matchs récents que sa moyenne
+  answeringRequest?: boolean; // le joueur avait demandé à parler au GM
 }
 
 // Sujets qui ont du sens pour ce joueur maintenant.
@@ -124,7 +126,9 @@ export function conversationOutcome(
   random: () => number = Math.random
 ): ConversationOutcome {
   const noise = (random() - 0.5) * 1.5; // une même discussion ne tourne pas toujours pareil
-  const reaction = toReaction(topicScore(topic, tone, c) + toneFit(tone, c.personality, c) + noise);
+  // Répondre à sa demande : il apprécie d'être écouté.
+  const listened = c.answeringRequest ? ANSWERED_REQUEST_BONUS : 0;
+  const reaction = toReaction(topicScore(topic, tone, c) + toneFit(tone, c.personality, c) + listened + noise);
   let effect: ConversationEffect = null;
   if (topic === "more_minutes") effect = "promise_minutes";
   if (topic === "promise_trade") effect = "promise_trade";

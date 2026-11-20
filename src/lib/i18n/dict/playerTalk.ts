@@ -1,4 +1,7 @@
 export const keys = [
+  "talk.request.minutes",
+  "talk.request.contract",
+  "talk.request.support",
   "talk.title",
   "talk.subtitle",
   "talk.topicLabel",
@@ -124,6 +127,9 @@ export const keys = [
 export type TalkKey = (typeof keys)[number];
 
 export const fr: Record<TalkKey, string> = {
+  "talk.request.minutes": "{name} demande à te parler de son temps de jeu. Réponds-lui dans la semaine, sinon il se sentira ignoré.",
+  "talk.request.contract": "{name} veut savoir où il en est pour son contrat. Parle-lui, ou fais-lui une offre de prolongation, dans la semaine.",
+  "talk.request.support": "{name} va mal et demande à te parler. Réponds-lui dans la semaine.",
   "talk.title": "Discuter avec le joueur",
   "talk.subtitle": "Choisis un sujet et un ton. Sa réaction dépend de sa personnalité, de son moral et de sa situation. Une discussion par joueur tous les 7 jours.",
   "talk.topicLabel": "Sujet",
@@ -247,6 +253,9 @@ export const fr: Record<TalkKey, string> = {
 };
 
 export const en: Record<TalkKey, string> = {
+  "talk.request.minutes": "{name} wants to talk about his playing time. Answer him within a week, or he'll feel ignored.",
+  "talk.request.contract": "{name} wants to know where he stands on his contract. Talk to him, or make him an extension offer, within a week.",
+  "talk.request.support": "{name} is struggling and asks to talk to you. Answer him within a week.",
   "talk.title": "Talk to the player",
   "talk.subtitle": "Pick a topic and a tone. His reaction depends on his personality, morale and situation. One talk per player every 7 days.",
   "talk.topicLabel": "Topic",

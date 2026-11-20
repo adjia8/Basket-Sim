@@ -14,6 +14,7 @@ export interface ConversationLabels {
   sending: string;
   you: string;
   cooldown: string | null;
+  request: string | null; // « Il demande à te parler : … »
 }
 
 export function PlayerConversation({
@@ -22,12 +23,14 @@ export function PlayerConversation({
   topics,
   tones,
   labels,
+  defaultTopic,
 }: {
   playerId: string;
   playerName: string;
   topics: { value: string; label: string }[];
   tones: { value: string; label: string }[];
   labels: ConversationLabels;
+  defaultTopic?: string | null;
 }) {
   const [state, action, pending] = useActionState<ConversationFormState | undefined, FormData>(talkToPlayer, undefined);
   const [tone, setTone] = useState(tones[0]?.value ?? "calm");
@@ -39,6 +42,11 @@ export function PlayerConversation({
     <div className="mt-6 card p-4" data-testid="player-conversation">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{labels.title}</h2>
       <p className="mt-1 text-xs text-faint">{labels.subtitle}</p>
+      {labels.request && !done && (
+        <p className="mt-3 rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn" data-testid="player-request">
+          {labels.request}
+        </p>
+      )}
 
       {labels.cooldown && !done ? (
         <p className="mt-3 text-sm text-muted">{labels.cooldown}</p>
@@ -48,7 +56,7 @@ export function PlayerConversation({
             <input type="hidden" name="playerId" value={playerId} />
             <label className="flex flex-col gap-1">
               <span className="text-xs text-muted">{labels.topicLabel}</span>
-              <select name="topic" className="field px-2 py-1.5" disabled={pending}>
+              <select name="topic" className="field px-2 py-1.5" disabled={pending} defaultValue={defaultTopic ?? undefined}>
                 {topics.map((t) => (
                   <option key={t.value} value={t.value}>
                     {t.label}

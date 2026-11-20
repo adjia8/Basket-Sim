@@ -64,6 +64,9 @@ export async function talkToPlayer(
     data: {
       morale: clampMorale(state.morale + delta),
       lastConversationAt: when,
+      // Toute discussion répond à sa demande en attente.
+      pendingRequest: null,
+      requestAt: null,
       ...(outcome.effect === "promise_minutes" && setup.nextStatus
         ? { promisedStatus: setup.nextStatus, promiseSince: when }
         : {}),

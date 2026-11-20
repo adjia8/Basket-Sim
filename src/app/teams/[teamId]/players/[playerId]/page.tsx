@@ -474,7 +474,11 @@ export default async function PlayerDetailPage({
             sending: t("talk.sending"),
             you: t("talk.you"),
             cooldown: conversation.cooldownDays > 0 ? t("talk.cooldown", { days: conversation.cooldownDays }) : null,
+            request: conversation.request
+              ? t(`talk.request.${conversation.request}`, { name: player.firstName })
+              : null,
           }}
+          defaultTopic={conversation.suggestedTopic}
         />
       )}
 

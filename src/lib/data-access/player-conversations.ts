@@ -1,4 +1,5 @@
 import "server-only";
+import { TOPICS_FOR_REQUEST, type PlayerRequest } from "@/lib/careers/player-request-rules";
 import { prisma } from "@/lib/prisma";
 import { personalityFor } from "@/lib/careers/personality-rules";
 import {
@@ -25,6 +26,8 @@ export interface ConversationSetup {
   cooldownDays: number; // 0 = on peut discuter
   today: Date | null;
   nextStatus: PlayerStatus | null; // rôle promis par « plus de minutes »
+  request: PlayerRequest | null; // demande du joueur en attente
+  suggestedTopic: ConversationTopic | null; // sujet qui y répond
 }
 
 // Tout ce qu'il faut pour discuter avec un joueur de MON effectif : sa
@@ -82,9 +85,14 @@ export async function getConversationSetup(
     hasActivePromise: !!state.activePromiseType,
     recentIncident,
     recentGoodForm: recent.length >= 3 && recentPpg >= ppg + 3,
+    answeringRequest: !!state.pendingRequest,
   };
   const today = lastGame?.gameDate ?? null;
   const since = state.lastConversationAt && today ? Math.floor((today.getTime() - state.lastConversationAt.getTime()) / DAY_MS) : null;
-  const cooldownDays = since === null ? 0 : Math.max(0, CONVERSATION_COOLDOWN_DAYS - since);
-  return { context, topics: availableTopics(context), cooldownDays, today, nextStatus };
+  // Une demande en attente passe avant le délai habituel entre deux discussions.
+  const cooldownDays = state.pendingRequest || since === null ? 0 : Math.max(0, CONVERSATION_COOLDOWN_DAYS - since);
+  const request = (state.pendingRequest as PlayerRequest | null) ?? null;
+  const topics = availableTopics(context);
+  const suggestedTopic = request ? (TOPICS_FOR_REQUEST[request].find((t) => topics.includes(t as ConversationTopic)) as ConversationTopic | undefined) ?? null : null;
+  return { context, topics, cooldownDays, today, nextStatus, request, suggestedTopic };
 }

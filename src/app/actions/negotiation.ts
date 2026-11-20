@@ -107,6 +107,12 @@ export async function negotiateContract(
       : checkSalaryMove(leagueId, salaryCap, "sign", payroll + offer.salary, offer.salary);
   if (!capVerdict.ok) return { error: capError(capVerdict, tr) };
 
+  // Une offre (quelle qu'elle soit) répond à sa demande sur son contrat.
+  await prisma.playerState.updateMany({
+    where: { careerId, playerId, pendingRequest: "contract" },
+    data: { pendingRequest: null, requestAt: null },
+  });
+
   const verdict =
     acceptCounter || view.rookieScale ? ({ kind: "accept" } as const) : evaluateOffer(view.stance, offer, view.patienceLeft);
 

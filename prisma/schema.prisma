@@ -527,6 +527,9 @@ model PlayerState {
   promisedStatus       String? // promesse de temps de jeu (statut promis) — voir player-status-rules.ts
   promiseSince         DateTime? // date de jeu de la promesse de temps de jeu
   lastConversationAt   DateTime? // date de jeu de la dernière discussion avec le GM — voir player-conversation-rules.ts
+  pendingRequest       String? // le joueur demande à parler au GM : "minutes" | "contract" | "support" — voir player-request-rules.ts
+  requestAt            DateTime? // date de jeu de la demande en attente
+  lastRequestAt        DateTime? // date de jeu de sa dernière demande (délai entre deux)
   morale               Int     @default(60) // 0-99, moral individuel (conférences de presse, résultats) — voir morale-rules.ts
   catalogOverall       Int? // note du catalogue (NBA 2K) avec laquelle ce joueur a été synchronisé — voir scripts/sync-ratings.ts
   potential            Int     @default(0) // potentiel caché (note maximale atteignable) — voir potential-rules.ts
@@ -676,6 +679,7 @@ model TeamState {
   tacticsJson              String? // JSON Tactics (rythme, attaque, défense, profondeur) — voir tactics-rules.ts ; null = équilibré / IA automatique
   rotationOrderJson        String? // JSON: string[] d'ids joueuses, ordre GM voulu (5 majeures + 6ème femme + banc) — null = tri automatique (voir rotationOf dans mockEngine.ts)
   refereeCriticisms        Int       @default(0) // critiques publiques de l'arbitrage cette saison (amendes de la ligue)
+  lastPlayerRequestAt DateTime? // dernière demande d'un joueur de l'équipe (délai entre deux) — voir player-requests.ts
   lastAiTradeOfferAt       DateTime? // date (jeu) de la dernière offre d'échange reçue d'une équipe IA — voir ai-trades.ts
   staffBudget              Int       @default(0) // budget staff de la saison (dollars), alloué par les propriétaires — voir staff-rules.ts
   staffSeverance           Int       @default(0) // indemnités de licenciement payées cette saison (pèsent sur le budget staff)

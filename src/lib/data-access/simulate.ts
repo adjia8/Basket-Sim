@@ -1,4 +1,5 @@
 import "server-only";
+import { maybePlayerRequests } from "@/lib/data-access/player-requests";
 import { getGameById } from "@/lib/data-access/schedule";
 import { evaluatePlayingTimePromises } from "@/lib/data-access/playing-time-promises";
 import { lockerRoom, personalityFor } from "@/lib/careers/personality-rules";
@@ -789,6 +790,14 @@ export async function simulateAndResolveGame(
     homeManager ? evaluatePlayingTimePromises(careerId, game.homeTeamId, game.season, locale) : Promise.resolve(),
     awayManager ? evaluatePlayingTimePromises(careerId, game.awayTeamId, game.season, locale) : Promise.resolve(),
   ]);
+  // Les joueurs viennent parfois voir le GM (voir player-requests.ts) —
+  // saison régulière seulement.
+  if (/^\d{4}-\d{4}$/.test(game.season)) {
+    await Promise.all([
+      homeManager ? maybePlayerRequests(careerId, game.homeTeamId, game.season, gameDate, locale) : Promise.resolve(),
+      awayManager ? maybePlayerRequests(careerId, game.awayTeamId, game.season, gameDate, locale) : Promise.resolve(),
+    ]);
+  }
 
   // Nouvelle demande de trade éventuelle (cooldown + tirage, voir
   // maybeFlagTradeRequest) — même restriction aux équipes humaines.
