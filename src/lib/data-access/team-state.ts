@@ -1,20 +1,17 @@
 import "server-only";
+import { addUpgradeToLedger, closeSeasonFinances } from "@/lib/data-access/finance";
 import { lockerRoom, personalityFor } from "@/lib/careers/personality-rules";
 import { prisma } from "@/lib/prisma";
 import type { TeamState } from "@prisma/client";
 import type { Player } from "@/lib/types";
 import { chemistryTarget, nextChemistry } from "@/lib/careers/chemistry-rules";
-import { luxuryTax } from "@/lib/careers/cap-rules";
-import { getPayrollForTeam } from "./contracts";
 import { attendanceTarget, nextAttendance } from "@/lib/careers/attendance-rules";
 import {
-  ANNUAL_DEGRADATION,
   clampFacilityLevel,
   UPGRADE_INCREMENT,
   initialFacilityLevel,
   initialFinances,
   initialTrainingStaffLevel,
-  seasonRevenue,
   upgradeCost,
 } from "@/lib/careers/finance-rules";
 
@@ -101,34 +98,18 @@ export async function advanceAttendance(
   });
 }
 
-// Appelé une fois par équipe au rollover de saison (src/app/actions/season.ts) :
-// encaisse le revenu de la saison qui vient de se terminer (bilan + marché),
-// prélève la taxe de luxe éventuelle (NBA), puis dégrade les infrastructures/personnel si non réinvestis.
+// Appelé une fois par équipe au rollover de saison (src/app/actions/season.ts),
+// AVANT le passage à la saison suivante : les recettes et dépenses courantes
+// tombent déjà match par match (voir finance.ts) ; ici, taxe de luxe, part
+// des propriétaires et usure des installations.
 export async function applySeasonFinancials(
   careerId: string,
   teamId: string,
   leagueId: string,
-  winPct: number,
-  marketAppeal: number
+  season: string
 ): Promise<void> {
-  const [state, payroll] = await Promise.all([
-    getOrCreateTeamState(careerId, teamId, leagueId),
-    getPayrollForTeam(careerId, teamId),
-  ]);
-  const revenue = seasonRevenue(leagueId, winPct, marketAppeal, state.publicOpinion);
-  // Taxe de luxe NBA sur la masse salariale de la saison écoulée (0 sous la
-  // ligne de taxe, toujours 0 en WNBA — voir cap-rules.ts).
-  const tax = luxuryTax(leagueId, payroll);
-
-  await prisma.teamState.update({
-    where: { id: state.id },
-    data: {
-      finances: state.finances + revenue - tax,
-      facilitiesLevel: clampFacilityLevel(state.facilitiesLevel - ANNUAL_DEGRADATION),
-      // trainingStaffLevel n'est plus acheté ni dégradé : il reflète le vrai
-      // staff (voir data-access/staff.ts).
-    },
-  });
+  await getOrCreateTeamState(careerId, teamId, leagueId);
+  await closeSeasonFinances(careerId, teamId, leagueId, season);
 }
 
 // Achète UPGRADE_INCREMENT points sur la composante choisie si la trésorerie
@@ -138,20 +119,22 @@ export async function upgradeFacility(
   careerId: string,
   teamId: string,
   leagueId: string,
-  component: "facilities" | "trainingStaff"
+  component: "facilities" | "arena",
+  season: string
 ): Promise<boolean> {
   const state = await getOrCreateTeamState(careerId, teamId, leagueId);
-  const currentLevel = component === "facilities" ? state.facilitiesLevel : state.trainingStaffLevel;
-  const cost = upgradeCost(currentLevel, leagueId);
+  const currentLevel = component === "facilities" ? state.facilitiesLevel : state.arenaLevel;
+  const cost = upgradeCost(currentLevel, leagueId, component === "facilities" ? "training" : "arena");
   if (state.finances < cost) return false;
 
   await prisma.teamState.update({
     where: { id: state.id },
     data: {
       finances: state.finances - cost,
+      financeLedgerJson: addUpgradeToLedger(state.financeLedgerJson, season, cost),
       ...(component === "facilities"
         ? { facilitiesLevel: clampFacilityLevel(currentLevel + UPGRADE_INCREMENT) }
-        : { trainingStaffLevel: clampFacilityLevel(currentLevel + UPGRADE_INCREMENT) }),
+        : { arenaLevel: clampFacilityLevel(currentLevel + UPGRADE_INCREMENT) }),
     },
   });
   return true;

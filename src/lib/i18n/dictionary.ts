@@ -38,6 +38,7 @@ import * as interview from "./dict/interview";
 import * as calendar from "./dict/calendar";
 import * as protocol from "./dict/protocol";
 import * as loadplan from "./dict/loadplan";
+import * as finance from "./dict/finance";
 
 // Chaque module dict/<zone>.ts exporte { fr, en } avec les MÊMES clés (voir
 // common.ts pour le patron : un tableau `keys as const`, puis deux
@@ -86,6 +87,7 @@ const sources = [
   calendar,
   protocol,
   loadplan,
+  finance,
 ];
 
 export const dictionaries = {
@@ -130,6 +132,7 @@ export const dictionaries = {
     ...calendar.fr,
     ...protocol.fr,
     ...loadplan.fr,
+    ...finance.fr,
   },
   en: {
     ...common.en,
@@ -172,6 +175,7 @@ export const dictionaries = {
     ...calendar.en,
     ...protocol.en,
     ...loadplan.en,
+    ...finance.en,
   },
 };
 

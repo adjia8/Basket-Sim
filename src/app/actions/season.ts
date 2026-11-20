@@ -216,10 +216,10 @@ export async function advanceSeason(): Promise<void> {
   // terminer (bilan + attractivité du marché) pour chaque équipe de la
   // ligue, puis dégradation annuelle des infrastructures/personnel non
   // réinvestis.
+  // (Recettes et dépenses courantes déjà encaissées match par match : ici,
+  // taxe de luxe, part des propriétaires et usure des installations.)
   for (const team of teams) {
-    const row = finishedStandings.find((s) => s.teamId === team.id);
-    const winPct = winPctForStandings(row?.wins ?? 0, row?.losses ?? 0);
-    await applySeasonFinancials(career.id, team.id, career.leagueId, winPct, team.marketAppeal);
+    await applySeasonFinancials(career.id, team.id, career.leagueId, career.season);
   }
 
   // 2ter. Évaluation des GM humains : compare l'objectif de pré-saison au

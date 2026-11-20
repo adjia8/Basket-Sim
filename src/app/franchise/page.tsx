@@ -7,8 +7,9 @@ import {
   getFranchiseRecords,
   getLegendsForTeam,
 } from "@/lib/data-access/franchise-history";
-import { healthyFinancesThreshold, upgradeCost } from "@/lib/careers/finance-rules";
-import { upgradeFacility } from "@/app/actions/franchise";
+import { PRICE_LEVELS, healthyFinancesThreshold, upgradeCost } from "@/lib/careers/finance-rules";
+import { parseLedger, totalExpenses, totalRevenue } from "@/lib/data-access/finance";
+import { setPricing, upgradeFacility } from "@/app/actions/franchise";
 import { getTranslator } from "@/lib/i18n/translate";
 import Link from "next/link";
 import { formatSalary, playerHref } from "@/lib/utils";
@@ -26,7 +27,9 @@ export default async function FranchisePage() {
   const isOffseasonWindow = seasonComplete && !!playoffs?.champion;
 
   const teamState = await getOrCreateTeamState(membership.careerId, membership.teamId, membership.leagueId);
-  const facilitiesCost = upgradeCost(teamState.facilitiesLevel, membership.leagueId);
+  const facilitiesCost = upgradeCost(teamState.facilitiesLevel, membership.leagueId, "training");
+  const arenaCost = upgradeCost(teamState.arenaLevel, membership.leagueId, "arena");
+  const ledger = parseLedger(teamState.financeLedgerJson, membership.season);
 
   const [championships, records, legends] = await Promise.all([
     getChampionshipsForTeam(membership.careerId, membership.teamId),
@@ -75,13 +78,22 @@ export default async function FranchisePage() {
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <FacilityCard
-          label={t("franchisePage.facilitiesLabel")}
+          label={t("finance.training")}
           description={t("franchisePage.facilitiesDescription")}
           level={teamState.facilitiesLevel}
           canAfford={teamState.finances >= facilitiesCost}
           canUpgrade={isOffseasonWindow}
           component="facilities"
           upgradeLabel={t("franchisePage.upgrade", { cost: formatSalary(facilitiesCost, locale) })}
+        />
+        <FacilityCard
+          label={t("finance.arena")}
+          description={t("finance.arenaDescription")}
+          level={teamState.arenaLevel}
+          canAfford={teamState.finances >= arenaCost}
+          canUpgrade={isOffseasonWindow}
+          component="arena"
+          upgradeLabel={t("franchisePage.upgrade", { cost: formatSalary(arenaCost, locale) })}
         />
         <div className="card p-4">
           <p className="text-xs uppercase tracking-wide text-muted">{t("common.nav.staff")}</p>
@@ -94,6 +106,96 @@ export default async function FranchisePage() {
           </Link>
         </div>
       </div>
+
+      <section className="mt-8" data-testid="finances">
+        <h2 className="text-lg font-semibold">{t("finance.title")}</h2>
+        <p className="mt-1 text-xs text-muted">{t("finance.subtitle")}</p>
+
+        <form action={setPricing} className="mt-3 card flex flex-wrap items-end gap-3 p-4 text-sm">
+          <p className="w-full font-medium">{t("finance.pricing")}</p>
+          <p className="w-full text-xs text-faint">{t("finance.pricingHint")}</p>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-muted">{t("finance.ticket")}</span>
+            <select name="ticketPriceLevel" defaultValue={teamState.ticketPriceLevel} className="field px-2 py-1">
+              {PRICE_LEVELS.map((l) => (
+                <option key={l} value={l}>
+                  {t("finance.level", { level: l })}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-muted">{t("finance.concession")}</span>
+            <select name="concessionPriceLevel" defaultValue={teamState.concessionPriceLevel} className="field px-2 py-1">
+              {PRICE_LEVELS.map((l) => (
+                <option key={l} value={l}>
+                  {t("finance.level", { level: l })}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" className="rounded-md bg-accent px-4 py-1.5 font-medium text-accent-fg hover:bg-accent-hover">
+            {t("finance.save")}
+          </button>
+        </form>
+
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          {[
+            { title: t("finance.current"), l: ledger.current },
+            ...(ledger.previous ? [{ title: t("finance.previous"), l: ledger.previous }] : []),
+          ].map(({ title, l }) => {
+            const revenue = totalRevenue(l);
+            const expenses = totalExpenses(l);
+            return (
+              <div key={title} className="card p-4 text-sm">
+                <p className="eyebrow">
+                  {title} · {l.season}
+                </p>
+                {revenue === 0 && expenses === 0 ? (
+                  <p className="mt-2 text-muted">{t("finance.noData")}</p>
+                ) : (
+                  <>
+                    <p className="mt-2 text-xs font-semibold uppercase text-muted">{t("finance.revenue")}</p>
+                    <ul className="mt-1 space-y-0.5">
+                      {(Object.keys(l.revenue) as (keyof typeof l.revenue)[]).map((k) => (
+                        <li key={k} className="flex justify-between gap-2">
+                          <span>{t(`finance.rev.${k}`)}</span>
+                          <span className="tabular">{formatSalary(l.revenue[k], locale)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-xs font-semibold uppercase text-muted">{t("finance.expenses")}</p>
+                    <ul className="mt-1 space-y-0.5">
+                      {(Object.keys(l.expenses) as (keyof typeof l.expenses)[])
+                        .filter((k) => l.expenses[k] > 0)
+                        .map((k) => (
+                          <li key={k} className="flex justify-between gap-2">
+                            <span>{t(`finance.exp.${k}`)}</span>
+                            <span className="tabular text-bad">−{formatSalary(l.expenses[k], locale)}</span>
+                          </li>
+                        ))}
+                    </ul>
+                    <p className="mt-2 flex justify-between border-t border-line pt-2 font-semibold">
+                      <span>{t("finance.net")}</span>
+                      <span className={`tabular ${revenue - expenses >= 0 ? "text-good" : "text-bad"}`}>
+                        {formatSalary(revenue - expenses, locale)}
+                      </span>
+                    </p>
+                    {l.homeGames > 0 && (
+                      <p className="mt-1 text-xs text-faint">
+                        {t("finance.attendance", {
+                          games: l.homeGames,
+                          fans: Math.round(l.attendees / l.homeGames).toLocaleString(locale === "fr" ? "fr-FR" : "en-US"),
+                        })}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       <div className="mt-8">
         <h2 className="text-lg font-semibold">{t("franchisePage.championshipsHeading")}</h2>
@@ -191,7 +293,7 @@ function FacilityCard({
   level: number;
   canAfford: boolean;
   canUpgrade: boolean;
-  component: "facilities" | "trainingStaff";
+  component: "facilities" | "arena";
   upgradeLabel: string;
 }) {
   return (

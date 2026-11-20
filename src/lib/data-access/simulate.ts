@@ -1,4 +1,5 @@
 import "server-only";
+import { computeGameFinances } from "@/lib/data-access/finance";
 import { effectiveMinutesCap, parseLoadPlan, planRests } from "@/lib/careers/load-plan-rules";
 import { PROGRESSIVE_MINUTES_CAP } from "@/lib/careers/return-protocol-rules";
 import { parseCalendar, sessionsBetween, summarizeSessions } from "@/lib/careers/training-calendar-rules";
@@ -662,13 +663,27 @@ export async function simulateAndResolveGame(
   const awayRecord = recordOf(game.awayTeamId);
   const homeWinPct = winPctForStandings(homeRecord.wins, homeRecord.losses);
   const awayWinPct = winPctForStandings(awayRecord.wins, awayRecord.losses);
-  const teamStateUpdate = (
+  const teamStateUpdate = async (
     state: typeof homeTeamState,
     winPct: number,
     roster: Player[],
     chemistryBonus: number,
-    marketAppeal: number
+    marketAppeal: number,
+    teamId: string,
+    home: boolean
   ) => {
+    // Finances du match (voir finance.ts) : recettes et dépenses à l'échelle réelle.
+    const money = await computeGameFinances({
+      careerId,
+      teamId,
+      leagueId: game.leagueId,
+      gameSeason: game.season,
+      home,
+      marketAppeal,
+      winPct,
+      state,
+      roster,
+    });
     const iq = roster.length ? roster.reduce((sum, p) => sum + p.ratings.basketballIQ, 0) / roster.length : 50;
     // Vestiaire (voir personality-rules.ts) : leaders et têtes brûlées
     // déplacent la cohésion visée.
@@ -681,6 +696,7 @@ export async function simulateAndResolveGame(
           Math.min(99, nextChemistry(state.chemistry, chemistryTarget(winPct, iq) + room.chemistryBonus) + chemistryBonus)
         ),
         attendance: nextAttendance(state.attendance, attendanceTarget(winPct, marketAppeal, state.facilitiesLevel)),
+        ...(money ?? {}),
       },
     });
   };
@@ -769,8 +785,8 @@ export async function simulateAndResolveGame(
           })),
         })
       : Promise.resolve(),
-    teamStateUpdate(homeTeamState, homeWinPct, homeRoster, chemistryTrainingBonus(homeFocus, homeIntensity), homeTeam.marketAppeal),
-    teamStateUpdate(awayTeamState, awayWinPct, awayRoster, chemistryTrainingBonus(awayFocus, awayIntensity), awayTeam.marketAppeal),
+    teamStateUpdate(homeTeamState, homeWinPct, homeRoster, chemistryTrainingBonus(homeFocus, homeIntensity), homeTeam.marketAppeal, game.homeTeamId, true),
+    teamStateUpdate(awayTeamState, awayWinPct, awayRoster, chemistryTrainingBonus(awayFocus, awayIntensity), awayTeam.marketAppeal, game.awayTeamId, false),
   ]);
 
   // Match entre deux équipes IA : rien d'autre à faire (presse, demandes de

@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getScheduleForCareer } from "@/lib/data-access/schedule";
 import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
 import { upgradeFacility as upgradeFacilityDataAccess } from "@/lib/data-access/team-state";
+import { clampPriceLevel } from "@/lib/careers/finance-rules";
 
 // Amélioration d'infrastructures/personnel — uniquement pendant la fenêtre
 // d'intersaison (saison régulière ET playoffs terminés, champion désigné,
@@ -16,7 +17,7 @@ export async function upgradeFacility(formData: FormData): Promise<void> {
   const { userId } = await verifySession();
   const component = String(formData.get("component") ?? "");
   // Le staff ne s'achète plus par paliers : il se recrute (page Staff).
-  if (component !== "facilities") return;
+  if (component !== "facilities" && component !== "arena") return;
 
   const membership = await prisma.membership.findFirst({
     where: await activeMembershipWhere(userId),
@@ -39,8 +40,24 @@ export async function upgradeFacility(formData: FormData): Promise<void> {
     membership.careerId,
     membership.teamId,
     membership.career.leagueId,
-    component
+    component,
+    membership.career.season
   );
 
+  revalidatePath("/franchise");
+}
+
+// Prix des billets et de la restauration (en % du prix « marché »),
+// modifiables à tout moment : effet dès le prochain match à domicile.
+export async function setPricing(formData: FormData): Promise<void> {
+  const { userId } = await verifySession();
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId) });
+  if (!membership) return;
+  const ticket = clampPriceLevel(Number(formData.get("ticketPriceLevel")));
+  const concession = clampPriceLevel(Number(formData.get("concessionPriceLevel")));
+  await prisma.teamState.updateMany({
+    where: { careerId: membership.careerId, teamId: membership.teamId },
+    data: { ticketPriceLevel: ticket, concessionPriceLevel: concession },
+  });
   revalidatePath("/franchise");
 }
