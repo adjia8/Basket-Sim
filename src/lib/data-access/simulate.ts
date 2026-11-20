@@ -1,4 +1,5 @@
 import "server-only";
+import { parseCalendar, sessionsBetween, summarizeSessions } from "@/lib/careers/training-calendar-rules";
 import { maybePlayerRequests } from "@/lib/data-access/player-requests";
 import { getGameById } from "@/lib/data-access/schedule";
 import { evaluatePlayingTimePromises } from "@/lib/data-access/playing-time-promises";
@@ -511,10 +512,21 @@ export async function simulateAndResolveGame(
   // `patches`, appliqué en une seule requête à la fin (voir
   // player-state-patches.ts) plutôt qu'une écriture par joueur et par étape.
   const patches = new PlayerStatePatches();
-  const homeFocus = homeTeamState.trainingFocus as TrainingFocus | null;
-  const awayFocus = awayTeamState.trainingFocus as TrainingFocus | null;
-  const homeIntensity = homeTeamState.trainingIntensity as TrainingIntensity;
-  const awayIntensity = awayTeamState.trainingIntensity as TrainingIntensity;
+  // Entraînement réellement suivi depuis le match précédent : d'après le
+  // calendrier de l'équipe s'il en a un (voir training-calendar-rules.ts),
+  // sinon son programme fixe (axe + intensité).
+  const trainingFor = (state: typeof homeTeamState, restDays: number): { focus: TrainingFocus | null; intensity: TrainingIntensity } => {
+    const base = state.trainingIntensity as TrainingIntensity;
+    const calendar = parseCalendar(state.trainingCalendarJson);
+    if (!calendar) return { focus: state.trainingFocus as TrainingFocus | null, intensity: base };
+    return summarizeSessions(sessionsBetween(calendar, gameDate, restDays), base);
+  };
+  const homeTraining = trainingFor(homeTeamState, homeRestDays);
+  const awayTraining = trainingFor(awayTeamState, awayRestDays);
+  const homeFocus = homeTraining.focus;
+  const awayFocus = awayTraining.focus;
+  const homeIntensity = homeTraining.intensity;
+  const awayIntensity = awayTraining.intensity;
   // Intensité qui pèse vraiment sur les organismes (usure, risque, progrès) :
   // seulement quand un programme d'entraînement actif est en place.
   const homeLoad = homeFocus && homeFocus !== "rest" ? homeIntensity : null;

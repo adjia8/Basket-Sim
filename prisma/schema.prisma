@@ -671,6 +671,7 @@ model TeamState {
   trainingStaffLevel       Int       @default(50) // 0-100
   trainingFocus            String? // "offensive" | "defensive" | "tactical" | "physical" | "chemistry" | "rest", null = aucun
   trainingIntensity        String    @default("medium") // "low" | "medium" | "high"
+  trainingCalendarJson     String? // calendrier d'entraînement (modèle + séances choisies) — voir training-calendar-rules.ts
   morale                   Int       @default(50) // 0-99, piloté par les réponses en conférence de presse
   publicOpinion            Int       @default(50) // 0-99, opinion fans/autres franchises, pilotée par les réponses en conférence de presse
   lastPressConferenceDate  DateTime?

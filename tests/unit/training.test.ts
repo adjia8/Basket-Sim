@@ -1,0 +1,56 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { autoSession, sessionsBetween, summarizeSessions } from "../../src/lib/careers/training-calendar-rules";
+
+test("modèle : récupération le lendemain d'un match, tactique la veille", () => {
+  assert.equal(autoSession("balanced", 1, 3), "recovery");
+  assert.equal(autoSession("balanced", 3, 3), "tactical");
+  assert.equal(autoSession("light", 1, 1), "recovery");
+});
+
+test("back-to-back : aucune séance, donc repos", () => {
+  const cal = { template: "balanced" as const, overrides: {} };
+  assert.deepEqual(sessionsBetween(cal, new Date("2026-11-10T12:00:00Z"), 1), []);
+  assert.deepEqual(summarizeSessions([], "high"), { focus: "rest", intensity: "low" });
+});
+
+test("les choix du GM priment sur le modèle, aux bonnes dates", () => {
+  const cal = { template: "heavy" as const, overrides: { "2026-11-08": "physical" as const } };
+  // Match le 10, précédent le 6 : jours libres 7, 8, 9.
+  const s = sessionsBetween(cal, new Date("2026-11-10T12:00:00Z"), 4);
+  assert.equal(s.length, 3);
+  assert.equal(s[0], "recovery");
+  assert.equal(s[1], "physical");
+  assert.equal(s[2], "tactical");
+});
+
+test("résumé : axe dominant et intensité selon la charge", () => {
+  const hard = summarizeSessions(["physical", "physical", "shooting"], "medium");
+  assert.equal(hard.focus, "physical");
+  assert.equal(hard.intensity, "high");
+  const easy = summarizeSessions(["recovery", "tactical", "rest"], "medium");
+  assert.equal(easy.focus, "tactical");
+  assert.equal(easy.intensity, "low");
+  // L'intensité choisie par le GM module la charge.
+  assert.equal(summarizeSessions(["shooting", "defense"], "low").intensity, "medium");
+  assert.equal(summarizeSessions(["shooting", "defense"], "high").intensity, "high");
+});
+
+test("semaine chargée plus douce qu'une semaine légère", () => {
+  const cal = (template: "heavy" | "light") => ({ template, overrides: {} });
+  const load = (t: "heavy" | "light") => summarizeSessions(sessionsBetween(cal(t), new Date("2026-11-20T12:00:00Z"), 6), "medium").intensity;
+  const order = { low: 0, medium: 1, high: 2 };
+  assert.ok(order[load("heavy")] < order[load("light")]);
+});
+
+import { planDays } from "../../src/lib/careers/training-calendar-rules";
+
+test("affichage : jours de match repérés, séances du modèle et choix du GM", () => {
+  const cal = { template: "balanced" as const, overrides: { "2026-11-12": "rest" as const } };
+  const days = planDays(new Date("2026-11-10T12:00:00Z"), 5, ["2026-11-10", "2026-11-14"], cal);
+  assert.deepEqual(days.map((d) => d.game), [true, false, false, false, true]);
+  assert.equal(days[1].session, "recovery"); // lendemain de match
+  assert.equal(days[2].session, "rest");
+  assert.equal(days[2].custom, true);
+  assert.equal(days[3].session, "tactical"); // veille de match
+});

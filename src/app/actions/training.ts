@@ -1,5 +1,13 @@
 "use server";
 
+import {
+  CALENDAR_TEMPLATES,
+  SESSION_TYPES,
+  parseCalendar,
+  type CalendarTemplate,
+  type SessionType,
+  type TrainingCalendar,
+} from "@/lib/careers/training-calendar-rules";
 import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/auth/dal";
@@ -54,4 +62,52 @@ export async function setTrainingPlan(
 
   revalidatePath(`/teams/${membership.teamId}`);
   return { success: t("training.applied") };
+}
+
+export interface TrainingCalendarFormState {
+  error?: string;
+  success?: string;
+}
+
+// Calendrier d'entraînement (voir training-calendar-rules.ts) : modèle et
+// séances choisies jour par jour (« auto » = revenir au modèle ce jour-là).
+// mode = "save" | "reset" (efface les choix) | "off" (retour au programme fixe).
+export async function saveTrainingCalendar(
+  _prev: TrainingCalendarFormState | undefined,
+  formData: FormData
+): Promise<TrainingCalendarFormState> {
+  const { userId } = await verifySession();
+  const { t } = await getTranslator();
+  const mode = String(formData.get("mode") ?? "save");
+  const template = String(formData.get("template") ?? "balanced") as CalendarTemplate;
+  if (!CALENDAR_TEMPLATES.includes(template)) return { error: t("calendar.error") };
+
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId), include: { career: true } });
+  if (!membership) return { error: t("rosterAction.noCareer") };
+  const state = await getOrCreateTeamState(membership.careerId, membership.teamId, membership.career.leagueId);
+
+  if (mode === "off") {
+    await prisma.teamState.update({ where: { id: state.id }, data: { trainingCalendarJson: null } });
+    revalidatePath(`/teams/${membership.teamId}`);
+    return { success: t("calendar.off") };
+  }
+  const current = parseCalendar(state.trainingCalendarJson);
+  const overrides: Record<string, SessionType> = mode === "reset" ? {} : { ...(current?.overrides ?? {}) };
+  if (mode === "save") {
+    for (const [key, value] of formData.entries()) {
+      if (!key.startsWith("day:")) continue;
+      const date = key.slice(4);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+      const v = String(value);
+      if (v === "auto") delete overrides[date];
+      else if (SESSION_TYPES.includes(v as SessionType)) overrides[date] = v as SessionType;
+    }
+  }
+  // Les jours passés ne servent plus : on ne garde que les 60 derniers jours.
+  const cutoff = new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
+  for (const d of Object.keys(overrides)) if (d < cutoff) delete overrides[d];
+  const calendar: TrainingCalendar = { template, overrides };
+  await prisma.teamState.update({ where: { id: state.id }, data: { trainingCalendarJson: JSON.stringify(calendar) } });
+  revalidatePath(`/teams/${membership.teamId}`);
+  return { success: t("calendar.saved") };
 }

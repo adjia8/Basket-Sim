@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { TrainingCalendarPanel, type CalendarPanelDay } from "@/components/team/TrainingCalendarPanel";
+import { CALENDAR_TEMPLATES, SESSION_TYPES, parseCalendar, planDays } from "@/lib/careers/training-calendar-rules";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { getTacticsReport } from "@/lib/data-access/tactics";
 import { TacticsPanel } from "@/components/team/TacticsPanel";
@@ -15,7 +17,7 @@ import { getSeasonStatsForPlayers, type SeasonStats } from "@/lib/data-access/se
 import { getTradeDeadlineInfo } from "@/lib/data-access/season-windows";
 import { TradeDeadlineNotice } from "@/components/team/TradeDeadlineNotice";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
-import { getTeamById } from "@/lib/data-access/teams";
+import { getTeamById, getTeamsByLeague } from "@/lib/data-access/teams";
 import { prisma } from "@/lib/prisma";
 import { RosterTable, type RosterPlayer } from "@/components/team/RosterTable";
 import { TradeProposalForm, type TradePick } from "@/components/team/TradeProposalForm";
@@ -34,7 +36,7 @@ import { NBA_SECOND_APRON, NBA_TAX_LINE, payrollWarningLine } from "@/lib/career
 import { getPlayerDemandStates, type PlayerDemandState } from "@/lib/data-access/trade-requests";
 import { mergeRotationOrder, parseRotationOrder } from "@/lib/careers/rotation-rules";
 import { getTranslator, type Translator } from "@/lib/i18n/translate";
-import { formatSalary, teamFullName } from "@/lib/utils";
+import { formatGameDate, formatSalary, teamFullName } from "@/lib/utils";
 
 function pickLabel(t: Translator, pick: Pick<TradePick, "pickNumber" | "round" | "season" | "originalTeamId" | "teamId" | "originalTeamAbbreviation">): string {
   const base =
@@ -230,6 +232,54 @@ export default async function TeamRosterPage({
   if (activeTab === "staff") await ensureCareerStaff(membership.careerId, team.leagueId, membership.season);
   const teamStaff = activeTab === "staff" ? await getTeamStaff(membership.careerId, team.id) : null;
   if (activeTab === "tactics") await ensureCareerStaff(membership.careerId, team.leagueId, membership.season);
+  // Calendrier d'entraînement des 14 prochains jours (mon équipe, onglet
+  // Entraînement) — voir training-calendar-rules.ts.
+  const trainingCalendar = parseCalendar(teamState.trainingCalendarJson);
+  let calendarDays: CalendarPanelDay[] | null = null;
+  if (isMyTeam && activeTab === "training") {
+    const lastPlayed = await prisma.game.findFirst({
+      where: { careerId: membership.careerId, status: "final" },
+      orderBy: { gameDate: "desc" },
+      select: { gameDate: true },
+    });
+    const firstUpcoming = await prisma.game.findFirst({
+      where: { careerId: membership.careerId, status: { not: "final" } },
+      orderBy: { gameDate: "asc" },
+      select: { gameDate: true },
+    });
+    const anchor = lastPlayed?.gameDate ?? firstUpcoming?.gameDate ?? new Date();
+    const from = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate() + (lastPlayed ? 1 : 0), 12));
+    const until = new Date(from.getTime() + 15 * 86_400_000);
+    const myGames = await prisma.game.findMany({
+      where: {
+        careerId: membership.careerId,
+        status: { not: "final" },
+        gameDate: { gte: new Date(from.getTime() - 86_400_000), lte: until },
+        OR: [{ homeTeamId: team.id }, { awayTeamId: team.id }],
+      },
+      select: { gameDate: true, homeTeamId: true, awayTeamId: true },
+    });
+    const allTeams = await getTeamsByLeague(team.leagueId);
+    const abbr = new Map(allTeams.map((x) => [x.id, x.abbreviation]));
+    const gameByDay = new Map(
+      myGames.map((g) => [
+        g.gameDate.toISOString().slice(0, 10),
+        g.homeTeamId === team.id ? `vs ${abbr.get(g.awayTeamId) ?? ""}` : `@ ${abbr.get(g.homeTeamId) ?? ""}`,
+      ])
+    );
+    const cal = trainingCalendar ?? { template: "balanced" as const, overrides: {} };
+    const planned = planDays(from, 14, [...gameByDay.keys()], cal);
+    const auto = planDays(from, 14, [...gameByDay.keys()], { ...cal, overrides: {} });
+    calendarDays = planned.map((d, i) => ({
+      date: d.date,
+      label: formatGameDate(d.date, locale),
+      game: d.game ? (gameByDay.get(d.date) ?? "") : null,
+      session: d.session,
+      autoSession: auto[i].session,
+      custom: d.custom,
+    }));
+  }
+
   const tacticsReport = activeTab === "tactics" ? await getTacticsReport(membership.careerId, team.id, team.leagueId) : null;
   const tacticsOpponent = tacticsReport?.opponent ? await getTeamById(tacticsReport.opponent.teamId) : null;
 
@@ -330,6 +380,29 @@ export default async function TeamRosterPage({
             focus={teamState.trainingFocus}
             intensity={teamState.trainingIntensity}
           />
+          {calendarDays && (
+            <TrainingCalendarPanel
+              active={!!trainingCalendar}
+              template={trainingCalendar?.template ?? "balanced"}
+              days={calendarDays}
+              templates={CALENDAR_TEMPLATES.map((v) => ({ value: v, label: t(`calendar.template.${v}`) }))}
+              sessions={SESSION_TYPES.map((v) => ({ value: v, label: t(`calendar.session.${v}`) }))}
+              labels={{
+                title: t("calendar.title"),
+                subtitle: t("calendar.subtitle"),
+                inactive: t("calendar.inactive"),
+                activate: t("calendar.activate"),
+                template: t("calendar.template"),
+                save: t("calendar.save"),
+                saving: t("calendar.saving"),
+                reset: t("calendar.reset"),
+                offButton: t("calendar.offButton"),
+                game: t("calendar.game"),
+                custom: t("calendar.custom"),
+                auto: t("calendar.auto"),
+              }}
+            />
+          )}
           <IndividualTrainingPanel teamId={team.id} roster={roster} t={t} />
         </div>
       )}
