@@ -11,7 +11,10 @@ import { onboardNbaTeam } from "./helpers";
 async function expectPageOk(page: Page, path: string) {
   await page.goto(path);
   await expect(page.getByText("This page couldn’t load")).toHaveCount(0);
-  await expect(page.locator("nextjs-portal")).toHaveCount(0);
+  // Le portail des outils de dev Next existe toujours (badge « N ») : on
+  // vérifie seulement qu'il ne signale aucune erreur.
+  await page.waitForLoadState("networkidle");
+  await expect(page.locator("[data-issues-count], [data-nextjs-dialog]")).toHaveCount(0);
 }
 
 test("pages de gestion, négociation et carrières multiples", async ({ page }) => {
@@ -53,7 +56,7 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       await expect(talk.getByText("Toi")).toBeVisible({ timeout: 30_000 });
 
       await expectPageOk(page, "/cup");
-      await expect(page.getByText("Phase de groupes")).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Phase de groupes" })).toBeVisible();
       await expect(page.getByText("Ouest C")).toBeVisible();
 
       await expectPageOk(page, "/schedule");
