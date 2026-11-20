@@ -189,6 +189,7 @@ model PressConference {
   skipped    Boolean         @default(false) // adjoint envoyé à la place du GM
   headline   String? // gros titre retenu par la presse après la conférence
   answeredAt DateTime?
+  reactionsJson String? // réactions des joueurs, médias et fans à ce qui a été dit — voir press-reactions-rules.ts
 
   @@index([careerId, teamId])
 }

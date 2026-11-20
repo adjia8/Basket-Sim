@@ -1,3 +1,4 @@
+import type { PressReactions } from "@/lib/careers/press-reactions-rules";
 import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -129,6 +130,64 @@ function ConferenceResult({ conference, t, locale }: { conference: PressConferen
           })}
         </ul>
       )}
+      {conference.reactions && <Reactions reactions={conference.reactions} t={t} />}
+    </div>
+  );
+}
+
+const STANCE_STYLE: Record<string, string> = { praise: "text-good", critical: "text-bad", neutral: "text-muted" };
+
+// Ce que les joueurs, la presse et les fans ont retenu de la conférence
+// (voir press-reactions-rules.ts).
+function Reactions({ reactions, t }: { reactions: PressReactions; t: Translator }) {
+  return (
+    <div className="mt-2 grid gap-4 border-t border-line-soft pt-3 text-sm md:grid-cols-3" data-testid="press-reactions">
+      <div>
+        <h3 className="eyebrow mb-2">{t("pressPage.reactions.players")}</h3>
+        {reactions.players.length === 0 ? (
+          <p className="text-xs text-faint">{t("pressPage.reactions.none")}</p>
+        ) : (
+          <ul className="space-y-2">
+            {reactions.players.map((r) => (
+              <li key={r.playerId + r.kind}>
+                <span className="font-medium">{r.name}</span>
+                <span className="ml-1 text-[11px] text-faint">{t(`pressPage.reactions.kind.${r.kind}` as DictionaryKey)}</span>
+                <p className="text-soft italic">« {r.quote} »</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div>
+        <h3 className="eyebrow mb-2">{t("pressPage.reactions.media")}</h3>
+        <ul className="space-y-2">
+          {reactions.media.map((m, i) => (
+            <li key={i}>
+              <span className="text-[11px] text-faint">{m.outlet}</span>
+              <p className={`font-medium ${STANCE_STYLE[m.stance] ?? ""}`}>{m.headline}</p>
+            </li>
+          ))}
+        </ul>
+        {reactions.mediaReputation && (
+          <p className="mt-2 text-xs text-muted">{t(`pressPage.reactions.reputation.${reactions.mediaReputation}` as DictionaryKey)}</p>
+        )}
+      </div>
+      <div>
+        <h3 className="eyebrow mb-2">{t("pressPage.reactions.fans")}</h3>
+        <ul className="space-y-2">
+          {reactions.fans.map((f, i) => (
+            <li key={i}>
+              <span className="text-[11px] text-faint">{f.handle}</span>
+              <p className="text-soft">{f.text}</p>
+            </li>
+          ))}
+        </ul>
+        {reactions.fanMood !== 0 && (
+          <p className={`mt-2 text-xs ${reactions.fanMood > 0 ? "text-good" : "text-bad"}`}>
+            {t("pressPage.reactions.attendance", { delta: reactions.fanMood > 0 ? `+${reactions.fanMood}` : `${reactions.fanMood}` })}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

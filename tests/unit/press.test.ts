@@ -120,3 +120,80 @@ test("conférences de presse WNBA : accords au féminin dans les nouveaux sujets
   assert.ok(texts.some((t) => /retenue|l'avez-vous trouvée/.test(t)), "pas d'accord féminin");
   assert.ok(!texts.some((t) => /\bretenu pour\b/.test(t)));
 });
+
+// ---------------------------------------------------------------------------
+// Réactions aux déclarations (joueurs, médias, fans)
+
+import { pressReactions, type ReactionInput, type ReactionPlayer } from "../../src/lib/careers/press-reactions-rules";
+import type { Personality } from "../../src/lib/careers/personality-rules";
+
+const pers = (o: Partial<Personality>): Personality => ({ professionalism: 10, ambition: 10, loyalty: 10, temperament: 10, leadership: 8, ...o });
+const player = (id: string, renown: number, o: Partial<Personality>): ReactionPlayer => ({ id, name: `Joueur ${id}`, renown, personality: pers(o), hasPendingRequest: false });
+const fx = (morale: number, publicOpinion: number, frontOfficeApproval: number, extra = {}) => ({ morale, publicOpinion, frontOfficeApproval, ...extra });
+
+function react(over: Partial<ReactionInput>) {
+  return pressReactions({
+    locale: "fr", women: false, teamShortName: "Lakers", teamCity: "Los Angeles", winPct: 0.5, gamesPlayed: 30,
+    skipped: false, answers: [], roster: [], recentTones: [], random: () => 0.1, ...over,
+  });
+}
+
+test("réactions : chaque joueur réagit à une critique publique selon son caractère", () => {
+  const critique = { topic: "star_struggle", tone: "aggressive" as const, label: "« Il doit en faire plus. »", effects: fx(-1, 1, 1, { playerMorale: -10 }), playerId: "a", outlet: "Hot Take Radio" };
+  const hot = react({ answers: [critique], roster: [player("a", 80, { temperament: 3 })] });
+  assert.equal(hot.players[0].kind, "public_reply");
+  assert.ok(hot.players[0].requestMeeting && hot.effects.publicOpinion < 0);
+  const pro = react({ answers: [critique], roster: [player("a", 80, { professionalism: 17 })] });
+  assert.equal(pro.players[0].kind, "takes_it_well");
+  assert.ok(pro.players[0].moraleDelta > 0);
+  const sulky = react({ answers: [critique], roster: [player("a", 80, {})] });
+  assert.equal(sulky.players[0].kind, "wants_meeting");
+  const praise = { ...critique, tone: "passionate" as const, effects: fx(1, 2, 0, { playerMorale: 8 }) };
+  assert.equal(react({ answers: [praise], roster: [player("a", 80, { ambition: 16 })] }).players[0].kind, "fired_up");
+});
+
+test("réactions : le leader du vestiaire soutient le coach ou défend le groupe", () => {
+  const shout = { topic: "locker_room", tone: "aggressive" as const, label: "« Trop confortable. »", effects: fx(-1, 1, 2, { squadMorale: -2 }), playerId: null, outlet: "Panier Plus" };
+  const backs = react({ answers: [shout], roster: [player("l", 70, { leadership: 18, professionalism: 15 })] });
+  assert.equal(backs.players[0].kind, "leader_backs_coach");
+  assert.ok(backs.effects.squadMorale > 0);
+  const defends = react({ answers: [shout], roster: [player("l", 70, { leadership: 18, professionalism: 6 })] });
+  assert.equal(defends.players[0].kind, "leader_defends_group");
+});
+
+test("réactions : la presse reprend selon la déclaration et se souvient du style du coach", () => {
+  const refs = { topic: "referees", tone: "aggressive" as const, label: "« L'arbitrage a été catastrophique. »", effects: fx(2, 2, -2, { refereeCriticism: true }), playerId: null, outlet: "Hot Take Radio" };
+  assert.match(react({ answers: [refs] }).media[0].headline, /arbitre/i);
+  const wood = { topic: "opponent", tone: "reserved" as const, label: "« Je me concentre sur mon équipe. »", effects: fx(0, 0, 0), playerId: null, outlet: "Courtside Daily" };
+  const closed = react({ answers: [wood, wood], recentTones: ["reserved", "reserved", "reserved", "calm", "reserved", "reserved"] });
+  assert.match(closed.media[0].headline, /langue de bois/i);
+  assert.equal(closed.mediaReputation, "closed");
+  assert.ok(closed.effects.publicOpinion <= -2);
+  assert.match(react({ skipped: true }).media[0].headline, /fuit/);
+});
+
+test("réactions : les fans se moquent, se fâchent ou adorent selon le contexte", () => {
+  const title = { topic: "standings", tone: "assertive" as const, label: "« Le titre. »", effects: fx(1, 1, -2), playerId: null, outlet: "Courtside Daily" };
+  const mock = react({ answers: [title], winPct: 0.3 });
+  assert.ok(mock.fans.some((f) => f.mood === "mock"));
+  assert.ok(mock.effects.attendance < 0);
+  const star = player("s", 92, {});
+  const hitStar = { topic: "star_struggle", tone: "aggressive" as const, label: "« Il doit en faire plus. »", effects: fx(-1, 1, 1, { playerMorale: -10 }), playerId: "s", outlet: "Buzzer Beat" };
+  const angry = react({ answers: [hitStar], roster: [star, player("b", 60, {})] });
+  assert.ok(angry.fans.some((f) => f.mood === "angry") && angry.effects.attendance < 0);
+  const love = { topic: "fans", tone: "passionate" as const, label: "« Merci ! »", effects: fx(1, 3, 0), playerId: null, outlet: "Los Angeles Tribune" };
+  assert.ok(react({ answers: [love] }).effects.attendance > 0);
+  assert.ok(react({ skipped: true }).fans.some((f) => f.mood === "angry"));
+});
+
+test("réactions : un journal différent par article, pas de « on gagne » sans résultats", () => {
+  const a = (topic: string) => ({ topic, tone: "aggressive" as const, label: "« Inacceptable. »", effects: fx(-2, 2, 2, { squadMorale: -3, refereeCriticism: topic === "referees" }), playerId: null, outlet: "Hot Take Radio" });
+  for (let i = 0; i < 20; i++) {
+    const r = pressReactions({
+      locale: "fr", women: false, teamShortName: "Lakers", teamCity: "Los Angeles", winPct: 0.5, gamesPlayed: 0,
+      skipped: false, answers: [a("referees"), a("locker_room"), a("result")], roster: [], recentTones: [],
+    });
+    assert.equal(new Set(r.media.map((m) => m.outlet)).size, r.media.length);
+    assert.ok(!r.fans.some((f) => /on gagne/.test(f.text)));
+  }
+});

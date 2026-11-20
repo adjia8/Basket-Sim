@@ -197,7 +197,7 @@ function MessageCard({
         </span>
       </div>
       <p className={`mt-2 ${isUnread ? "font-semibold" : "font-medium"}`}>{message.title}</p>
-      <p className="mt-1 text-sm text-soft">{message.body}</p>
+      <p className="mt-1 whitespace-pre-line text-sm text-soft">{message.body}</p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {poachDecision && (

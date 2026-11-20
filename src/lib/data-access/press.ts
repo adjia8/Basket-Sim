@@ -6,12 +6,13 @@ import { getStandings } from "@/lib/data-access/standings";
 import { createInboxMessage } from "@/lib/data-access/inbox";
 import { winPctForStandings } from "@/lib/careers/player-demands";
 import {
-  playerReactionMessageText,
+  playerPressReactionMessageText,
   pressMessageText,
   pressReviewMessageText,
   refereeFineMessageText,
 } from "@/lib/careers/inbox-rules";
 import { clampMorale } from "@/lib/careers/morale-rules";
+import { pressReactions, type PressReactions } from "@/lib/careers/press-reactions-rules";
 import { NBA_TAX_LINE } from "@/lib/careers/cap-rules";
 import { getPayrollForTeam } from "@/lib/data-access/contracts";
 import { parseBoardObjectives, type BoardObjective } from "@/lib/careers/board-objectives-rules";
@@ -68,6 +69,7 @@ export interface PressConferenceView {
   kind: string;
   skipped: boolean;
   headline: string | null;
+  reactions: PressReactions | null;
   questions: PressQuestionView[];
 }
 
@@ -79,6 +81,7 @@ type ConferenceRow = {
   kind: string;
   skipped: boolean;
   headline: string | null;
+  reactionsJson?: string | null;
   questions: {
     id: string;
     order: number;
@@ -103,6 +106,7 @@ function toView(row: ConferenceRow): PressConferenceView {
     kind: row.kind,
     skipped: row.skipped,
     headline: row.headline,
+    reactions: row.reactionsJson ? (JSON.parse(row.reactionsJson) as PressReactions) : null,
     questions: [...row.questions]
       .sort((a, b) => a.order - b.order)
       .map((q) => ({
@@ -408,7 +412,7 @@ async function resolveConference(
       where: { careerId_teamId: { careerId, teamId } },
       include: { gmProfile: true },
     }),
-    prisma.team.findUnique({ where: { id: teamId }, select: { name: true } }),
+    prisma.team.findUnique({ where: { id: teamId }, select: { name: true, city: true } }),
     prisma.contract.findMany({ where: { careerId, teamId }, select: { playerId: true } }),
   ]);
   const playerStates = await prisma.playerState.findMany({
@@ -470,6 +474,48 @@ async function resolveConference(
   const teamShortName = team?.name ?? teamId;
   const headline = pressHeadline(locale, teamShortName, chosenOptions, skipped);
 
+  // Réactions des joueurs, des médias et des fans à ce qui vient d'être dit
+  // (voir press-reactions-rules.ts).
+  const recentConferences = await prisma.pressConference.findMany({
+    where: { careerId, teamId, status: "answered", id: { not: conferenceId } },
+    orderBy: { answeredAt: "desc" },
+    take: 4,
+    include: { questions: { select: { chosenOptionId: true, optionsJson: true } } },
+  });
+  const recentTones = recentConferences.flatMap((c) =>
+    c.questions
+      .map((q) => (JSON.parse(q.optionsJson) as PressOption[]).find((o) => o.id === q.chosenOptionId)?.tone)
+      .filter((tone): tone is AnswerTone => !!tone)
+  );
+  const reactions = pressReactions({
+    locale,
+    women: leagueId === "wnba",
+    teamShortName,
+    teamCity: team?.city ?? teamShortName,
+    winPct: teamWinPct,
+    gamesPlayed: (standingsRow?.wins ?? 0) + (standingsRow?.losses ?? 0),
+    skipped,
+    answers: conference.questions.flatMap((q) => {
+      const chosen = (JSON.parse(q.optionsJson) as PressOption[]).find((o) => o.id === answerByQuestionId.get(q.id));
+      return chosen
+        ? [{ topic: q.topic, tone: chosen.tone, label: chosen.label, effects: chosen.effects ?? pressAnswerEffects(chosen.tone, teamWinPct), playerId: q.playerId, outlet: q.outlet }]
+        : [];
+    }),
+    roster: playerStates.map((st) => ({
+      id: st.playerId,
+      name: nameById.get(st.playerId) ?? st.playerId,
+      renown: st.renown,
+      personality: personalityFor(st.playerId, st.age),
+      hasPendingRequest: !!st.pendingRequest,
+    })),
+    recentTones,
+  });
+  totals.publicOpinion += reactions.effects.publicOpinion;
+  squadDelta += reactions.effects.squadMorale;
+  for (const r of reactions.players) {
+    if (r.moraleDelta) playerDeltas.set(r.playerId, (playerDeltas.get(r.playerId) ?? 0) + r.moraleDelta);
+  }
+
   // Moral individuel : le vestiaire entier, puis le joueur visé en plus.
   const moraleWrites: { playerId: string; morale: number }[] = [];
   for (const [playerId, current] of moraleById) {
@@ -486,7 +532,7 @@ async function resolveConference(
   // adjoint) ne peuvent jamais l'appliquer deux fois.
   const claimed = await prisma.pressConference.updateMany({
     where: { id: conferenceId, status: "pending" },
-    data: { status: "answered", skipped, headline, answeredAt: new Date() },
+    data: { status: "answered", skipped, headline, answeredAt: new Date(), reactionsJson: JSON.stringify(reactions) },
   });
   if (claimed.count === 0) return;
 
@@ -506,6 +552,9 @@ async function resolveConference(
       data: {
         morale: Math.max(0, Math.min(99, state.morale + totals.morale)),
         publicOpinion: Math.max(0, Math.min(99, state.publicOpinion + totals.publicOpinion)),
+        // Les fans votent avec leurs pieds : l'humeur des réseaux pèse un peu
+        // sur l'affluence (voir attendance-rules.ts pour la dérive de fond).
+        attendance: Math.max(0, Math.min(99, state.attendance + reactions.effects.attendance)),
         refereeCriticisms: newCriticisms,
         ...(fine > 0 ? { finances: state.finances - fine } : {}),
       },
@@ -525,23 +574,23 @@ async function resolveConference(
       : []),
   ]);
   await patches.apply(careerId);
+  const meetings = reactions.players.filter((r) => r.requestMeeting).map((r) => r.playerId);
+  if (meetings.length > 0) {
+    await prisma.playerState.updateMany({
+      where: { careerId, playerId: { in: meetings }, pendingRequest: null },
+      data: { pendingRequest: "support", requestAt: conference.gameDate },
+    });
+  }
 
   const gameDate = conference.gameDate;
-  const review = pressReviewMessageText(locale, headline, totals, skipped);
+  const review = pressReviewMessageText(locale, headline, totals, skipped, reactions);
   await createInboxMessage(careerId, teamId, season, "press_review", review.title, review.body, "/press", { gameDate });
-  for (const [playerId, delta] of playerDeltas) {
-    if (Math.abs(delta) < 6) continue;
-    const reaction = playerReactionMessageText(locale, nameById.get(playerId) ?? playerId, delta > 0, leagueId === "wnba");
-    await createInboxMessage(
-      careerId,
-      teamId,
-      season,
-      "player_reaction",
-      reaction.title,
-      reaction.body,
-      `/teams/${teamId}/players/${playerId}`,
-      { gameDate, playerId }
-    );
+  for (const r of reactions.players) {
+    const msg = playerPressReactionMessageText(locale, r, leagueId === "wnba");
+    await createInboxMessage(careerId, teamId, season, "player_reaction", msg.title, msg.body, `/teams/${teamId}/players/${r.playerId}`, {
+      gameDate,
+      playerId: r.playerId,
+    });
   }
   if (fine > 0) {
     const msg = refereeFineMessageText(locale, fine);

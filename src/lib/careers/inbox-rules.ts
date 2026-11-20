@@ -10,6 +10,7 @@
 // section), qui lui passe bien par src/lib/i18n/dict/inbox.ts.
 
 import type { Locale } from "@/lib/i18n/locale";
+import type { PlayerReaction, PressReactions } from "./press-reactions-rules";
 import { formatSalary } from "@/lib/utils";
 
 // Anti-spam pour les messages "agent libre notable disponible" — même
@@ -50,53 +51,81 @@ export function pressReviewMessageText(
   locale: Locale,
   headline: string,
   totals: { morale: number; publicOpinion: number; frontOfficeApproval: number },
-  skipped: boolean
+  skipped: boolean,
+  reactions?: PressReactions
 ): InboxMessageText {
   const sign = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `${n}` : "±0");
-  if (locale === "fr") {
-    return {
-      title: `Revue de presse — ${headline}`,
-      body: skipped
-        ? `Ton adjoint a répondu aux journalistes à ta place. Opinion publique ${sign(totals.publicOpinion)}.`
-        : `Tes déclarations font les gros titres. Moral de l'équipe ${sign(totals.morale)}, opinion publique ${sign(totals.publicOpinion)}, relation avec la direction ${sign(totals.frontOfficeApproval)}.`,
-    };
+  const fr = locale === "fr";
+  const lines: string[] = [];
+  if (skipped) {
+    lines.push(fr ? `Ton adjoint a répondu aux journalistes à ta place. Opinion publique ${sign(totals.publicOpinion)}.` : `Your assistant answered the reporters for you. Public opinion ${sign(totals.publicOpinion)}.`);
+  } else {
+    lines.push(
+      fr
+        ? `Tes déclarations font les gros titres. Moral de l'équipe ${sign(totals.morale)}, opinion publique ${sign(totals.publicOpinion)}, relation avec la direction ${sign(totals.frontOfficeApproval)}.`
+        : `Your comments are making headlines. Team morale ${sign(totals.morale)}, public opinion ${sign(totals.publicOpinion)}, front office relationship ${sign(totals.frontOfficeApproval)}.`
+    );
   }
-  return {
-    title: `Press review — ${headline}`,
-    body: skipped
-      ? `Your assistant answered the reporters for you. Public opinion ${sign(totals.publicOpinion)}.`
-      : `Your comments are making headlines. Team morale ${sign(totals.morale)}, public opinion ${sign(totals.publicOpinion)}, front office relationship ${sign(totals.frontOfficeApproval)}.`,
-  };
+  if (reactions) {
+    if (reactions.media.length > 0) {
+      lines.push("", fr ? "Dans la presse :" : "In the press:");
+      for (const m of reactions.media) lines.push(`• ${m.outlet} — ${m.headline}`);
+    }
+    if (reactions.mediaReputation) {
+      const rep = {
+        closed: fr ? "Les journalistes te trouvent fermé : trop de langue de bois au fil des conférences (opinion publique -2)." : "Reporters find you guarded: too much stonewalling over recent pressers (public opinion -2).",
+        fiery: fr ? "Ta réputation de coach sulfureux grandit : chaque conférence fait le buzz." : "Your fiery reputation is growing: every presser makes noise.",
+        respected: fr ? "La presse salue ta constance et ta franchise (opinion publique +1)." : "The press praises your consistency and candor (public opinion +1).",
+      }[reactions.mediaReputation];
+      lines.push(rep);
+    }
+    if (reactions.fans.length > 0) {
+      lines.push("", fr ? "Sur les réseaux :" : "On social media:");
+      for (const f of reactions.fans) lines.push(`${f.handle} : « ${f.text} »`);
+      if (reactions.fanMood !== 0) {
+        lines.push(
+          reactions.fanMood > 0
+            ? fr ? `Les fans ont aimé : affluence ${sign(reactions.fanMood)}.` : `Fans loved it: attendance ${sign(reactions.fanMood)}.`
+            : fr ? `Les fans grincent des dents : affluence ${sign(reactions.fanMood)}.` : `Fans aren't happy: attendance ${sign(reactions.fanMood)}.`
+        );
+      }
+    }
+  }
+  return { title: `${fr ? "Revue de presse" : "Press review"} — ${headline}`, body: lines.join("\n") };
 }
 
-// Réaction d'un joueur à ce que le GM a dit de lui en conférence de presse.
-export function playerReactionMessageText(
-  locale: Locale,
-  playerName: string,
-  positive: boolean,
-  women = false
-): InboxMessageText {
-  if (locale === "fr") {
-    return positive
-      ? {
-          title: `${playerName} apprécie ton soutien public`,
-          body: `${playerName} a été ${women ? "touchée" : "touché"} par tes mots en conférence de presse. Son moral est en hausse.`,
-        }
-      : {
-          title: `${playerName} n'a pas apprécié tes propos`,
-          body: `${playerName} a mal vécu tes déclarations en conférence de presse. Son moral est en baisse — ${women ? "une joueuse malheureuse" : "un joueur malheureux"} finit par demander à partir.`,
-        };
-  }
-  const his = women ? "Her" : "His";
-  return positive
-    ? {
-        title: `${playerName} appreciates your public support`,
-        body: `${playerName} was touched by what you said at the press conference. ${his} morale is up.`,
-      }
-    : {
-        title: `${playerName} didn't like your comments`,
-        body: `${playerName} took your press conference comments badly. ${his} morale is down — an unhappy player eventually asks to leave.`,
-      };
+// Réaction d'un joueur à ce que le GM a dit (de lui ou du groupe) en
+// conférence de presse, selon sa personnalité (voir press-reactions-rules.ts).
+export function playerPressReactionMessageText(locale: Locale, r: PlayerReaction, women = false): InboxMessageText {
+  const fr = locale === "fr";
+  const e = (m: string, f: string) => (women ? f : m);
+  const titles: Record<PlayerReaction["kind"], [string, string]> = {
+    grateful: [`${r.name} apprécie ton soutien public`, `${r.name} appreciates your public support`],
+    fired_up: [`${r.name}, ${e("galvanisé", "galvanisée")} par tes mots`, `${r.name} is fired up by your words`],
+    public_reply: [`${r.name} te répond dans les médias`, `${r.name} fires back in the media`],
+    takes_it_well: [`${r.name} accepte la critique`, `${r.name} takes the criticism on board`],
+    wants_meeting: [`${r.name} a mal vécu tes propos`, `${r.name} took your comments badly`],
+    leader_backs_coach: [`${r.name} soutient ton discours`, `${r.name} backs your message`],
+    leader_defends_group: [`${r.name} prend la défense du vestiaire`, `${r.name} stands up for the locker room`],
+    leader_thanks: [`${r.name} salue ton soutien au groupe`, `${r.name} thanks you for backing the group`],
+  };
+  const notes: Record<PlayerReaction["kind"], [string, string]> = {
+    grateful: ["Son moral est en hausse.", "Morale is up."],
+    fired_up: ["Son moral grimpe, et l'ambition avec.", "Morale is up, and ambition with it."],
+    public_reply: [
+      "Sa réponse publique fait du bruit dans le vestiaire et dans la presse. Il demande à te voir.",
+      "The public reply is making noise in the locker room and the press. A meeting has been requested.",
+    ],
+    takes_it_well: ["En vrai professionnel, il en fait une motivation : le vestiaire apprécie.", "A true professional, using it as motivation — the locker room appreciates it."],
+    wants_meeting: ["Son moral baisse et il demande à te parler.", "Morale is down and a meeting has been requested."],
+    leader_backs_coach: ["Le leader du vestiaire relaie ton message : le groupe suit.", "The locker-room leader relays your message: the group follows."],
+    leader_defends_group: ["Le leader du vestiaire n'a pas aimé que tu t'en prennes au groupe.", "The locker-room leader didn't like you going after the group."],
+    leader_thanks: ["Le vestiaire se sent soutenu.", "The locker room feels backed."],
+  };
+  const [titleFr, titleEn] = titles[r.kind];
+  const [noteFr, noteEn] = notes[r.kind];
+  const note = fr ? (women ? noteFr.replace(/\bIl\b/g, "Elle").replace(/\bil\b/g, "elle") : noteFr) : noteEn;
+  return { title: fr ? titleFr : titleEn, body: `« ${r.quote} »\n\n${note}` };
 }
 
 // Staff : budget de la nouvelle saison alloué par les propriétaires.
