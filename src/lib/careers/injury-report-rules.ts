@@ -38,3 +38,23 @@ export function sortInjured<T extends InjuredPlayerSort>(list: T[]): T[] {
 export function estimatedReturn(upcomingGameDates: string[], gamesRemaining: number): string | null {
   return upcomingGameDates[Math.max(0, gamesRemaining)] ?? null;
 }
+
+export type InjuryBadgeTone = "red" | "orange" | "green";
+export type InjuryBadgeKind = "long" | "soon" | "imminent" | "discomfort";
+
+// Vignette de blessure (page de rotation) : rouge = blessure grave ou longue
+// (10 matchs et plus), vert = retour imminent (2 matchs ou moins) ou simple
+// inconfort (joue malgré une blessure légère), orange = entre les deux.
+export function injuryBadge(p: {
+  injured?: boolean;
+  injurySeverity?: string | null;
+  injuryGamesRemaining?: number;
+  playingThroughInjury?: boolean;
+}): { tone: InjuryBadgeTone; kind: InjuryBadgeKind; games: number } | null {
+  if (!p.injured) return null;
+  const games = p.injuryGamesRemaining ?? 0;
+  if (p.playingThroughInjury && p.injurySeverity === "minor") return { tone: "green", kind: "discomfort", games };
+  if (p.injurySeverity === "severe" || games >= 10) return { tone: "red", kind: "long", games };
+  if (games <= 2) return { tone: "green", kind: "imminent", games };
+  return { tone: "orange", kind: "soon", games };
+}

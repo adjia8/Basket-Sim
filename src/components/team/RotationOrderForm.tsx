@@ -29,6 +29,12 @@ export async function RotationOrderForm({
           removeFromRotation: t("rotation.removeFromRotation"),
           save: t("rotation.save"),
           saving: t("rotation.saving"),
+          injury: {
+            long: t("rotation.injury.long"),
+            soon: t("rotation.injury.soon"),
+            imminent: t("rotation.injury.imminent"),
+            discomfort: t("rotation.injury.discomfort"),
+          },
         }}
       />
     </div>

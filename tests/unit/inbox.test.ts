@@ -87,3 +87,14 @@ test("alerte blessure d'une autre équipe : importante pour une superstar seulem
   assert.equal(leagueInjuryPriority(92), "important");
   assert.equal(leagueInjuryPriority(84), "info");
 });
+
+test("vignette de blessure : rouge si grave/longue, orange si retour proche, vert si imminent ou inconfort", async () => {
+  const { injuryBadge } = await import("../../src/lib/careers/injury-report-rules");
+  assert.equal(injuryBadge({ injured: false }), null);
+  assert.equal(injuryBadge({ injured: true, injurySeverity: "severe", injuryGamesRemaining: 4 })?.tone, "red");
+  assert.equal(injuryBadge({ injured: true, injurySeverity: "moderate", injuryGamesRemaining: 14 })?.tone, "red");
+  assert.equal(injuryBadge({ injured: true, injurySeverity: "moderate", injuryGamesRemaining: 5 })?.tone, "orange");
+  assert.equal(injuryBadge({ injured: true, injurySeverity: "minor", injuryGamesRemaining: 3 })?.tone, "orange");
+  assert.equal(injuryBadge({ injured: true, injurySeverity: "moderate", injuryGamesRemaining: 2 })?.tone, "green");
+  assert.equal(injuryBadge({ injured: true, injurySeverity: "minor", injuryGamesRemaining: 4, playingThroughInjury: true })?.kind, "discomfort");
+});

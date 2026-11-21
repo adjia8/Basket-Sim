@@ -12,6 +12,11 @@ export interface RotationOrderPlayer {
   position: string;
   overallRating: number;
   fatigue: number; // 0-99, voir Player.fatigue — affiché en anneau dans l'UI
+  // Blessure (vignette colorée, voir injuryBadge dans injury-report-rules.ts).
+  injured?: boolean;
+  injurySeverity?: string | null;
+  injuryGamesRemaining?: number;
+  playingThroughInjury?: boolean;
 }
 
 // TeamState.rotationOrderJson est une chaîne libre (peut être absente,

@@ -4,11 +4,19 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { setRotationOrder, type RotationOrderFormState } from "@/app/actions/rotation";
 import { ROTATION_SIZE } from "@/lib/simulation/mockEngine";
 import type { RotationOrderPlayer } from "@/lib/careers/rotation-rules";
+import { injuryBadge, type InjuryBadgeKind, type InjuryBadgeTone } from "@/lib/careers/injury-report-rules";
 import Link from "next/link";
 import { playerHref } from "@/lib/utils";
 import { EnergyRing } from "./EnergyRing";
 
+const BADGE_TONE: Record<InjuryBadgeTone, string> = {
+  red: "bg-bad/15 text-bad",
+  orange: "bg-warn/15 text-warn",
+  green: "bg-good/15 text-good",
+};
+
 export interface RotationOrderLabels {
+  injury: Record<InjuryBadgeKind, string>; // « {games} » remplacé par le nombre de matchs
   description: string;
   activeHeading: string;
   reserveHeading: string;
@@ -174,13 +182,25 @@ export function RotationOrderFormClient({
             <span className="hidden sm:inline">#{player.jerseyNumber} </span>
             {player.firstName} {player.lastName}
           </Link>
-          <span className="text-xs text-faint">
+          <span className="flex flex-wrap items-center gap-1.5 text-xs text-faint">
             {player.position} · {player.overallRating}
+            {(() => {
+              const badge = injuryBadge(player);
+              return badge ? (
+                <span
+                  className={`rounded-full px-1.5 py-px text-[10px] font-semibold ${BADGE_TONE[badge.tone]}`}
+                  data-testid="injury-badge"
+                  data-tone={badge.tone}
+                >
+                  🩹 {labels.injury[badge.kind].replace("{games}", String(badge.games))}
+                </span>
+              ) : null;
+            })()}
           </span>
         </span>
         <EnergyRing fatigue={player.fatigue} size={34} />
         {inRotation ? (
-          <span className="w-[4.5rem] shrink-0 rounded-full bg-surface-2 px-1 py-0.5 text-center text-[10px] font-medium leading-tight text-soft sm:w-24 sm:px-2 sm:text-xs">
+          <span className="w-[4.5rem] shrink-0 rounded-full bg-surface-2 px-1 py-0.5 text-center text-[10px] font-medium leading-tight text-soft sm:w-28 sm:px-2 sm:text-xs">
             {roleLabel(index, labels)}
           </span>
         ) : (
@@ -188,7 +208,7 @@ export function RotationOrderFormClient({
           // ça, l'anneau d'énergie se décale ligne par ligne selon que le
           // texte du badge voisin ("Titulaire"/"6ème femme"/"Banc", ou rien
           // du tout hors rotation) est plus ou moins large.
-          <span className="w-[4.5rem] shrink-0 sm:w-24" aria-hidden />
+          <span className="w-[4.5rem] shrink-0 sm:w-28" aria-hidden />
         )}
         <button
           type="button"
