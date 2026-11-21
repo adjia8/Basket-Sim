@@ -19,6 +19,13 @@ export const keys = [
   "draft.scoutingHint",
   "draft.colAction",
   "draft.draftButton",
+  "draft.myPicks.title",
+  "draft.myPicks.draftYear",
+  "draft.myPicks.count",
+  "draft.myPicks.round1",
+  "draft.myPicks.round2",
+  "draft.myPicks.via",
+  "draft.myPicks.tradedTo",
 ] as const;
 
 export type DraftKey = (typeof keys)[number];
@@ -44,6 +51,13 @@ export const fr: Record<DraftKey, string> = {
   "draft.scoutingHint": "Notes et potentiels estimés par tes recruteurs (niveau {level}/99, précision ±{error} pts). De meilleurs recruteurs resserrent les fourchettes.",
   "draft.colAction": "Action",
   "draft.draftButton": "Drafter",
+  "draft.myPicks.title": "Mes choix de draft",
+  "draft.myPicks.draftYear": "Draft {year}",
+  "draft.myPicks.count": "{count} choix",
+  "draft.myPicks.round1": "1er tour",
+  "draft.myPicks.round2": "2e tour",
+  "draft.myPicks.via": "via {team}",
+  "draft.myPicks.tradedTo": "cédé à {team}",
 };
 
 export const en: Record<DraftKey, string> = {
@@ -67,4 +81,11 @@ export const en: Record<DraftKey, string> = {
   "draft.scoutingHint": "Ratings and potential estimated by your scouts (level {level}/99, accuracy ±{error} pts). Better scouts narrow the ranges.",
   "draft.colAction": "Action",
   "draft.draftButton": "Draft",
+  "draft.myPicks.title": "My draft picks",
+  "draft.myPicks.draftYear": "{year} draft",
+  "draft.myPicks.count": "{count} pick(s)",
+  "draft.myPicks.round1": "1st round",
+  "draft.myPicks.round2": "2nd round",
+  "draft.myPicks.via": "via {team}",
+  "draft.myPicks.tradedTo": "traded to {team}",
 };

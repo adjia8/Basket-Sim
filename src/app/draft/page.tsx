@@ -15,6 +15,7 @@ import { NEUTRAL_STAFF_PROFILE } from "@/lib/careers/staff-rules";
 import { estimateError, estimateRating, ratingStars } from "@/lib/careers/potential-rules";
 import { Stars } from "@/components/ui/Stars";
 import { DraftInterviewForm } from "@/components/draft/DraftInterviewForm";
+import { MyDraftPicks } from "@/components/draft/MyDraftPicks";
 import {
   INTERVIEWS_PER_DRAFT,
   INTERVIEW_QUESTIONS,
@@ -58,6 +59,7 @@ export default async function DraftPage() {
         <p className="mt-4 text-sm text-muted">
           {hasDraftPicks > 0 ? t("draft.overForSeason") : t("draft.noneInProgress")}
         </p>
+        <MyDraftPicks careerId={membership.careerId} teamId={membership.teamId} season={membership.season} t={t} />
       </div>
     );
   }
@@ -134,6 +136,8 @@ export default async function DraftPage() {
           {t("draft.scoutingHint", { level: scouting, error: Math.round(estimateError(scouting) / 2) })}
         </p>
       )}
+
+      <MyDraftPicks careerId={membership.careerId} teamId={membership.teamId} season={membership.season} t={t} />
 
       {prospects.length > 0 && (
         <section className="mt-6 card p-4" data-testid="draft-interviews">

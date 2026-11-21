@@ -67,6 +67,10 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       await expectPageOk(page, "/schedule?view=list");
       expect(await page.getByText("🏆").count()).toBeGreaterThanOrEqual(4); // 4 matchs de groupe de NBA Cup
 
+      // Page Draft : mes choix pour les drafts à venir.
+      await expectPageOk(page, "/draft");
+      await expect(page.getByTestId("my-draft-picks")).toBeVisible();
+
       await expectPageOk(page, "/draft/future");
       await expect(page.getByTestId("future-class").first()).toBeVisible();
       await expect(page.getByText("Joaquim Boumtje Boumtje")).toBeVisible();
