@@ -33,12 +33,13 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       await tip.hover();
       await expect(page.getByRole("tooltip").filter({ hasText: "Cohésion de l'équipe" })).toBeVisible();
 
-      // Calendrier d'entraînement : activation puis 14 jours affichés.
+      // Calendrier d'entraînement : activation puis grille de 4 semaines (lundi → dimanche).
       await expectPageOk(page, "/teams/lal?tab=training");
       const cal = page.getByTestId("training-calendar");
       await cal.locator('button[value="save"]').click();
       await expect(cal.getByText("Calendrier enregistré.")).toBeVisible({ timeout: 30_000 });
-      await expect(cal.locator("li")).toHaveCount(14);
+      await expect(cal.getByTestId("training-grid")).toBeVisible();
+      expect(await cal.locator("select[aria-label]").count()).toBeGreaterThanOrEqual(10);
 
       await expectPageOk(page, "/teams/lal/players/luka-doncic");
       await expect(page.getByTestId("personality")).toBeVisible();
@@ -59,7 +60,11 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       await expect(page.getByRole("heading", { name: "Phase de groupes" })).toBeVisible();
       await expect(page.getByText("Ouest C")).toBeVisible();
 
+      // Calendrier mensuel (lundi → dimanche) par défaut, liste au choix.
       await expectPageOk(page, "/schedule");
+      await expect(page.getByTestId("month-calendar")).toBeVisible();
+      expect(await page.getByTestId("calendar-game").count()).toBeGreaterThanOrEqual(1);
+      await expectPageOk(page, "/schedule?view=list");
       expect(await page.getByText("🏆").count()).toBeGreaterThanOrEqual(4); // 4 matchs de groupe de NBA Cup
 
       await expectPageOk(page, "/draft/future");

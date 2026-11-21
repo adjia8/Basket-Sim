@@ -301,7 +301,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
                         </span>
                         <span className="transition group-open:rotate-90">›</span>
                       </summary>
-                      <div className="divide-y divide-line-soft bg-surface-1/40 pl-3">{r.messages.map(row)}</div>
+                      <div className="divide-y divide-line-soft bg-surface/40 pl-3">{r.messages.map(row)}</div>
                     </details>
                   )
                 )}

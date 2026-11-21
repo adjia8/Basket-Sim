@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { TrainingCalendarPanel, type CalendarPanelDay } from "@/components/team/TrainingCalendarPanel";
 import { CALENDAR_TEMPLATES, SESSION_TYPES, parseCalendar, planDays } from "@/lib/careers/training-calendar-rules";
+import { weeksCovering } from "@/lib/careers/month-grid";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { getTacticsReport } from "@/lib/data-access/tactics";
 import { TacticsPanel } from "@/components/team/TacticsPanel";
@@ -236,6 +237,7 @@ export default async function TeamRosterPage({
   // Entraînement) — voir training-calendar-rules.ts.
   const trainingCalendar = parseCalendar(teamState.trainingCalendarJson);
   let calendarDays: CalendarPanelDay[] | null = null;
+  let calendarWeeks: string[][] = [];
   if (isMyTeam && activeTab === "training") {
     const lastPlayed = await prisma.game.findFirst({
       where: { careerId: membership.careerId, status: "final" },
@@ -249,7 +251,12 @@ export default async function TeamRosterPage({
     });
     const anchor = lastPlayed?.gameDate ?? firstUpcoming?.gameDate ?? new Date();
     const from = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate() + (lastPlayed ? 1 : 0), 12));
-    const until = new Date(from.getTime() + 15 * 86_400_000);
+    // Grille de 4 semaines (lundi → dimanche) à partir de la semaine en cours.
+    const fromDay = from.toISOString().slice(0, 10);
+    calendarWeeks = weeksCovering(fromDay, new Date(from.getTime() + 27 * 86_400_000).toISOString().slice(0, 10));
+    const gridEnd = calendarWeeks[calendarWeeks.length - 1][6];
+    const dayCount = Math.round((Date.parse(`${gridEnd}T12:00:00Z`) - from.getTime()) / 86_400_000) + 1;
+    const until = new Date(from.getTime() + (dayCount + 1) * 86_400_000);
     const myGames = await prisma.game.findMany({
       where: {
         careerId: membership.careerId,
@@ -268,8 +275,8 @@ export default async function TeamRosterPage({
       ])
     );
     const cal = trainingCalendar ?? { template: "balanced" as const, overrides: {} };
-    const planned = planDays(from, 14, [...gameByDay.keys()], cal);
-    const auto = planDays(from, 14, [...gameByDay.keys()], { ...cal, overrides: {} });
+    const planned = planDays(from, dayCount, [...gameByDay.keys()], cal);
+    const auto = planDays(from, dayCount, [...gameByDay.keys()], { ...cal, overrides: {} });
     calendarDays = planned.map((d, i) => ({
       date: d.date,
       label: formatGameDate(d.date, locale),
@@ -385,8 +392,14 @@ export default async function TeamRosterPage({
               active={!!trainingCalendar}
               template={trainingCalendar?.template ?? "balanced"}
               days={calendarDays}
+              weeks={calendarWeeks}
+              weekdayLabels={calendarWeeks[0]?.map((d) =>
+                new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", { weekday: "short", timeZone: "UTC" })
+                  .format(new Date(`${d}T12:00:00Z`))
+                  .replace(".", "")
+              ) ?? []}
               templates={CALENDAR_TEMPLATES.map((v) => ({ value: v, label: t(`calendar.template.${v}`) }))}
-              sessions={SESSION_TYPES.map((v) => ({ value: v, label: t(`calendar.session.${v}`) }))}
+              sessions={SESSION_TYPES.map((v) => ({ value: v, label: t(`calendar.session.${v}`), short: t(`calendar.short.${v}`) }))}
               labels={{
                 title: t("calendar.title"),
                 subtitle: t("calendar.subtitle"),
@@ -400,6 +413,7 @@ export default async function TeamRosterPage({
                 game: t("calendar.game"),
                 custom: t("calendar.custom"),
                 auto: t("calendar.auto"),
+                past: t("calendar.past"),
               }}
             />
           )}

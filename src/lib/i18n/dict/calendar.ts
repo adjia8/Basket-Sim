@@ -24,6 +24,14 @@ export const keys = [
   "calendar.session.defense",
   "calendar.session.physical",
   "calendar.session.chemistry",
+  "calendar.short.recovery",
+  "calendar.short.rest",
+  "calendar.short.tactical",
+  "calendar.short.shooting",
+  "calendar.short.defense",
+  "calendar.short.physical",
+  "calendar.short.chemistry",
+  "calendar.past",
 ] as const;
 
 export type CalendarKey = (typeof keys)[number];
@@ -54,6 +62,14 @@ export const fr: Record<CalendarKey, string> = {
   "calendar.session.defense": "Défense",
   "calendar.session.physical": "Physique",
   "calendar.session.chemistry": "Cohésion",
+  "calendar.short.recovery": "Récup",
+  "calendar.short.rest": "Repos",
+  "calendar.short.tactical": "Tact.",
+  "calendar.short.shooting": "Tir",
+  "calendar.short.defense": "Déf.",
+  "calendar.short.physical": "Phys.",
+  "calendar.short.chemistry": "Cohés.",
+  "calendar.past": "Passé",
 };
 
 export const en: Record<CalendarKey, string> = {
@@ -82,4 +98,12 @@ export const en: Record<CalendarKey, string> = {
   "calendar.session.defense": "Defense",
   "calendar.session.physical": "Conditioning",
   "calendar.session.chemistry": "Team bonding",
+  "calendar.short.recovery": "Recov.",
+  "calendar.short.rest": "Rest",
+  "calendar.short.tactical": "Tact.",
+  "calendar.short.shooting": "Shoot.",
+  "calendar.short.defense": "Def.",
+  "calendar.short.physical": "Phys.",
+  "calendar.short.chemistry": "Chem.",
+  "calendar.past": "Past",
 };

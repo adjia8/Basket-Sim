@@ -3,8 +3,8 @@
 import { useActionState, useState } from "react";
 import { saveTrainingCalendar, type TrainingCalendarFormState } from "@/app/actions/training";
 
-// Calendrier d'entraînement des 14 prochains jours (voir
-// training-calendar-rules.ts) : textes déjà traduits par la page d'équipe.
+// Calendrier d'entraînement sur 4 semaines, en grille lundi → dimanche (voir
+// training-calendar-rules.ts, month-grid.ts) : textes traduits par la page.
 export interface CalendarPanelDay {
   date: string;
   label: string; // « lun. 16 nov. »
@@ -18,6 +18,8 @@ export function TrainingCalendarPanel({
   active,
   template,
   days,
+  weeks,
+  weekdayLabels,
   templates,
   sessions,
   labels,
@@ -25,13 +27,16 @@ export function TrainingCalendarPanel({
   active: boolean;
   template: string;
   days: CalendarPanelDay[];
+  weeks: string[][]; // semaines lundi → dimanche (voir month-grid.ts)
+  weekdayLabels: string[];
   templates: { value: string; label: string }[];
-  sessions: { value: string; label: string }[];
-  labels: Record<"title" | "subtitle" | "inactive" | "activate" | "template" | "save" | "saving" | "reset" | "offButton" | "game" | "custom" | "auto", string>;
+  sessions: { value: string; label: string; short: string }[];
+  labels: Record<"title" | "subtitle" | "inactive" | "activate" | "template" | "save" | "saving" | "reset" | "offButton" | "game" | "custom" | "auto" | "past", string>;
 }) {
   const [state, action, pending] = useActionState<TrainingCalendarFormState | undefined, FormData>(saveTrainingCalendar, undefined);
   const [changed, setChanged] = useState<Record<string, string>>({});
-  const sessionLabel = new Map(sessions.map((s) => [s.value, s.label]));
+  const sessionShort = new Map(sessions.map((s) => [s.value, s.short]));
+  const dayByDate = new Map(days.map((d) => [d.date, d]));
 
   return (
     <section className="mt-6 card p-4" data-testid="training-calendar">
@@ -50,39 +55,72 @@ export function TrainingCalendarPanel({
         </label>
         {!active && <p className="text-xs text-muted">{labels.inactive}</p>}
         {active && (
-          <ul className="grid gap-1.5 sm:grid-cols-2">
-            {days.map((d) => (
-              <li
-                key={d.date}
-                className={`flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 ${d.game ? "border-accent/40 bg-accent/5" : "border-line"}`}
-              >
-                <span className="text-xs text-muted">{d.label}</span>
-                {d.game ? (
-                  <span className="text-xs font-semibold text-accent-text">
-                    🏀 {labels.game} {d.game}
-                  </span>
-                ) : (
-                  <select
-                    name={changed[d.date] ? `day:${d.date}` : undefined}
-                    value={changed[d.date] ?? (d.custom ? d.session ?? "auto" : "auto")}
-                    onChange={(e) => setChanged({ ...changed, [d.date]: e.target.value })}
-                    className="field max-w-[60%] px-1.5 py-0.5 text-xs"
-                    disabled={pending}
-                    aria-label={d.label}
+          // Grille hebdomadaire (lundi → dimanche) : jours passés grisés, jours
+          // de match en couleur, séance modifiable les autres jours.
+          <div data-testid="training-grid">
+            <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-faint sm:gap-1.5 sm:text-xs">
+              {weekdayLabels.map((d) => (
+                <div key={d} className="pb-1">
+                  {d}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+              {weeks.flat().map((date) => {
+                const d = dayByDate.get(date);
+                const dayNumber = Number(date.slice(8));
+                if (!d) {
+                  return (
+                    <div key={date} className="flex min-h-16 min-w-0 flex-col rounded-md border border-line-soft p-1 opacity-35" title={labels.past}>
+                      <span className="text-[10px] tabular text-muted sm:text-xs">{dayNumber}</span>
+                    </div>
+                  );
+                }
+                if (d.game) {
+                  return (
+                    <div key={date} className="flex min-h-16 min-w-0 flex-col rounded-md border border-accent/40 bg-accent/10 p-1" title={d.label}>
+                      <span className="text-[10px] tabular text-muted sm:text-xs">{dayNumber}</span>
+                      <span className="mt-auto truncate text-[10px] font-semibold text-accent-text sm:text-xs">
+                        <span className="hidden sm:inline">🏀 </span>
+                        {d.game.replace(/^vs /, "").replace(/^@ /, "@")}
+                      </span>
+                    </div>
+                  );
+                }
+                const value = changed[date] ?? (d.custom ? d.session ?? "auto" : "auto");
+                const custom = value !== "auto";
+                return (
+                  <label
+                    key={date}
+                    className={`flex min-h-16 min-w-0 flex-col gap-1 rounded-md border p-1 ${custom ? "border-info/50 bg-info/5" : "border-line"}`}
+                    title={d.label}
                   >
-                    <option value="auto">
-                      {labels.auto} · {sessionLabel.get(d.autoSession ?? "")}
-                    </option>
-                    {sessions.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </li>
-            ))}
-          </ul>
+                    <span className="text-[10px] tabular text-muted sm:text-xs">{dayNumber}</span>
+                    <select
+                      name={changed[date] ? `day:${date}` : undefined}
+                      value={value}
+                      onChange={(e) => setChanged({ ...changed, [date]: e.target.value })}
+                      className="field mt-auto w-full min-w-0 appearance-none px-0.5 py-0.5 text-center text-[10px] sm:appearance-auto sm:px-1 sm:text-left sm:text-xs"
+                      disabled={pending}
+                      aria-label={d.label}
+                    >
+                      <option value="auto">{sessionShort.get(d.autoSession ?? "") ?? labels.auto}</option>
+                      {sessions.map((s) => (
+                        <option key={s.value} value={s.value}>
+                          {s.short}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-[11px] text-faint">
+              <span className="mr-3"><span className="inline-block h-2 w-2 rounded-sm border border-line align-middle" /> {labels.auto}</span>
+              <span className="mr-3"><span className="inline-block h-2 w-2 rounded-sm border border-info/50 bg-info/20 align-middle" /> {labels.custom}</span>
+              <span><span className="inline-block h-2 w-2 rounded-sm bg-accent/40 align-middle" /> {labels.game}</span>
+            </p>
+          </div>
         )}
         <div className="flex flex-wrap gap-2">
           <button

@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { Fragment } from "react";
-import { allStarGameDate, cupSeasonLabel } from "@/lib/careers/nba-cup-rules";
+import { allStarBreakDays, allStarGameDate, cupSeasonLabel } from "@/lib/careers/nba-cup-rules";
+import { monthKey, monthsBetween, weeksCovering, weeksOfMonth } from "@/lib/careers/month-grid";
+import { MonthCalendar, type CalendarGame } from "@/components/schedule/MonthCalendar";
+import { getGameClock } from "@/lib/data-access/game-clock";
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getScheduleForCareer, getScheduleForTeam } from "@/lib/data-access/schedule";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
@@ -24,10 +27,13 @@ export const maxDuration = 60;
 export default async function SchedulePage({
   searchParams,
 }: {
-  searchParams: Promise<{ all?: string }>;
+  searchParams: Promise<{ all?: string; view?: string; month?: string }>;
 }) {
-  const { all } = await searchParams;
+  const { all, view, month: monthParam } = await searchParams;
   const showAll = all === "1";
+  // Mon équipe : calendrier mensuel par défaut (liste au choix) ; toute la
+  // ligue : liste (trop de matchs par jour pour une grille).
+  const showMonth = !showAll && view !== "list";
   const membership = await getCurrentMembership();
   const { t, locale } = await getTranslator();
 
@@ -76,6 +82,61 @@ export default async function SchedulePage({
     },
   });
 
+  // Calendrier mensuel (voir month-grid.ts) : mois affiché = celui demandé,
+  // sinon celui du jour de jeu, borné aux mois de la saison.
+  const allMine = [...preseasonGames, ...games];
+  const clock = await getGameClock(membership.careerId, membership.teamId);
+  const today = clock.today ? clock.today.toISOString().slice(0, 10) : null;
+  const months = allMine.length
+    ? monthsBetween(allMine[0].gameDate.slice(0, 10), allMine[allMine.length - 1].gameDate.slice(0, 10))
+    : [monthKey(today ?? new Date().toISOString())];
+  const wanted = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : monthKey(today ?? allMine[0]?.gameDate ?? new Date().toISOString());
+  const month = months.includes(wanted) ? wanted : wanted < months[0] ? months[0] : months[months.length - 1];
+  const gamesByDay = new Map<string, CalendarGame>();
+  for (const g of allMine) {
+    const home = g.homeTeamId === membership.teamId;
+    const opp = teamById.get(home ? g.awayTeamId : g.homeTeamId);
+    const played = g.status === "final" && g.homeScore !== undefined && g.awayScore !== undefined;
+    const mine = home ? g.homeScore : g.awayScore;
+    const theirs = home ? g.awayScore : g.homeScore;
+    gamesByDay.set(g.gameDate.slice(0, 10), {
+      id: g.id,
+      opponent: opp?.abbreviation ?? "?",
+      home,
+      played,
+      won: played && (mine ?? 0) > (theirs ?? 0),
+      score: played ? `${mine}-${theirs}` : null,
+      cup: !!g.cupStage,
+    });
+  }
+  const weekdayFmt = new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", { weekday: "short", timeZone: "UTC" });
+  const weekdayLabels = weeksCovering("2026-11-02", "2026-11-08")[0].map((d) => weekdayFmt.format(new Date(`${d}T12:00:00Z`)).replace(".", ""));
+  const monthLabel = new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", { month: "long", year: "numeric", timeZone: "UTC" }).format(
+    new Date(`${month}-15T12:00:00Z`)
+  );
+  const idx = months.indexOf(month);
+  const monthProps = {
+    month,
+    weeks: weeksOfMonth(month),
+    gamesByDay,
+    today,
+    breakDays: new Set(
+      membership.leagueId === "nba" ? allStarBreakDays(membership.season).map((d) => d.toISOString().slice(0, 10)) : []
+    ),
+    weekdayLabels,
+    monthLabel,
+    prevHref: idx > 0 ? `/schedule?month=${months[idx - 1]}` : null,
+    nextHref: idx < months.length - 1 ? `/schedule?month=${months[idx + 1]}` : null,
+    labels: {
+      win: t("schedule.win"),
+      loss: t("schedule.loss"),
+      allStar: t("schedule.allStarShort"),
+      today: t("schedule.today"),
+      prev: t("schedule.prevMonth"),
+      next: t("schedule.nextMonth"),
+    },
+  };
+
   return (
     <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -111,6 +172,15 @@ export default async function SchedulePage({
               }}
             />
           )}
+          {!showAll && (
+            <Link
+              href={showMonth ? "/schedule?view=list" : "/schedule"}
+              className="rounded-full bg-surface-2 px-3 py-1 text-sm"
+              data-testid="schedule-view-toggle"
+            >
+              {showMonth ? t("schedule.viewList") : t("schedule.viewMonth")}
+            </Link>
+          )}
           <Link
             href={showAll ? "/schedule" : "/schedule?all=1"}
             className="rounded-full bg-surface-2 px-3 py-1 text-sm"
@@ -120,7 +190,13 @@ export default async function SchedulePage({
         </div>
       </div>
 
-      {preseasonGames.length > 0 && (
+      {showMonth && (
+        <div className="mt-6">
+          <MonthCalendar {...monthProps} />
+        </div>
+      )}
+
+      {!showMonth && preseasonGames.length > 0 && (
         <div className="mt-6">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">
             {t("schedule.preseasonHeading")}
@@ -129,6 +205,7 @@ export default async function SchedulePage({
         </div>
       )}
 
+      {!showMonth && (
       <div className="mt-6">
         {preseasonGames.length > 0 && (
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted">
@@ -145,6 +222,7 @@ export default async function SchedulePage({
           breakLabel={t("cup.allStarBreak")}
         />
       </div>
+      )}
     </div>
   );
 }
