@@ -9,18 +9,21 @@
    une seule fois par thème ici. */
 /* « Arena Night » (thème de base) : une salle NBA un soir de match — bleu
    nuit, orange ballon, cyan de tableau d'affichage pour les infos. */
+/* Clair adouci : pas de blanc pur (éblouissant), fond gris-bleu et
+   cartes blanc cassé ; texte un peu moins noir pour réduire le contraste
+   tout en restant bien lisible. */
 :root {
-  --bg: #eef2fa;
-  --surface: #ffffff;
-  --surface-2: #f2f5fb;
-  --surface-3: #e3e9f4;
-  --line: #d3dbea;
-  --line-soft: #e5eaf3;
-  --line-strong: #a3b0c8;
-  --fg: #0b1430;
-  --soft: #2b3756;
-  --muted: #4d5b7c;
-  --faint: #8390ab;
+  --bg: #d9dfea;
+  --surface: #eef1f6;
+  --surface-2: #e4e8f0;
+  --surface-3: #d6dce8;
+  --line: #c3ccdc;
+  --line-soft: #d4dbe7;
+  --line-strong: #97a4bd;
+  --fg: #141c33;
+  --soft: #313c58;
+  --muted: #4f5b78;
+  --faint: #7d88a2;
   --accent: #e8601c;
   --accent-hover: #d4530f;
   --accent-fg: #160800;
@@ -56,17 +59,17 @@
 /* « Trophée » pendant les playoffs (attribut data-phase posé par
    layout.tsx) : noir profond et or, comme le trophée Larry O'Brien. */
 html[data-phase="playoffs"] {
-  --bg: #f2f1ee;
-  --surface: #ffffff;
-  --surface-2: #f6f4ef;
-  --surface-3: #ebe7dd;
-  --line: #e0dccf;
-  --line-soft: #ece9e1;
-  --line-strong: #b9b19c;
-  --fg: #1b1812;
-  --soft: #3d372b;
+  --bg: #e2ded5;
+  --surface: #f2efe8;
+  --surface-2: #e9e5dc;
+  --surface-3: #ddd8cc;
+  --line: #cdc6b6;
+  --line-soft: #dcd7cb;
+  --line-strong: #a89f89;
+  --fg: #1f1b14;
+  --soft: #3f392d;
   --muted: #5e574a;
-  --faint: #958c7a;
+  --faint: #8c8371;
   --accent: #c99a27;
   --accent-hover: #b8891a;
   --accent-fg: #1a1200;
