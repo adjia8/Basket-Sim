@@ -2,7 +2,7 @@ import "server-only";
 import type { DraftPick } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { rookieScaleContract } from "@/lib/careers/rookie-scale";
-import { MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import { OFFSEASON_MAX_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import { checkSalaryMove } from "@/lib/careers/cap-rules";
 import { getPayrollForTeam } from "./contracts";
 
@@ -39,7 +39,9 @@ export async function getCurrentDraftPick(
       getPayrollForTeam(careerId, pick.teamId),
     ]);
     const { salary } = rookieScaleContract(pick.pickNumber, picksPerRound, leagueId);
-    const maxRosterSize = MAX_ROSTER_SIZE[leagueId] ?? MAX_ROSTER_SIZE.nba;
+    // La draft a lieu en intersaison : la limite est celle du camp
+    // d'entraînement (21 en NBA), pas celle de la saison.
+    const maxRosterSize = OFFSEASON_MAX_ROSTER_SIZE[leagueId] ?? OFFSEASON_MAX_ROSTER_SIZE.nba;
     const canDraft =
       rosterSize < maxRosterSize && checkSalaryMove(leagueId, salaryCap, "draft", payroll + salary, salary).ok;
     if (canDraft) return pick as ResolvedDraftPick;

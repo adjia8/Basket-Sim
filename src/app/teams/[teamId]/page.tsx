@@ -97,7 +97,7 @@ export default async function TeamRosterPage({
 
   const isMyTeam = team.id === membership.teamId;
   // Vestiaire (voir personality-rules.ts) : leaders, mentors, perturbateurs.
-  const room = lockerRoom(roster.map((p) => ({ id: p.id, age: p.age, personality: personalityFor(p.id, p.age) })));
+  const room = lockerRoom(roster.map((p) => ({ id: p.id, age: p.age, personality: personalityFor(p.id, p.age), overall: p.overallRating, renown: p.renown })));
   const tradeDeadlinePassed = deadlineInfo.passed;
 
   const seasonStats = await getSeasonStatsForPlayers(

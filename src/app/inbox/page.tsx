@@ -45,6 +45,8 @@ function actionsFor(message: InboxMessageView, teamId: string, t: Translator): M
           : []),
         { label: t("inbox.action.manageRotation"), href: `/teams/${teamId}?tab=rotation` },
       ];
+    case "roster":
+      return [{ label: t("inbox.action.manageRoster"), href: `/teams/${teamId}`, primary: true }];
     case "league_injury":
       return [
         { label: t("inbox.action.injuryReport"), href: "/injuries", primary: true },
@@ -337,7 +339,7 @@ function typeLabel(type: string, t: Translator): string {
   return KNOWN_TYPES.includes(type) ? t(`inbox.type.${type}` as DictionaryKey) : type;
 }
 
-const KNOWN_TYPES = ["league_injury", "press", "injury", "trade_request", "free_agent", "free_agency", "standings", "poach_offer", "press_review", "player_reaction", "fine", "staff", "trade_offer", "award", "contract", "cup", "board", "player_request"];
+const KNOWN_TYPES = ["roster", "league_injury", "press", "injury", "trade_request", "free_agent", "free_agency", "standings", "poach_offer", "press_review", "player_reaction", "fine", "staff", "trade_offer", "award", "contract", "cup", "board", "player_request"];
 
 function MessageCard({
   message,

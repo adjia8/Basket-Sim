@@ -180,9 +180,11 @@ function GameList({
           )}
           <Link
             href={`/game/${game.id}`}
-            className="flex items-center justify-between card px-4 py-3 text-sm transition hover:bg-surface-2"
+            className="flex items-center justify-between gap-3 card px-4 py-3 text-sm transition hover:bg-surface-2"
           >
-            <span>
+            <span className="min-w-0">
+              {/* Sur mobile, la date passe sous l'affiche (elle s'étalait sur trois lignes à droite). */}
+              <span className="block text-xs text-muted sm:hidden">{formatGameDate(game.gameDate, locale)}</span>
               {away ? teamFullName(away) : "?"} @ {home ? teamFullName(home) : "?"}
               {game.cupStage && cupLabels && (
                 <span className="ml-2 rounded bg-accent/15 px-1.5 py-0.5 text-xs font-medium text-accent-text">
@@ -191,8 +193,8 @@ function GameList({
                 </span>
               )}
             </span>
-            <span className="flex items-center gap-3 text-muted">
-              <span>{formatGameDate(game.gameDate, locale)}</span>
+            <span className="flex shrink-0 items-center gap-3 text-muted">
+              <span className="hidden whitespace-nowrap sm:inline">{formatGameDate(game.gameDate, locale)}</span>
               {game.status === "final" ? (
                 <span className="font-medium text-fg">
                   {game.awayScore}-{game.homeScore}

@@ -135,3 +135,18 @@ test("effectif : contrats standard et places two-way contrôlés séparément", 
   assert.equal(rosterMoveAllowed({ ...m, standardBefore: 13, standardOut: 2, standardIn: 1 }, 13, 15, 3), false); // 12
   assert.equal(capSalary([{ salary: 5, contractType: "standard" }, { salary: 1, contractType: "two_way" }]), 5);
 });
+
+test("effectif : 21 contrats en intersaison, retour aux bornes de saison avant le premier match", async () => {
+  const { OFFSEASON_MAX_ROSTER_SIZE, rosterIssue, releaseOrder } = await import("../../src/lib/careers/roster-rules");
+  assert.equal(OFFSEASON_MAX_ROSTER_SIZE.nba, 21);
+  assert.equal(rosterIssue(17, "nba"), "over");
+  assert.equal(rosterIssue(12, "nba"), "under");
+  assert.equal(rosterIssue(14, "nba"), null);
+  const order = releaseOrder([
+    { id: "star", overall: 85, guaranteed: true, salary: 40_000_000 },
+    { id: "rookie2", overall: 62, guaranteed: false, salary: 1_200_000 },
+    { id: "vet", overall: 62, guaranteed: true, salary: 3_000_000 },
+  ]);
+  // À niveau égal, on coupe d'abord le contrat non garanti (pas d'argent mort).
+  assert.deepEqual(order.map((p) => p.id), ["rookie2", "vet", "star"]);
+});

@@ -154,10 +154,10 @@ test("réactions : chaque joueur réagit à une critique publique selon son cara
 
 test("réactions : le leader du vestiaire soutient le coach ou défend le groupe", () => {
   const shout = { topic: "locker_room", tone: "aggressive" as const, label: "« Trop confortable. »", effects: fx(-1, 1, 2, { squadMorale: -2 }), playerId: null, outlet: "Panier Plus" };
-  const backs = react({ answers: [shout], roster: [player("l", 70, { leadership: 18, professionalism: 15 })] });
+  const backs = react({ answers: [shout], roster: [{ ...player("l", 85, { leadership: 18, professionalism: 15 }), overall: 90, age: 29 }] });
   assert.equal(backs.players[0].kind, "leader_backs_coach");
   assert.ok(backs.effects.squadMorale > 0);
-  const defends = react({ answers: [shout], roster: [player("l", 70, { leadership: 18, professionalism: 6 })] });
+  const defends = react({ answers: [shout], roster: [{ ...player("l", 85, { leadership: 18, professionalism: 6 }), overall: 90, age: 29 }] });
   assert.equal(defends.players[0].kind, "leader_defends_group");
 });
 

@@ -764,7 +764,7 @@ export async function simulateAndResolveGame(
     const iq = roster.length ? roster.reduce((sum, p) => sum + p.ratings.basketballIQ, 0) / roster.length : 50;
     // Vestiaire (voir personality-rules.ts) : leaders et têtes brûlées
     // déplacent la cohésion visée.
-    const room = lockerRoom(roster.map((p) => ({ id: p.id, age: p.age, personality: personalityFor(p.id, p.age) })));
+    const room = lockerRoom(roster.map((p) => ({ id: p.id, age: p.age, personality: personalityFor(p.id, p.age), overall: p.overallRating, renown: p.renown })));
     return prisma.teamState.update({
       where: { id: state.id },
       data: {
@@ -952,8 +952,8 @@ export async function simulateAndResolveGame(
   // Promesses de temps de jeu arrivées à échéance (voir
   // playing-time-promises.ts) — équipes humaines seulement.
   await Promise.all([
-    homeManager ? evaluatePlayingTimePromises(careerId, game.homeTeamId, game.season, locale) : Promise.resolve(),
-    awayManager ? evaluatePlayingTimePromises(careerId, game.awayTeamId, game.season, locale) : Promise.resolve(),
+    homeManager ? evaluatePlayingTimePromises(careerId, game.homeTeamId, game.season, locale, gameDate) : Promise.resolve(),
+    awayManager ? evaluatePlayingTimePromises(careerId, game.awayTeamId, game.season, locale, gameDate) : Promise.resolve(),
   ]);
   // Les joueurs viennent parfois voir le GM (voir player-requests.ts) —
   // saison régulière seulement.

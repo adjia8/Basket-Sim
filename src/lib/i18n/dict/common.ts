@@ -59,6 +59,7 @@ export const keys = [
   "common.topbar.waitingFor",
   "common.topbar.newMessages",
   "common.topbar.draftTurn",
+  "common.topbar.rosterIssue",
   "common.topbar.error",
 ] as const;
 
@@ -120,6 +121,7 @@ export const fr: Record<CommonKey, string> = {
   "common.topbar.waitingFor": "En attente de {name}",
   "common.topbar.newMessages": "{count} message(s) à lire avant de continuer",
   "common.topbar.draftTurn": "Draft : à toi de choisir",
+  "common.topbar.rosterIssue": "Effectif : {size} joueurs, il en faut entre {min} et {max} avant la reprise",
   "common.topbar.error": "Impossible d'avancer — réessaie.",
 };
 
@@ -179,5 +181,6 @@ export const en: Record<CommonKey, string> = {
   "common.topbar.waitingFor": "Waiting for {name}",
   "common.topbar.newMessages": "{count} message(s) to read before continuing",
   "common.topbar.draftTurn": "Draft: you're on the clock",
+  "common.topbar.rosterIssue": "Roster: {size} players, you need between {min} and {max} before the season",
   "common.topbar.error": "Couldn't continue — try again.",
 };

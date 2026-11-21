@@ -15,3 +15,28 @@ export const MIN_ROSTER_SIZE: Record<string, number> = {
   nba: 13,
   wnba: 6,
 };
+
+// Intersaison : comme en vraie NBA, un effectif peut compter jusqu'à 21
+// contrats (draft, camp d'entraînement) ; il doit redescendre dans les
+// bornes de saison avant le premier match (voir roster-compliance.ts).
+export const OFFSEASON_MAX_ROSTER_SIZE: Record<string, number> = {
+  nba: 21,
+  wnba: 15,
+};
+
+export type RosterIssue = "over" | "under" | null;
+
+// L'effectif standard respecte-t-il les bornes de saison ?
+export function rosterIssue(size: number, leagueId: string): RosterIssue {
+  if (size > (MAX_ROSTER_SIZE[leagueId] ?? MAX_ROSTER_SIZE.nba)) return "over";
+  if (size < (MIN_ROSTER_SIZE[leagueId] ?? MIN_ROSTER_SIZE.nba)) return "under";
+  return null;
+}
+
+// Ordre de coupe d'une équipe IA trop fournie : on garde la valeur
+// sportive ; à niveau proche, on coupe d'abord un contrat non garanti (pas
+// d'argent mort) puis le salaire le plus faible.
+export function releaseOrder<T extends { overall: number; guaranteed: boolean; salary: number }>(players: T[]): T[] {
+  const value = (p: T) => p.overall + (p.guaranteed ? 2 : 0) + p.salary / 10_000_000;
+  return [...players].sort((a, b) => value(a) - value(b));
+}

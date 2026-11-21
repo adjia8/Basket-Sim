@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
+import { humanRosterIssue } from "@/lib/data-access/roster-compliance";
 import { getGameById, setGameReady } from "@/lib/data-access/schedule";
 import { simulateAndResolveGame } from "@/lib/data-access/simulate";
 import { getTranslator } from "@/lib/i18n/translate";
@@ -50,6 +51,16 @@ export async function POST(request: Request) {
   if (game.status === "final") {
     return NextResponse.json(
       { error: t("simulateAction.alreadyPlayed") },
+      { status: 409 }
+    );
+  }
+
+  // Effectif hors des bornes de saison (voir roster-compliance.ts) : on ne
+  // joue pas tant que le manager n'a pas coupé ou complété son effectif.
+  const roster = await humanRosterIssue(membership.careerId, membership.teamId, game.leagueId);
+  if (roster.issue) {
+    return NextResponse.json(
+      { error: t("common.topbar.rosterIssue", { size: roster.size, min: roster.min, max: roster.max }) },
       { status: 409 }
     );
   }

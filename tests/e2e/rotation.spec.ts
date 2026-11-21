@@ -31,10 +31,10 @@ test("promoting a player to the active rotation persists after reload", async ({
 
   const reserveList = page.locator("main ul").nth(1);
   const reserveCountBefore = await reserveList.locator("li").count();
-  const reserveFirstRowText = await reserveList.locator("li").first().innerText();
-  const nameMatch = reserveFirstRowText.match(/#\d+\s+([^(]+?)\s*\(/);
-  if (!nameMatch) throw new Error(`Could not parse player name from row text: ${reserveFirstRowText}`);
-  const promotedName = nameMatch[1];
+  // Nom lu sur le lien de la ligne (le numéro de maillot est masqué sur mobile).
+  const reserveFirstLink = await reserveList.locator("li").first().locator("a").first().innerText();
+  const promotedName = reserveFirstLink.replace(/^#\d+\s*/, "").trim();
+  if (!promotedName) throw new Error(`Could not read player name from row link: ${reserveFirstLink}`);
 
   await reserveAddButtons.first().click();
   // Découpage à taille fixe : les deux listes gardent leur taille (une

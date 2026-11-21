@@ -16,7 +16,8 @@ import { getTranslator } from "@/lib/i18n/translate";
 import { endOfGameDay } from "@/lib/data-access/game-clock";
 import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
 import { countUrgentUnread, createInboxMessage, markUrgentInboxMessagesRead } from "@/lib/data-access/inbox";
-import { freeAgencyOpenMessageText } from "@/lib/careers/inbox-rules";
+import { freeAgencyOpenMessageText, rosterIssueMessageText } from "@/lib/careers/inbox-rules";
+import { enforceAiRosterLimits, humanRosterIssue } from "@/lib/data-access/roster-compliance";
 import { aiRosterTarget, runAiDraft, runAiFreeAgency } from "@/lib/data-access/ai-offseason";
 import { isFreeAgencyOpen } from "@/lib/data-access/season-windows";
 
@@ -325,6 +326,7 @@ export type ContinueResult =
   | { kind: "inbox"; count: number } // messages importants non lus : à lire avant d'avancer
   | { kind: "draft" } // à mon tour (ou à celui d'un autre humain) de drafter
   | { kind: "seasonOver" } // plus rien à jouer cette saison
+  | { kind: "roster"; teamId: string; size: number; min: number; max: number } // effectif hors des bornes avant la reprise
   | { kind: "error" };
 
 // « Continuer » façon Football Manager (barre du haut, voir
@@ -395,6 +397,25 @@ export async function continueGame(options: { acknowledgeInbox?: boolean } = {})
   // Saison régulière terminée : crée les matchs de playoffs à venir (match
   // suivant d'une série, tour suivant) — sans effet avant.
   await getOrAdvancePlayoffs(careerId, career.season, career.leagueId);
+
+  // Avant le premier match de la saison (pré-saison comprise) : retour aux
+  // bornes de saison. L'IA coupe ou complète d'elle-même ; le manager doit
+  // le faire lui-même (« Continuer » le renvoie à son effectif).
+  const seasonStarted = await prisma.game.count({
+    where: { careerId, season: { startsWith: career.season }, status: "final" },
+  });
+  if (seasonStarted === 0) {
+    await enforceAiRosterLimits(careerId, career.leagueId, career.season);
+    const roster = await humanRosterIssue(careerId, teamId, career.leagueId);
+    if (roster.issue) {
+      const already = await prisma.inboxMessage.count({ where: { careerId, teamId, season: career.season, type: "roster" } });
+      if (already === 0) {
+        const { title, body } = rosterIssueMessageText(locale, roster.issue, roster.size, roster.min, roster.max);
+        await createInboxMessage(careerId, teamId, career.season, "roster", title, body, `/teams/${teamId}`, { priority: "urgent" });
+      }
+      return { kind: "roster", teamId, size: roster.size, min: roster.min, max: roster.max };
+    }
+  }
 
   const nextMyGame = await prisma.game.findFirst({
     where: { careerId, status: { not: "final" }, OR: [{ homeTeamId: teamId }, { awayTeamId: teamId }] },

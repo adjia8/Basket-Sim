@@ -48,12 +48,18 @@ export function Scoreboard({
 }) {
   const awayWon = isFinal && (awayScore ?? 0) > (homeScore ?? 0);
   const homeWon = isFinal && (homeScore ?? 0) > (awayScore ?? 0);
+  // Sur mobile, le nom passe au-dessus du score (les noms longs ne poussent
+  // plus l'autre équipe hors de l'écran) ; avant le match, pas de score.
   const side = (snap: TeamSnapshot, score: number | undefined, won: boolean, lost: boolean, alignRight: boolean) => (
-    <div className={`flex flex-1 items-center gap-4 ${alignRight ? "flex-row-reverse text-right" : ""}`}>
-      <div className="min-w-0">
+    <div
+      className={`flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-4 ${
+        alignRight ? "items-end text-right sm:flex-row-reverse" : "items-start"
+      }`}
+    >
+      <div className="min-w-0 max-w-full">
         <Link
           href={`/teams/${snap.team.id}`}
-          className={`block truncate text-lg font-bold hover:underline sm:text-xl ${lost ? "text-muted" : ""}`}
+          className={`block truncate text-base font-bold hover:underline sm:text-xl ${lost ? "text-muted" : ""}`}
         >
           {teamFullName(snap.team)}
         </Link>
@@ -62,13 +68,15 @@ export function Scoreboard({
           {snap.rank > 0 && ` · ${rankLabel(snap.rank, snap.leagueSize)}`}
         </p>
       </div>
-      <span
-        className={`ml-auto text-4xl font-extrabold tabular sm:text-5xl ${alignRight ? "ml-0 mr-auto" : ""} ${
-          lost ? "text-muted" : won ? "text-fg" : "text-soft"
-        }`}
-      >
-        {score ?? "–"}
-      </span>
+      {score !== undefined && (
+        <span
+          className={`text-4xl font-extrabold tabular sm:text-5xl ${alignRight ? "sm:mr-auto" : "sm:ml-auto"} ${
+            lost ? "text-muted" : won ? "text-fg" : "text-soft"
+          }`}
+        >
+          {score}
+        </span>
+      )}
     </div>
   );
 
@@ -81,12 +89,12 @@ export function Scoreboard({
         }}
         aria-hidden
       />
-      <div className="relative flex items-center justify-between gap-2 border-b border-line px-5 py-2 text-xs">
+      <div className="relative flex items-center justify-between gap-2 border-b border-line px-4 py-2 text-xs sm:px-5">
         <span className="eyebrow">{phaseLabel}</span>
         <span className="text-muted first-letter:uppercase">{dateLabel}</span>
         <span className={`eyebrow ${isFinal ? "text-fg" : "text-accent-text"}`}>{statusLabel}</span>
       </div>
-      <div className="relative flex items-center gap-4 px-5 py-6">
+      <div className="relative flex items-center gap-3 px-4 py-5 sm:gap-4 sm:px-5 sm:py-6">
         {side(away, awayScore, awayWon, homeWon, false)}
         <span className="text-sm font-semibold text-faint">@</span>
         {side(home, homeScore, homeWon, awayWon, true)}

@@ -153,6 +153,8 @@ export interface LockerRoomMember {
   id: string;
   age: number;
   personality: Personality;
+  overall?: number; // note actuelle
+  renown?: number; // renommée 0-99
 }
 
 export interface LockerRoom {
@@ -162,14 +164,47 @@ export interface LockerRoom {
   chemistryBonus: number; // ajouté à la cible de cohésion de l'équipe
 }
 
-// Des leaders (leadership 16+) tirent la cohésion vers le haut, des
-// « têtes brûlées » (sanguin et peu professionnel) la font baisser.
+export const MAX_LEADERS = 2;
+
+// Stature d'un joueur dans le vestiaire : on ne suit pas un remplaçant, aussi
+// charismatique soit-il. Peut prétendre au rôle de leader : une star (note
+// 85+ ou renommée 80+), l'un des deux meilleurs joueurs de l'équipe, ou un
+// vétéran (31 ans et plus) qui a encore du crédit (renommée 70+ ou note 78+),
+// signe d'une carrière conséquente.
+export function hasLeaderStature(m: LockerRoomMember, topTwoIds: Set<string>): boolean {
+  const overall = m.overall ?? 0;
+  const renown = m.renown ?? 0;
+  const star = overall >= 85 || renown >= 80;
+  const veteran = m.age >= 31 && (renown >= 70 || overall >= 78);
+  return star || veteran || topTwoIds.has(m.id);
+}
+
+const isDisruptive = (p: Personality) => p.temperament <= 5 && p.professionalism <= 8;
+
+// Leaders (au plus deux) : la star franchise d'office, puis, parmi les
+// joueurs qui ont la stature, ceux qui ont aussi le tempérament (leadership
+// 10+, pas une tête brûlée), les meilleurs d'abord (stature puis leadership). Les « têtes brûlées » (sanguin et
+// peu professionnel) font baisser la cohésion ; un vrai meneur d'hommes
+// (leadership 16+) la tire plus fort qu'un leader par le statut.
 export function lockerRoom(members: LockerRoomMember[]): LockerRoom {
-  const leaders = members.filter((m) => m.personality.leadership >= 16).map((m) => m.id);
+  const byOverall = [...members].sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0));
+  const topTwo = new Set(byOverall.slice(0, 2).filter((m) => m.overall !== undefined).map((m) => m.id));
+  const score = (m: LockerRoomMember) => (m.overall ?? 0) + (m.renown ?? 0) * 0.5 + m.personality.leadership * 1.5;
+  // La star franchise (meilleur joueur, note 85+ ou renommée 80+) est leader
+  // de fait, quel que soit son caractère — sauf tête brûlée.
+  const franchise = byOverall[0];
+  const franchiseLeader =
+    franchise && ((franchise.overall ?? 0) >= 85 || (franchise.renown ?? 0) >= 80) && !isDisruptive(franchise.personality)
+      ? franchise
+      : null;
+  const others = members
+    .filter((m) => m !== franchiseLeader && hasLeaderStature(m, topTwo) && m.personality.leadership >= 10 && !isDisruptive(m.personality))
+    .sort((a, b) => score(b) - score(a));
+  const leaderMembers = [...(franchiseLeader ? [franchiseLeader] : []), ...others].slice(0, MAX_LEADERS);
+  const leaders = leaderMembers.map((m) => m.id);
   const mentors = members.filter((m) => isMentor(m.personality, m.age)).map((m) => m.id);
-  const disruptive = members
-    .filter((m) => m.personality.temperament <= 5 && m.personality.professionalism <= 8)
-    .map((m) => m.id);
-  const chemistryBonus = Math.min(4, leaders.length * 2) - Math.min(6, disruptive.length * 3);
+  const disruptive = members.filter((m) => isDisruptive(m.personality)).map((m) => m.id);
+  const leaderBonus = leaderMembers.reduce((sum, m) => sum + (m.personality.leadership >= 16 ? 2 : 1), 0);
+  const chemistryBonus = Math.min(4, leaderBonus) - Math.min(6, disruptive.length * 3);
   return { leaders, mentors, disruptive, chemistryBonus };
 }

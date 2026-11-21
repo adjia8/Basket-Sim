@@ -66,7 +66,7 @@ export default async function StandingsPage() {
                           <span key="rank" className="text-muted">{index + 1}</span>,
                           <Link key="team" href={`/teams/${team.id}`} className="flex items-center gap-2 font-medium hover:underline">
                             <span
-                              className="h-2.5 w-2.5 shrink-0 rounded-full"
+                              className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-white/25"
                               style={{ backgroundColor: team.primaryColor }}
                               aria-hidden
                             />

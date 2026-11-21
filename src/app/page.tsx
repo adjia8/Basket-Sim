@@ -80,9 +80,8 @@ export default async function DashboardPage() {
         deleteCareerCancel: t("dashboard.deleteCareerCancel"),
         deletingCareer: t("dashboard.deletingCareer"),
       }}
-    />
-    {news.length > 0 && (
-      <section className="mx-auto max-w-6xl px-4 pb-10 lg:px-8">
+      newsSlot={news.length > 0 ? (
+      <section>
         <div className="card p-4">
           <div className="mb-2 flex items-baseline justify-between gap-2">
             <h2 className="eyebrow">{t("league.news.dashboardHeading")}</h2>
@@ -100,7 +99,8 @@ export default async function DashboardPage() {
           </ul>
         </div>
       </section>
-    )}
+      ) : null}
+    />
     </>
   );
 }

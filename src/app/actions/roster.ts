@@ -8,6 +8,7 @@ import { generateContractTerms } from "@/lib/careers/generate-contracts";
 import { getLeagueById } from "@/lib/data-access/leagues";
 import { getPayrollForTeam } from "@/lib/data-access/contracts";
 import { MAX_ROSTER_SIZE, MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
+import { releaseContract } from "@/lib/data-access/roster-compliance";
 import { checkSalaryMove, type CapVerdict } from "@/lib/careers/cap-rules";
 import { initialRenown } from "@/lib/careers/renown-rules";
 import {
@@ -52,42 +53,7 @@ export async function releasePlayer(formData: FormData): Promise<void> {
   const minRosterSize = MIN_ROSTER_SIZE[membership.career.leagueId] ?? MIN_ROSTER_SIZE.nba;
   if (contract.contractType === "standard" && rosterSize <= minRosterSize) return;
 
-  await prisma.$transaction([
-    prisma.contract.delete({
-      where: { careerId_playerId: { careerId: membership.careerId, playerId } },
-    }),
-    // Un contrat garanti coupé avant terme laisse de l'argent mort qui
-    // continue de compter dans le plafond de l'équipe — un contrat de 2e
-    // tour de draft (non garanti) n'en laisse aucun.
-    ...(contract.guaranteed
-      ? [
-          prisma.deadCap.create({
-            data: {
-              careerId: membership.careerId,
-              teamId: membership.teamId,
-              playerId,
-              salary: contract.salary,
-              yearsRemaining: contract.yearsRemaining,
-            },
-          }),
-        ]
-      : []),
-    // Une joueuse coupée n'est plus le problème de ce GM — sans ce reset, une
-    // promesse active resterait bloquée pour toujours si elle est re-signée
-    // plus tard (y compris par un autre GM humain en multijoueur).
-    prisma.playerState.updateMany({
-      where: { careerId: membership.careerId, playerId },
-      data: {
-        wantsTrade: false,
-        tradeRequestReasonsJson: null,
-        tradeRequestSinceSeason: null,
-        lastTradeRequestCheckDate: null,
-        activePromiseType: null,
-        activePromiseSeason: null,
-        promiseOriginTeamId: null,
-      },
-    }),
-  ]);
+  await releaseContract(membership.careerId, membership.teamId, contract);
 
   revalidateRosterPaths(membership.teamId);
 }

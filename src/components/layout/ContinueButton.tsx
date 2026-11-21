@@ -13,6 +13,7 @@ export interface ContinueButtonLabels {
   waitingFor: string; // "En attente de {name}"
   newMessages: string; // "{count} message(s) à lire avant de continuer"
   draftTurn: string; // "Draft : à toi de choisir"
+  rosterIssue: string; // "Effectif : {size} joueurs, il en faut entre {min} et {max}"
   error: string;
 }
 
@@ -76,6 +77,16 @@ export function ContinueButton({
       if (res.kind === "draft") {
         setStatus(labels.draftTurn);
         goTo("/draft");
+        return;
+      }
+      if (res.kind === "roster") {
+        setStatus(
+          labels.rosterIssue
+            .replace("{size}", String(res.size))
+            .replace("{min}", String(res.min))
+            .replace("{max}", String(res.max))
+        );
+        goTo(`/teams/${res.teamId}`);
         return;
       }
       if (res.kind === "inbox") {

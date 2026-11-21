@@ -68,7 +68,7 @@ export async function advanceTeamChemistry(
   const averageBasketballIQ = roster.length
     ? roster.reduce((sum, p) => sum + p.ratings.basketballIQ, 0) / roster.length
     : 50;
-  const room = lockerRoom(roster.map((p) => ({ id: p.id, age: p.age, personality: personalityFor(p.id, p.age) })));
+  const room = lockerRoom(roster.map((p) => ({ id: p.id, age: p.age, personality: personalityFor(p.id, p.age), overall: p.overallRating, renown: p.renown })));
   const target = chemistryTarget(winPct, averageBasketballIQ) + room.chemistryBonus;
   const chemistry = Math.max(0, Math.min(99, nextChemistry(state.chemistry, target) + trainingBonus));
 

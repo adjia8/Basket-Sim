@@ -16,7 +16,7 @@
 //   peu sur l'affluence.
 
 import type { Locale } from "@/lib/i18n/locale";
-import type { Personality } from "./personality-rules";
+import { lockerRoom, type Personality } from "./personality-rules";
 import type { AnswerTone, JournalistStyle, PressEffects } from "./press-rules";
 
 export interface AnsweredQuestion {
@@ -32,6 +32,8 @@ export interface ReactionPlayer {
   id: string;
   name: string;
   renown: number;
+  overall?: number;
+  age?: number;
   personality: Personality;
   hasPendingRequest: boolean;
 }
@@ -180,9 +182,12 @@ function targetReaction(
 }
 
 function leaderReaction(input: ReactionInput, squadDelta: number, refereeCriticism: boolean, exclude: Set<string>, rnd: () => number): PlayerReaction | null {
-  const leader = input.roster
-    .filter((p) => !exclude.has(p.id) && p.personality.leadership >= 14)
-    .sort((a, b) => b.personality.leadership - a.personality.leadership)[0];
+  // Le leader du vestiaire (voir lockerRoom) : une star, un des meilleurs
+  // joueurs ou un vétéran reconnu, qui a aussi le tempérament d'un meneur.
+  const room = lockerRoom(
+    input.roster.map((p) => ({ id: p.id, age: p.age ?? 27, personality: p.personality, overall: p.overall, renown: p.renown }))
+  );
+  const leader = room.leaders.map((id) => input.roster.find((p) => p.id === id)!).find((p) => p && !exclude.has(p.id));
   if (!leader) return null;
   const fr = input.locale === "fr";
   const base = { playerId: leader.id, name: leader.name, moraleDelta: 0, squadMorale: 0, publicOpinion: 0, requestMeeting: false };

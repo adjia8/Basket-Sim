@@ -61,8 +61,8 @@ export default async function FutureDraftPage() {
                       <th className="py-1.5 text-left">{t("futureDraft.col.player")}</th>
                       <th className="py-1.5 text-left">{t("futureDraft.col.pos")}</th>
                       <th className="py-1.5 text-right">{t("futureDraft.col.height")}</th>
-                      <th className="py-1.5 text-right">{t("futureDraft.col.age")}</th>
-                      <th className="py-1.5 text-left">{t("futureDraft.col.projection")}</th>
+                      <th className="py-1.5 pr-4 text-right">{t("futureDraft.col.age")}</th>
+                      <th className="py-1.5 pr-4 text-left">{t("futureDraft.col.projection")}</th>
                       <th className="py-1.5 text-left">{t("futureDraft.col.team")}</th>
                     </tr>
                   </thead>
@@ -84,8 +84,8 @@ export default async function FutureDraftPage() {
                           </td>
                           <td className="py-1.5">{p.position}</td>
                           <td className="py-1.5 text-right tabular">{p.heightCm} cm</td>
-                          <td className="py-1.5 text-right tabular">{p.age}</td>
-                          <td className="py-1.5">
+                          <td className="py-1.5 pr-4 text-right tabular">{p.age}</td>
+                          <td className="py-1.5 pr-4 whitespace-nowrap">
                             <Stars value={ratingStars(est.mid)} />{" "}
                             <span className="text-xs text-faint tabular">
                               {est.low}-{est.high}

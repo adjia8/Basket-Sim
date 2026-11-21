@@ -1,6 +1,7 @@
 "use server";
 
 import { activeMembershipWhere } from "@/lib/auth/active-membership";
+import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getCurrentDraftPick } from "@/lib/data-access/draft-picks";
@@ -36,6 +37,9 @@ export async function draftProspect(formData: FormData): Promise<void> {
   if (!currentPick || currentPick.teamId !== membership.teamId) return; // pas mon tour
 
   await performDraftPick(currentPick, prospect, teams.length, membership.career.leagueId);
+  // Sans ça, la page Draft restait figée sur « à toi de choisir » après le
+  // choix (les clics suivants ne faisaient plus rien).
+  revalidatePath("/", "layout");
 }
 
 // Fait drafter une équipe gérée par l'IA — n'importe quel membre humain de la
@@ -73,4 +77,5 @@ export async function draftForAiTeam(): Promise<void> {
   if (!best) return;
 
   await performDraftPick(currentPick, best, teams.length, membership.career.leagueId);
+  revalidatePath("/", "layout");
 }

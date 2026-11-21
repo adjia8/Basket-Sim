@@ -32,15 +32,16 @@ export default async function AwardsPage() {
         <p className="eyebrow mb-2">{awardName(type, locale, women)}</p>
         <ol className="space-y-1">
           {entries.map((e, i) => (
-            <li key={e.playerId} className="flex items-baseline justify-between gap-2">
-              <span>
-                <span className="mr-2 text-faint tabular">{i + 1}.</span>
+            <li key={e.playerId} className="flex gap-2">
+              <span className="w-4 shrink-0 text-faint tabular">{i + 1}.</span>
+              {/* Nom puis ligne de stats dessous : côte à côte, les stats passaient mal à la ligne. */}
+              <span className="min-w-0">
                 <Link href={playerHref(e.playerId, e.teamId)} className={`hover:underline ${i === 0 ? "font-semibold" : ""}`}>
                   {e.name}
                 </Link>{" "}
                 <span className="text-xs text-muted">{abbr.get(e.teamId)}</span>
+                <span className="block text-xs text-muted tabular">{e.statLine}</span>
               </span>
-              <span className="text-xs text-muted tabular">{e.statLine}</span>
             </li>
           ))}
         </ol>

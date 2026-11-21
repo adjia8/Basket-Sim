@@ -323,3 +323,34 @@ export function freeAgencyOpenMessageText(locale: Locale): InboxMessageText {
         body: "The draft is over and free agents can now sign. Other teams will start recruiting as soon as you move the calendar forward.",
       };
 }
+
+// Effectif hors des bornes de saison avant la reprise (voir
+// roster-compliance.ts) : « Continuer » est bloqué tant que ce n'est pas réglé.
+export function rosterIssueMessageText(
+  locale: Locale,
+  issue: "over" | "under",
+  size: number,
+  min: number,
+  max: number
+): InboxMessageText {
+  if (locale === "fr") {
+    return issue === "over"
+      ? {
+          title: `Effectif trop fourni : ${size} joueurs pour ${max} places`,
+          body: `La saison approche : il faut redescendre à ${max} contrats standard avant le premier match. Libère ${size - max} joueur(s) ou échange-les. Un contrat garanti coupé laisse de l'argent mort ; un contrat de 2e tour non garanti, non.`,
+        }
+      : {
+          title: `Effectif incomplet : ${size} joueurs, il en faut ${min}`,
+          body: `La saison approche : il faut au moins ${min} contrats standard avant le premier match. Signe ${min - size} agent(s) libre(s).`,
+        };
+  }
+  return issue === "over"
+    ? {
+        title: `Roster too big: ${size} players for ${max} spots`,
+        body: `The season is near: you must get down to ${max} standard contracts before the first game. Release or trade ${size - max} player(s). Cutting a guaranteed deal leaves dead money; a non-guaranteed 2nd-round deal doesn't.`,
+      }
+    : {
+        title: `Roster incomplete: ${size} players, ${min} required`,
+        body: `The season is near: you need at least ${min} standard contracts before the first game. Sign ${min - size} free agent(s).`,
+      };
+}

@@ -85,7 +85,7 @@ export async function maybePlayerRequests(
         ? `Tu n'as pas répondu à sa demande depuis une semaine. Son moral en prend un coup${toTrade ? ", et il demande désormais à être échangé" : ""}.`
         : `You haven't answered his request for a week. His morale takes a hit${toTrade ? ", and he now wants to be traded" : ""}.`,
       `/teams/${teamId}/players/${s.playerId}`,
-      { playerId: s.playerId, priority: toTrade ? "urgent" : "important" }
+      { gameDate, playerId: s.playerId, priority: toTrade ? "urgent" : "important" }
     );
   }
 
@@ -137,7 +137,7 @@ export async function maybePlayerRequests(
       body.replace("{name}", name(s)) +
         (fr ? " Réponds-lui depuis sa fiche dans la semaine." : " Answer him from his player page within a week."),
       `/teams/${teamId}/players/${s.playerId}`,
-      { playerId: s.playerId }
+      { gameDate, playerId: s.playerId }
     );
     return; // une seule nouvelle demande à la fois
   }

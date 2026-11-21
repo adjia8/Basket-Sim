@@ -41,8 +41,8 @@ test("tempérament : les sanguins prennent plus de techniques et vivent le moral
 test("vestiaire : leaders et perturbateurs déplacent la cohésion, mentor = vétéran pro", () => {
   const base = { professionalism: 10, ambition: 10, loyalty: 10, temperament: 10, leadership: 10 };
   const room = lockerRoom([
-    { id: "leader", age: 30, personality: { ...base, leadership: 18 } },
-    { id: "hothead", age: 24, personality: { ...base, temperament: 3, professionalism: 5 } },
+    { id: "leader", age: 30, overall: 88, renown: 85, personality: { ...base, leadership: 18 } },
+    { id: "hothead", age: 24, overall: 70, renown: 50, personality: { ...base, temperament: 3, professionalism: 5 } },
   ]);
   assert.deepEqual(room.leaders, ["leader"]);
   assert.deepEqual(room.disruptive, ["hothead"]);
@@ -85,4 +85,29 @@ test("potentiel : jamais sous la note, progression nulle au plafond", () => {
   assert.equal(annualGrowth(22, 80, 80, 1), 0);
   const e = estimateRating(85, 99, "seed");
   assert.ok(e.low <= 85 + 2 && e.high >= 85 - 2);
+});
+
+test("leaders : la stature d'abord (star, meilleurs joueurs, vétéran reconnu), puis le tempérament", () => {
+  const base = { professionalism: 12, ambition: 10, loyalty: 10, temperament: 10, leadership: 12 };
+  const room = lockerRoom([
+    { id: "star", age: 27, overall: 96, renown: 95, personality: base },
+    { id: "second", age: 28, overall: 88, renown: 80, personality: { ...base, leadership: 6 } }, // pas un meneur
+    { id: "charismaticBench", age: 24, overall: 72, renown: 55, personality: { ...base, leadership: 19 } },
+    { id: "veteran", age: 33, overall: 76, renown: 74, personality: { ...base, leadership: 15 } },
+    { id: "hotheadStar", age: 26, overall: 86, renown: 82, personality: { ...base, temperament: 3, professionalism: 5, leadership: 17 } },
+  ]);
+  // Le remplaçant charismatique n'est pas leader ; la star tête brûlée non plus.
+  assert.deepEqual(room.leaders, ["star", "veteran"]);
+  assert.ok(room.leaders.length <= 2);
+  assert.ok(room.disruptive.includes("hotheadStar"));
+});
+
+test("leaders : la star franchise mène d'office, même sans grand charisme", () => {
+  const base = { professionalism: 12, ambition: 10, loyalty: 10, temperament: 10, leadership: 7 };
+  const room = lockerRoom([
+    { id: "franchise", age: 27, overall: 96, renown: 92, personality: base },
+    { id: "second", age: 26, overall: 86, renown: 70, personality: { ...base, leadership: 5 } },
+    { id: "role", age: 25, overall: 74, renown: 55, personality: { ...base, leadership: 18 } },
+  ]);
+  assert.deepEqual(room.leaders, ["franchise"]);
 });

@@ -18,6 +18,7 @@ export const INBOX_CATEGORIES: InboxCategory[] = ["team", "medical", "transfers"
 
 const CATEGORY_BY_TYPE: Record<string, InboxCategory> = {
   player_request: "team",
+  roster: "team",
   player_reaction: "team",
   injury: "medical",
   league_injury: "medical",
@@ -43,6 +44,7 @@ export function categoryOf(type: string): InboxCategory {
 
 const PRIORITY_BY_TYPE: Record<string, InboxPriority> = {
   trade_request: "urgent",
+  roster: "urgent",
   player_request: "urgent",
   trade_offer: "urgent",
   poach_offer: "urgent",

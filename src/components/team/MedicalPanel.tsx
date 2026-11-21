@@ -12,7 +12,7 @@ function Meter({ value, tone }: { value: number; tone: "good" | "warn" | "bad" }
   const color = tone === "good" ? "bg-good" : tone === "warn" ? "bg-warn" : "bg-bad";
   return (
     <span className="flex items-center gap-2">
-      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-3">
+      <span className="h-1.5 w-10 overflow-hidden rounded-full bg-surface-3 2xl:w-16">
         <span className={`block h-full ${color}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
       </span>
       <span className="w-6 text-right tabular">{value}</span>
@@ -49,7 +49,9 @@ export function MedicalPanel({
     if (p.injured) {
       const injury = p.injuryType ? t(`domain.injuryType.${p.injuryType}` as "domain.injuryType.illness") : t(`domain.injurySeverity.${p.injurySeverity ?? "minor"}`);
       return (
-        <span className="text-bad">
+        // Largeur bornée : une blessure au nom long ne pousse plus la colonne
+        // d'action hors du tableau.
+        <span className="inline-block max-w-56 text-bad">
           {r.returnDate
             ? t("team.medical.out", { injury, date: formatGameDate(r.returnDate.toISOString(), locale) })
             : t("team.medical.outSeason", { injury })}
@@ -130,7 +132,7 @@ export function MedicalPanel({
                           <input type="hidden" name="value" value={p.restNextGame ? "false" : "true"} />
                           <button
                             type="submit"
-                            className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                            className={`whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium transition ${
                               p.restNextGame
                                 ? "border border-line hover:bg-surface-2"
                                 : r.needsRest

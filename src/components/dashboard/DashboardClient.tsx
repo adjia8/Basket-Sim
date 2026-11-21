@@ -53,7 +53,9 @@ export function DashboardClient({
   inviteCode,
   locale,
   labels,
+  newsSlot,
 }: {
+  newsSlot?: React.ReactNode; // actualité de la ligue, au-dessus de la suppression de carrière
   teamId: string;
   teams: Team[];
   players: Player[];
@@ -280,6 +282,9 @@ export function DashboardClient({
         </div>
       </div>
 
+      {newsSlot}
+
+      {/* Action destructrice : tout en bas, après le contenu utile. */}
       <div className="border-t border-line pt-6">
         <DeleteCareerButton
           labels={{

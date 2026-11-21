@@ -505,6 +505,8 @@ async function resolveConference(
       id: st.playerId,
       name: nameById.get(st.playerId) ?? st.playerId,
       renown: st.renown,
+      overall: st.overallRating,
+      age: st.age,
       personality: personalityFor(st.playerId, st.age),
       hasPendingRequest: !!st.pendingRequest,
     })),
@@ -535,6 +537,12 @@ async function resolveConference(
     data: { status: "answered", skipped, headline, answeredAt: new Date(), reactionsJson: JSON.stringify(reactions) },
   });
   if (claimed.count === 0) return;
+  // La convocation (« Les médias attendent une déclaration ») est traitée :
+  // elle ne doit plus encombrer la boîte de réception.
+  await prisma.inboxMessage.updateMany({
+    where: { careerId, teamId, type: "press", status: "unread" },
+    data: { status: "read" },
+  });
 
   // Moral des joueurs en une seule requête (voir player-state-patches.ts).
   const patches = new PlayerStatePatches();

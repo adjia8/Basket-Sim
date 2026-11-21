@@ -46,10 +46,10 @@ export function StaffTable({
                 {members.length}/{slots[role]}
               </span>
             </h3>
-            <div className="card divide-y divide-line-soft overflow-x-auto">
+            <div className="card divide-y divide-line-soft">
               {members.map((m) => (
-                <div key={m.id} className="flex min-w-[640px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 text-sm">
-                  <div className="w-48">
+                <div key={m.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 text-sm">
+                  <div className="w-full sm:w-48">
                     <p className="font-medium">
                       {m.firstName} {m.lastName}
                     </p>

@@ -57,7 +57,8 @@ export async function evaluatePlayingTimePromises(
   careerId: string,
   teamId: string,
   season: string,
-  locale: Locale
+  locale: Locale,
+  gameDate: Date | null = null
 ): Promise<void> {
   const contracts = await prisma.contract.findMany({ where: { careerId, teamId }, select: { playerId: true } });
   const states = await prisma.playerState.findMany({
@@ -100,7 +101,7 @@ export async function evaluatePlayingTimePromises(
           : `You promised him a ${label} role (≈ ${EXPECTED_MINUTES[progress.status]} min); he only played ${mpg} min per game. He feels betrayed and wants out.`,
       `/teams/${teamId}/players/${s.playerId}`,
       // Promesse rompue : le joueur veut partir — à traiter.
-      { playerId: s.playerId, priority: kept ? "info" : "urgent" }
+      { gameDate, playerId: s.playerId, priority: kept ? "info" : "urgent" }
     );
   }
 }

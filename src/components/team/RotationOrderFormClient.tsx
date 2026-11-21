@@ -148,7 +148,7 @@ export function RotationOrderFormClient({
           if (el) itemRefs.current.set(player.id, el);
           else itemRefs.current.delete(player.id);
         }}
-        className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-sm transition ${
+        className={`flex items-center gap-2 rounded-lg border px-2 py-2 text-sm transition sm:gap-3 sm:px-3 ${
           draggingId === player.id
             ? "border-line-strong bg-surface-2 shadow-sm"
             : "border-line-soft"
@@ -166,18 +166,21 @@ export function RotationOrderFormClient({
         >
           ⠿
         </button>
-        <span className="w-6 text-center text-faint">{index + 1}</span>
-        <span className="flex-1">
-          <Link href={playerHref(player.id, teamId)} className="hover:underline">
-            #{player.jerseyNumber} {player.firstName} {player.lastName}
-          </Link>{" "}
-          <span className="text-faint">
-            ({player.position}, {player.overallRating})
+        <span className="hidden w-6 text-center text-faint sm:inline">{index + 1}</span>
+        {/* Nom sur une ligne (tronqué si besoin), poste et note dessous : sur
+            mobile, le nom ne s'écrase plus mot par mot. */}
+        <span className="min-w-0 flex-1">
+          <Link href={playerHref(player.id, teamId)} className="block truncate hover:underline">
+            <span className="hidden sm:inline">#{player.jerseyNumber} </span>
+            {player.firstName} {player.lastName}
+          </Link>
+          <span className="text-xs text-faint">
+            {player.position} · {player.overallRating}
           </span>
         </span>
-        <EnergyRing fatigue={player.fatigue} />
+        <EnergyRing fatigue={player.fatigue} size={34} />
         {inRotation ? (
-          <span className="w-24 shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-center text-xs font-medium text-soft">
+          <span className="w-[4.5rem] shrink-0 rounded-full bg-surface-2 px-1 py-0.5 text-center text-[10px] font-medium leading-tight text-soft sm:w-24 sm:px-2 sm:text-xs">
             {roleLabel(index, labels)}
           </span>
         ) : (
@@ -185,13 +188,13 @@ export function RotationOrderFormClient({
           // ça, l'anneau d'énergie se décale ligne par ligne selon que le
           // texte du badge voisin ("Titulaire"/"6ème femme"/"Banc", ou rien
           // du tout hors rotation) est plus ou moins large.
-          <span className="w-24 shrink-0" aria-hidden />
+          <span className="w-[4.5rem] shrink-0 sm:w-24" aria-hidden />
         )}
         <button
           type="button"
           aria-label={inRotation ? labels.removeFromRotation : labels.addToRotation}
           onClick={() => (inRotation ? removeFromRotation(player.id) : addToRotation(player.id))}
-          className={`flex h-6 w-6 items-center justify-center rounded-full text-sm font-bold transition ${
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-bold transition ${
             inRotation
               ? "bg-bad/10 text-bad hover:bg-bad/20"
               : "bg-good/10 text-good hover:bg-good/20"

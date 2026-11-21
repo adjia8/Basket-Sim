@@ -40,9 +40,9 @@ export default async function FranchisePage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <h1 className="text-2xl font-bold tracking-tight">{t("franchisePage.title")}</h1>
-      <p className="mt-1 text-soft">{t("franchisePage.description")}</p>
+      <p className="mt-1 text-sm text-muted">{t("franchisePage.description")}</p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+      <div className="mt-6 grid items-start gap-4 sm:grid-cols-2">
         <div className="card p-4">
           <p className="text-xs uppercase tracking-wide text-muted">{t("gm.treasury")}</p>
           <p

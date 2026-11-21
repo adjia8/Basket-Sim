@@ -107,12 +107,12 @@ export function RosterTable({
       <table className="data-table w-full min-w-[860px] text-left text-sm">
         <thead>
           <tr className="border-b border-line text-muted">
-            <th className="py-2 pr-4" />
-            <th className="py-2 pr-4">{labels.player}</th>
-            <th className="py-2 pr-4">{labels.position}</th>
-            <th className="py-2 pr-4">{labels.nationality}</th>
+            <th className="py-2 pr-3" />
+            <th className="py-2 pr-3">{labels.player}</th>
+            <th className="py-2 pr-3">{labels.position}</th>
+            <th className="py-2 pr-3">{labels.nationality}</th>
             {COLUMNS.map((col) => (
-              <th key={col.key} className="py-2 pr-4">
+              <th key={col.key} className="py-2 pr-3">
                 <button
                   type="button"
                   onClick={() => toggleSort(col.key)}
@@ -130,72 +130,71 @@ export function RosterTable({
         <tbody>
           {sorted.map((player) => (
             <tr key={player.id} className="border-b border-line-soft">
-              <td className="py-2 pr-4">
+              <td className="py-2 pr-3">
                 <PlayerAvatar playerId={player.id} firstName={player.firstName} lastName={player.lastName} />
               </td>
-              <td className="py-2 pr-4 font-medium">
-                <Link
-                  href={`/teams/${teamId}/players/${player.id}`}
-                  className="hover:underline"
-                >
+              <td className="py-2 pr-3 font-medium">
+                <Link href={`/teams/${teamId}/players/${player.id}`} className="whitespace-nowrap hover:underline">
                   #{player.jerseyNumber} {player.firstName} {player.lastName}
                 </Link>
-                {player.contractType !== "standard" && (
-                  <span className="ml-2 rounded-full bg-info/10 px-2 py-0.5 text-xs font-normal text-info">
-                    {labels.contractType[player.contractType]}
-                  </span>
-                )}
-                {player.injured && (
-                  <span className="ml-2 rounded-full bg-bad/10 px-2 py-0.5 text-xs font-normal text-bad">
-                    {labels.unavailable}{" "}
-                    {player.injurySeverity ? `(${labels.severity[player.injurySeverity]}, ` : "("}
-                    {player.injuryGamesRemaining} {labels.games})
-                  </span>
-                )}
-                {player.injured && player.injurySeverity === "minor" && canRelease && (
-                  <form action={setPlayingThroughInjury} className="ml-2 inline">
-                    <input type="hidden" name="playerId" value={player.id} />
-                    <input
-                      type="hidden"
-                      name="value"
-                      value={player.playingThroughInjury ? "false" : "true"}
-                    />
-                    <button
-                      type="submit"
-                      className="rounded-full border border-line px-2 py-0.5 text-xs font-normal hover:bg-surface-2"
-                    >
-                      {player.playingThroughInjury ? labels.rest : labels.playThroughInjury}
-                    </button>
-                  </form>
-                )}
-                {player.wantsTrade && (
-                  <span
-                    title={player.tradeReasons.map((r) => labels.tradeReason[r]).join(" · ")}
-                    className="ml-2 rounded-full bg-warn/10 px-2 py-0.5 text-xs font-normal text-warn"
-                  >
-                    {labels.wantsTrade}
-                  </span>
+                {/* Badges sous le nom : en ligne, ils élargissaient la colonne et
+                    poussaient les dernières colonnes hors du tableau. */}
+                {(player.contractType !== "standard" || player.injured || player.wantsTrade) && (
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    {player.contractType !== "standard" && (
+                      <span className="rounded-full bg-info/10 px-2 py-0.5 text-xs font-normal text-info">
+                        {labels.contractType[player.contractType]}
+                      </span>
+                    )}
+                    {player.injured && (
+                      <span className="rounded-full bg-bad/10 px-2 py-0.5 text-xs font-normal text-bad">
+                        {labels.unavailable}{" "}
+                        {player.injurySeverity ? `(${labels.severity[player.injurySeverity]}, ` : "("}
+                        {player.injuryGamesRemaining} {labels.games})
+                      </span>
+                    )}
+                    {player.injured && player.injurySeverity === "minor" && canRelease && (
+                      <form action={setPlayingThroughInjury} className="inline">
+                        <input type="hidden" name="playerId" value={player.id} />
+                        <input type="hidden" name="value" value={player.playingThroughInjury ? "false" : "true"} />
+                        <button
+                          type="submit"
+                          className="rounded-full border border-line px-2 py-0.5 text-xs font-normal hover:bg-surface-2"
+                        >
+                          {player.playingThroughInjury ? labels.rest : labels.playThroughInjury}
+                        </button>
+                      </form>
+                    )}
+                    {player.wantsTrade && (
+                      <span
+                        title={player.tradeReasons.map((r) => labels.tradeReason[r]).join(" · ")}
+                        className="rounded-full bg-warn/10 px-2 py-0.5 text-xs font-normal text-warn"
+                      >
+                        {labels.wantsTrade}
+                      </span>
+                    )}
+                  </div>
                 )}
               </td>
-              <td className="py-2 pr-4">{player.position}</td>
-              <td className="py-2 pr-4">{player.nationality}</td>
-              <td className={`py-2 pr-4 font-semibold ${toneClass(ratingTone(player.overallRating))}`}>
+              <td className="py-2 pr-3">{player.position}</td>
+              <td className="py-2 pr-3">{player.nationality}</td>
+              <td className={`py-2 pr-3 font-semibold ${toneClass(ratingTone(player.overallRating))}`}>
                 {player.overallRating}
               </td>
-              <td className="py-2 pr-4">{player.heightCm} cm</td>
-              <td className="py-2 pr-4">{player.age}</td>
-              <td className="py-2 pr-4">
+              <td className="py-2 pr-3">{player.heightCm} cm</td>
+              <td className="py-2 pr-3">{player.age}</td>
+              <td className="whitespace-nowrap py-2 pr-3">
                 {formatSalary(player.salary, locale)}
                 {!player.guaranteed && (
-                  <span className="ml-1 text-xs text-faint">
+                  <span className="block text-xs text-faint">
                     {labels.notGuaranteed}
                   </span>
                 )}
               </td>
-              <td className="py-2 pr-4">{player.yearsRemaining}</td>
-              <td className="py-2 pr-4">{player.ppg}</td>
-              <td className="py-2 pr-4">{player.rpg}</td>
-              <td className="py-2 pr-4">{player.apg}</td>
+              <td className="py-2 pr-3">{player.yearsRemaining}</td>
+              <td className="py-2 pr-3">{player.ppg}</td>
+              <td className="py-2 pr-3">{player.rpg}</td>
+              <td className="py-2 pr-3">{player.apg}</td>
             </tr>
           ))}
         </tbody>

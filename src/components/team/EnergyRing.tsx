@@ -41,7 +41,7 @@ export function EnergyRing({ fatigue, size = 40 }: { fatigue: number; size?: num
         y={center}
         textAnchor="middle"
         dominantBaseline="central"
-        fontSize={size * 0.3}
+        fontSize={size * 0.24}
         fontWeight="600"
         className="fill-current"
       >

@@ -35,7 +35,7 @@ export function GameRosterPreview({
   const sorted = [...roster].sort((a, b) => b.overallRating - a.overallRating);
 
   return (
-    <div className="card p-4">
+    <div className="card min-w-0 p-4">
       <div className="flex items-baseline justify-between gap-2">
         <Link href={`/teams/${team.id}`} className="font-semibold hover:underline">
           {teamFullName(team)}
