@@ -73,6 +73,12 @@ export function injuryPriority(severity: string, gamesOut: number, renown: numbe
   return "info";
 }
 
+// Blessure d'une star d'une autre équipe : importante seulement pour une
+// superstar (note 88+) ; les autres stars passent en info (regroupées).
+export function leagueInjuryPriority(overall: number): InboxPriority {
+  return overall >= 88 ? "important" : "info";
+}
+
 export function isPriority(value: string | null | undefined): value is InboxPriority {
   return value === "urgent" || value === "important" || value === "info";
 }

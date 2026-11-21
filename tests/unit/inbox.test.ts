@@ -81,3 +81,9 @@ test("infirmerie : blessure notable = star absente longtemps ; retour estimé d'
   assert.equal(estimatedReturn(dates, 2), "2026-12-05");
   assert.equal(estimatedReturn(dates, 3), null); // saison terminée avant
 });
+
+test("alerte blessure d'une autre équipe : importante pour une superstar seulement", async () => {
+  const { leagueInjuryPriority } = await import("../../src/lib/careers/inbox-priority-rules");
+  assert.equal(leagueInjuryPriority(92), "important");
+  assert.equal(leagueInjuryPriority(84), "info");
+});

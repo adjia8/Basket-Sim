@@ -300,7 +300,7 @@ export async function maybeCreatePressConference(
   const recent = await prisma.pressConference.findMany({
     where: { careerId, teamId },
     orderBy: { createdAt: "desc" },
-    take: 2,
+    take: 3,
     include: { questions: { select: { topic: true, playerId: true } } },
   });
   const ctx = await enrichContext(
@@ -315,14 +315,14 @@ export async function maybeCreatePressConference(
   );
   if (Math.random() >= pressConferenceChance(ctx)) return;
 
-  // Pas deux fois le même sujet de suite, ni le même joueur visé sur le même
-  // sujet au cours des deux dernières conférences.
+  // Pas deux fois le même sujet en trois conférences, ni le même joueur visé
+  // sur le même sujet au cours des trois dernières.
   const avoid = new Set<string>();
   recent.forEach((conference, i) => {
     for (const q of conference.questions) {
       if (!q.topic) continue;
       if (q.playerId) avoid.add(topicKey(q.topic, q.playerId));
-      else if (i === 0) avoid.add(q.topic);
+      else if (i <= 1) avoid.add(q.topic); // pas deux fois en trois conférences
     }
   });
 

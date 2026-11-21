@@ -39,7 +39,7 @@ import {
 } from "@/lib/careers/team-talk-rules";
 import type { HalfState, QuarterEvent } from "@/lib/simulation/engine";
 import { GAMES_PER_SEASON } from "@/lib/careers/finance-rules";
-import { injuryPriority } from "@/lib/careers/inbox-priority-rules";
+import { injuryPriority, leagueInjuryPriority } from "@/lib/careers/inbox-priority-rules";
 import { clampMorale } from "@/lib/careers/morale-rules";
 
 // Niveau d'un effectif pour juger favori / outsider : moyenne des 8 meilleurs.
@@ -875,13 +875,14 @@ export async function simulateAndResolveGame(
   const starInjuries = news.filter((n) => n.type === "injury" && n.teamId);
   if (starInjuries.length > 0) {
     const humans = await prisma.membership.findMany({ where: { careerId }, select: { teamId: true } });
+    const rosterById = new Map([...homeRoster, ...awayRoster].map((p) => [p.id, p]));
     for (const n of starInjuries) {
       for (const h of humans) {
         if (h.teamId === n.teamId) continue;
         await createInboxMessage(careerId, h.teamId, game.season, "league_injury", n.title, n.body, "/injuries", {
           gameDate,
           playerId: n.playerId,
-          priority: "important",
+          priority: leagueInjuryPriority(rosterById.get(n.playerId ?? "")?.overallRating ?? 0),
         });
       }
     }
