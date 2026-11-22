@@ -73,3 +73,57 @@ test("classes de prospects réels : 3 drafts, pas de doublon, absents du catalog
     }
   }
 });
+
+import {
+  attributeEvolution,
+  clubStanding,
+  extensionOffer,
+  gmRating,
+  gmSalary,
+  interestedTeams,
+  poachChance,
+  purchase,
+  reputationAfterSeason,
+  sell,
+  severancePay,
+} from "../../src/lib/careers/gm-career-rules";
+
+test("carrière du GM : note, évolution selon le style, réputation", () => {
+  const p = { offense: 4, defense: 4, physical: 4, tactical: 4, chemistry: 4 };
+  assert.equal(gmRating(p), 52);
+  const style = { offenseRank: 2, defenseRank: 28, teams: 30, chemistry: 75, pace: "fast", offenseStyle: "perimeter", defenseStyle: "man", outcome: "exceeded" as const };
+  const d = attributeEvolution(p, style);
+  assert.equal(d.offense, 2); // top 3 en attaque
+  assert.equal(d.defense, -1); // défense parmi les pires
+  assert.equal(d.physical, 1); // rythme rapide
+  assert.equal(d.tactical, 2); // système + objectifs dépassés
+  assert.equal(d.chemistry, 1);
+  // Bornes 0-20.
+  assert.equal(attributeEvolution({ ...p, offense: 20 }, style).offense, 0);
+  assert.equal(attributeEvolution({ ...p, defense: 0 }, style).defense, 0);
+  const standing = clubStanding({ board: 80, players: 70, press: 60, fans: 70 });
+  assert.equal(standing, 71);
+  assert.ok(reputationAfterSeason({ reputation: 50, standing, outcome: "exceeded", champion: true, prestige: 0 }) > 60);
+  assert.ok(reputationAfterSeason({ reputation: 50, standing: 30, outcome: "fired", champion: false, prestige: 0 }) < 42);
+});
+
+test("carrière du GM : contrat, marché de l'emploi, train de vie", () => {
+  assert.ok(gmSalary("nba", 90, 90) > gmSalary("nba", 20, 30));
+  assert.equal(extensionOffer({ salary: 3_000_000, yearsLeft: 2, outcome: "met", marketSalary: 0 }), null);
+  assert.equal(extensionOffer({ salary: 3_000_000, yearsLeft: 1, outcome: "warning", marketSalary: 0 }), null);
+  assert.equal(extensionOffer({ salary: 3_000_000, yearsLeft: 1, outcome: "exceeded", marketSalary: 0 })?.salary, 3_450_000);
+  assert.equal(severancePay(4_000_000, 2), 4_000_000);
+  assert.equal(poachChance("warning", 90), 0);
+  assert.ok(poachChance("exceeded", 80) > poachChance("exceeded", 20));
+  const teams = [10, 30, 50, 70, 90, 95].map((m, i) => ({ id: `t${i}`, marketAppeal: m }));
+  assert.equal(interestedTeams(teams, 80).length, 6);
+  assert.deepEqual(interestedTeams(teams, 10).map((t) => t.id), ["t0", "t1", "t2", "t3"]); // au moins 4 clubs
+  // Achats : un seul logement (l'ancien revendu 60 %), garage limité, fonds.
+  const a = purchase([], "apartment", 500_000);
+  assert.ok(a.ok);
+  const b = purchase(a.ok ? a.owned : [], "family_house", 1_000_000);
+  assert.ok(b.ok && !b.owned.includes("apartment") && b.cashDelta === 270_000 - 1_200_000);
+  assert.deepEqual(purchase([], "yacht", 1_000), { ok: false, error: "funds" });
+  assert.deepEqual(purchase(["city_car", "sedan", "electric_suv", "sports_car"], "supercar", 1e9), { ok: false, error: "garage" });
+  assert.equal(sell(["villa"], "villa")?.cashDelta, 3_600_000);
+});

@@ -255,6 +255,15 @@ model GmProfile {
   pendingOfferTeamId     String? // offre de dépeçage en attente de réponse
   frontOfficeApproval    Int              @default(50) // 0-99, piloté par les réponses en conférence de presse
   boardObjectivesJson    String? // objectifs des propriétaires de la saison en cours — voir board-objectives-rules.ts
+  reputation             Int              @default(45) // 0-99, réputation de carrière (suit le GM d'un club à l'autre) — voir gm-career-rules.ts
+  mediaRelation          Int              @default(50) // 0-99, relation avec la presse (conférences)
+  contractSalary         Int              @default(0) // salaire annuel du GM (dollars) ; 0 = contrat à établir
+  contractYears          Int              @default(0) // saisons restantes, saison en cours comprise
+  pendingOfferJson       String? // conditions de l'offre d'un autre club : { salary, years }
+  pendingExtensionJson   String? // prolongation proposée par la direction : { salary, years }
+  personalCash           Int              @default(250000) // fortune personnelle du GM (dollars)
+  lifestyleJson          String? // achats personnels (logement, voitures, garde-robe…)
+  lastSeasonChangesJson  String? // évolution de fin de saison (attributs, réputation) pour l'affichage
   seasonRecords          GmSeasonRecord[]
 }
 

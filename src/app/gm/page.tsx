@@ -7,7 +7,10 @@ import { prisma } from "@/lib/prisma";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getStandings } from "@/lib/data-access/standings";
 import { getTeamsByLeague, getTeamById } from "@/lib/data-access/teams";
-import { acceptPoachOffer, declinePoachOffer } from "@/app/actions/gm";
+import { acceptPoachOffer, declinePoachOffer, respondToExtension } from "@/app/actions/gm";
+import { ensureGmContract, getGmCareerView } from "@/lib/data-access/gm-career";
+import { GM_ATTRIBUTE_MAX, GM_ATTRIBUTES, interestedTeams, lifestyleLevel } from "@/lib/careers/gm-career-rules";
+import type { DictionaryKey } from "@/lib/i18n/dictionary";
 import type { ExpectationTier } from "@/lib/careers/gm-rules";
 import { healthyFinancesThreshold } from "@/lib/careers/finance-rules";
 import { getTranslator, type Translator } from "@/lib/i18n/translate";
@@ -68,6 +71,34 @@ export default async function GmPage() {
   const myStandingsRow = standings.find((row) => row.teamId === membership.teamId);
 
   const offerTeam = gm.pendingOfferTeamId ? await getTeamById(gm.pendingOfferTeamId) : null;
+  // Carrière du GM (voir gm-career-rules.ts) : contrat, note, réputation, fortune.
+  const contract = await ensureGmContract(gm, membership.leagueId, membership.teamId);
+  const career = await getGmCareerView(membership.careerId, membership.teamId, gm, standings);
+  const interestedCount = interestedTeams(
+    leagueTeams.filter((x) => x.id !== membership.teamId),
+    gm.reputation,
+    0
+  ).length;
+  const parseTerms = (json: string | null) => {
+    try {
+      return json ? (JSON.parse(json) as { salary: number; years: number }) : null;
+    } catch {
+      return null;
+    }
+  };
+  const offerTerms = parseTerms(gm.pendingOfferJson);
+  const extension = parseTerms(gm.pendingExtensionJson);
+  const lastChanges = (() => {
+    try {
+      return gm.lastSeasonChangesJson
+        ? (JSON.parse(gm.lastSeasonChangesJson) as { season: string; reputationBefore: number; reputation: number; severance?: number })
+        : null;
+    } catch {
+      return null;
+    }
+  })();
+  const repLevel = gm.reputation >= 75 ? "star" : gm.reputation >= 55 ? "recognized" : gm.reputation >= 30 ? "respected" : "unknown";
+  const money = (v: number) => formatSalary(v, locale);
   // Objectifs des propriétaires de la saison (voir board-objectives.ts).
   const board = await getBoardObjectivesProgress(
     membership.careerId,
@@ -95,6 +126,11 @@ export default async function GmPage() {
             </Link>{" "}
             {t("gm.poachOfferSuffix")}
           </p>
+          {offerTerms && (
+            <p className="mt-1 text-sm text-soft" data-testid="offer-terms">
+              {t("gmCareer.offerTerms", { salary: money(offerTerms.salary), years: offerTerms.years })}
+            </p>
+          )}
           <div className="mt-3 flex gap-2">
             <form action={acceptPoachOffer}>
               <button
@@ -166,14 +202,119 @@ export default async function GmPage() {
         <p className="text-sm text-muted">
           {t("player.ageLabel", { age: gm.age })} · {sexLabel[gm.sex] ?? gm.sex}
         </p>
-        <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
-          <PointStat label={t("gm.pointOffense")} value={gm.offensePoints} />
-          <PointStat label={t("gm.pointDefense")} value={gm.defensePoints} />
-          <PointStat label={t("gm.pointPhysical")} value={gm.physicalPoints} />
-          <PointStat label={t("gm.pointTactical")} value={gm.tacticalPoints} />
-          <PointStat label={t("gm.pointChemistry")} value={gm.chemistryPoints} />
-        </div>
       </div>
+
+      {extension && (
+        <div className="mt-6 rounded-xl border border-good/40 bg-good/5 p-4" data-testid="gm-extension">
+          <p className="font-medium">{t("gmCareer.extensionTitle")}</p>
+          <p className="mt-1 text-sm text-soft">{t("gmCareer.extensionTerms", { salary: money(extension.salary), years: extension.years })}</p>
+          <div className="mt-3 flex gap-2">
+            <form action={respondToExtension}>
+              <input type="hidden" name="decision" value="accept" />
+              <button type="submit" className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-fg hover:bg-accent-hover">
+                {t("gmCareer.sign")}
+              </button>
+            </form>
+            <form action={respondToExtension}>
+              <input type="hidden" name="decision" value="decline" />
+              <button type="submit" className="rounded-full border border-line px-4 py-1.5 text-sm hover:bg-surface-2">
+                {t("gmCareer.decline")}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <section className="card p-4" data-testid="gm-rating">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{t("gmCareer.ratingTitle")}</h2>
+            <span className={`text-3xl font-bold tabular ${toneClass(neutralTone(career.rating))}`}>{career.rating}</span>
+          </div>
+          <ul className="mt-3 space-y-2 text-sm">
+            {GM_ATTRIBUTES.map((a) => {
+              const delta = career.projection[a];
+              return (
+                <li key={a}>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span>{t(`gmCareer.attr.${a}` as DictionaryKey)}</span>
+                    <span className="tabular">
+                      {career.points[a]}
+                      <span className="text-faint">/{GM_ATTRIBUTE_MAX}</span>
+                      <span
+                        className={`ml-2 inline-block w-6 text-right text-xs font-semibold ${delta > 0 ? "text-good" : delta < 0 ? "text-bad" : "text-faint"}`}
+                        data-testid={`gm-trend-${a}`}
+                      >
+                        {delta > 0 ? `▲${delta}` : delta < 0 ? `▼${-delta}` : "="}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-3">
+                    <div className="h-full rounded-full bg-accent" style={{ width: `${(career.points[a] / GM_ATTRIBUTE_MAX) * 100}%` }} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-3 text-xs text-faint">{t("gmCareer.ratingHint")}</p>
+          {lastChanges && (
+            <p className="mt-1 text-xs text-muted">
+              {t("gmCareer.lastSeason", { season: lastChanges.season, before: lastChanges.reputationBefore, after: lastChanges.reputation })}
+            </p>
+          )}
+        </section>
+
+        <section className="card p-4" data-testid="gm-reputation">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">{t("gmCareer.reputationTitle")}</h2>
+            <span className="text-right">
+              <span className={`text-3xl font-bold tabular ${toneClass(neutralTone(gm.reputation))}`}>{gm.reputation}</span>
+              <span className="ml-1 text-xs text-muted">{t(`gmCareer.repLevel.${repLevel}` as DictionaryKey)}</span>
+            </span>
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            {t("gmCareer.clubImage")} : <span className={`font-semibold ${toneClass(neutralTone(career.standing))}`}>{career.standing}/99</span>
+          </p>
+          <ul className="mt-2 space-y-2 text-sm">
+            {(["board", "players", "press", "fans"] as const).map((k) => (
+              <li key={k}>
+                <div className="flex justify-between gap-2">
+                  <span>{t(`gmCareer.part.${k}` as DictionaryKey)}</span>
+                  <span className={`tabular ${toneClass(neutralTone(career.parts[k]))}`}>{career.parts[k]}</span>
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-3">
+                  <div
+                    className={`h-full rounded-full ${career.parts[k] >= 60 ? "bg-good" : career.parts[k] >= 40 ? "bg-warn" : "bg-bad"}`}
+                    style={{ width: `${career.parts[k]}%` }}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-soft">{t("gmCareer.interested", { count: interestedCount })}</p>
+          <p className="mt-1 text-xs text-faint">{t("gmCareer.reputationHint")}</p>
+        </section>
+      </div>
+
+      <section className="mt-6 card p-4" data-testid="gm-wealth">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">{t("gmCareer.wealthTitle")}</h2>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-xs text-muted">{t("gmCareer.cash")}</p>
+            <p className="text-2xl font-semibold tabular text-good">{money(gm.personalCash)}</p>
+            <p className="mt-1 text-xs text-muted">
+              {t("gmCareer.lifestyleLevel", {
+                level: t(`gmCareer.lifestyle.${lifestyleLevel(career.prestige)}` as DictionaryKey),
+                prestige: career.prestige,
+              })}
+            </p>
+          </div>
+          <Link href="/gm/lifestyle" className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-fg hover:bg-accent-hover">
+            {t("gmCareer.shopLink")}
+          </Link>
+        </div>
+        <p className="mt-2 text-xs text-faint">{t("gmCareer.salaryPaid")}</p>
+      </section>
 
       <div className="mt-6 flex flex-wrap gap-4">
         <div className="card p-4">
@@ -224,10 +365,16 @@ export default async function GmPage() {
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           {t("gm.contract")}
         </h2>
-        <p className="text-sm">
+        <p className="text-sm" data-testid="gm-contract">
+          <strong>{t("gmCareer.salary", { salary: money(contract.salary) })}</strong> · {t("gmCareer.years", { n: contract.years })}
+        </p>
+        <p className="mt-1 text-sm">
           {t("gm.hiredSincePrefix")} <strong>{gm.hiredSeason}</strong>
           {t("gm.hiredSinceSuffix")}
         </p>
+        {lastChanges?.severance ? (
+          <p className="mt-1 text-sm text-muted">{t("gmCareer.severance", { amount: money(lastChanges.severance) })}</p>
+        ) : null}
         <p className="mt-1 text-sm">
           {gm.warningsAtCurrentTeam > 0 ? (
             <span className={toneClass("bad")}>
@@ -284,15 +431,6 @@ export default async function GmPage() {
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-function PointStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="card p-2 text-center">
-      <p className="text-xs text-muted">{label}</p>
-      <p className="font-semibold">{value}</p>
     </div>
   );
 }

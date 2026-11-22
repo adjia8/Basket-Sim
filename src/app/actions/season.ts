@@ -28,7 +28,20 @@ import { getCareerExpectations } from "@/lib/data-access/expectations";
 import { evaluatePendingPromises } from "@/lib/data-access/trade-requests";
 import { createInboxMessage } from "@/lib/data-access/inbox";
 import { poachOfferMessageText } from "@/lib/careers/inbox-rules";
-import { getTranslator } from "@/lib/i18n/translate";
+import { getTranslator, translatorFor } from "@/lib/i18n/translate";
+import { ensureGmContract, pointsOf, seasonStyle, standingParts } from "@/lib/data-access/gm-career";
+import {
+  attributeEvolution,
+  clubStanding,
+  extensionOffer,
+  gmSalary,
+  interestedTeams,
+  parseLifestyle,
+  poachChance,
+  prestigeOf,
+  reputationAfterSeason,
+  severancePay,
+} from "@/lib/careers/gm-career-rules";
 import { formatSalary, playerHref, teamFullName } from "@/lib/utils";
 import { offseasonRecovery } from "@/lib/careers/injury-rules";
 import { ensureCareerStaff, getStaffProfiles, processStaffOffseason } from "@/lib/data-access/staff";
@@ -49,7 +62,6 @@ function healthAfterSummer(state: { injured: boolean; injuryGamesRemaining: numb
   };
 }
 
-const POACH_OFFER_CHANCE = 0.25;
 
 export async function advanceSeason(): Promise<void> {
   const { userId } = await verifySession();
@@ -262,27 +274,116 @@ export async function advanceSeason(): Promise<void> {
       },
     });
 
+    // Carrière du GM (voir gm-career-rules.ts) : compétences selon les
+    // résultats et le style de jeu, réputation, contrat.
+    const contract = await ensureGmContract(gmProfile, career.leagueId, member.teamId);
+    const [style, parts] = await Promise.all([
+      seasonStyle(career.id, member.teamId, finishedStandings, outcome),
+      standingParts(career.id, member.teamId, gmProfile),
+    ]);
+    const deltas = attributeEvolution(pointsOf(gmProfile), style);
+    const standing = clubStanding(parts);
+    const reputation = reputationAfterSeason({
+      reputation: gmProfile.reputation,
+      standing,
+      outcome,
+      champion: resultTier === "champion",
+      prestige: prestigeOf(parseLifestyle(gmProfile.lifestyleJson)),
+    });
+    const tf = translatorFor(locale);
+    const money = (v: number) => formatSalary(v, locale);
+    const pointsData = {
+      offensePoints: gmProfile.offensePoints + deltas.offense,
+      defensePoints: gmProfile.defensePoints + deltas.defense,
+      physicalPoints: gmProfile.physicalPoints + deltas.physical,
+      tacticalPoints: gmProfile.tacticalPoints + deltas.tactical,
+      chemistryPoints: gmProfile.chemistryPoints + deltas.chemistry,
+    };
+    const yearsLeft = contract.years - 1;
+    const changes = { season: career.season, deltas, reputationBefore: gmProfile.reputation, reputation, standing, parts };
+
     if (outcome === "fired") {
+      // Indemnités : la moitié du salaire des saisons restantes.
+      const severance = severancePay(contract.salary, yearsLeft);
       await prisma.gmProfile.update({
         where: { id: gmProfile.id },
-        data: { pendingReassignment: true },
+        data: {
+          ...pointsData,
+          reputation,
+          pendingReassignment: true,
+          personalCash: gmProfile.personalCash + severance,
+          contractSalary: 0,
+          contractYears: 0,
+          pendingExtensionJson: null,
+          lastSeasonChangesJson: JSON.stringify({ ...changes, severance }),
+        },
       });
       continue; // le GM viré choisira sa nouvelle franchise via /onboarding/reassign
     }
 
-    const nextWarnings = outcome === "warning" ? gmProfile.warningsAtCurrentTeam + 1 : 0;
-    let pendingOfferTeamId: string | null = null;
-    if (outcome === "exceeded" && teamState.finances >= 0 && Math.random() < POACH_OFFER_CHANCE) {
-      const currentTeam = teams.find((t) => t.id === member.teamId);
-      const takenTeamIds = new Set(gmMemberships.map((m) => m.teamId));
-      const candidates = teams.filter(
-        (t) => !takenTeamIds.has(t.id) && t.marketAppeal > (currentTeam?.marketAppeal ?? 0)
+    // Fin de contrat : prolongation proposée si le travail est bon ; sinon,
+    // après un avertissement, la direction ne le renouvelle pas.
+    const currentTeam = teams.find((t) => t.id === member.teamId);
+    const extension = extensionOffer({
+      salary: contract.salary,
+      yearsLeft,
+      outcome,
+      marketSalary: gmSalary(career.leagueId, currentTeam?.marketAppeal ?? 50, reputation),
+    });
+    if (yearsLeft <= 0 && !extension && outcome === "warning") {
+      await prisma.gmProfile.update({
+        where: { id: gmProfile.id },
+        data: {
+          ...pointsData,
+          reputation,
+          pendingReassignment: true,
+          contractSalary: 0,
+          contractYears: 0,
+          lastSeasonChangesJson: JSON.stringify({ ...changes, notRenewed: true }),
+        },
+      });
+      continue;
+    }
+    if (extension) {
+      await createInboxMessage(
+        career.id,
+        member.teamId,
+        newSeason,
+        "board",
+        tf("gmCareer.inbox.extensionTitle"),
+        tf("gmCareer.inbox.extensionBody", { salary: money(extension.salary), years: extension.years }),
+        "/gm",
+        { priority: "urgent" }
       );
+    }
+
+    const nextWarnings = outcome === "warning" ? gmProfile.warningsAtCurrentTeam + 1 : 0;
+    // Offres d'autres clubs : plus fréquentes et plus prestigieuses avec
+    // la réputation.
+    let pendingOfferTeamId: string | null = null;
+    let pendingOfferJson: string | null = null;
+    if (teamState.finances >= 0 && Math.random() < poachChance(outcome, reputation)) {
+      const takenTeamIds = new Set(gmMemberships.map((m) => m.teamId));
+      const candidates = interestedTeams(
+        teams.filter((t) => !takenTeamIds.has(t.id)),
+        reputation,
+        0
+      ).filter((t) => t.marketAppeal > (currentTeam?.marketAppeal ?? 0) - 10);
       if (candidates.length > 0) {
         const chosenTeam = candidates[Math.floor(Math.random() * candidates.length)];
         pendingOfferTeamId = chosenTeam.id;
+        const terms = { salary: Math.round((gmSalary(career.leagueId, chosenTeam.marketAppeal, reputation) * 1.1) / 50_000) * 50_000, years: 3 };
+        pendingOfferJson = JSON.stringify(terms);
         const { title, body } = poachOfferMessageText(locale, teamFullName(chosenTeam));
-        await createInboxMessage(career.id, member.teamId, newSeason, "poach_offer", title, body, "/gm");
+        await createInboxMessage(
+          career.id,
+          member.teamId,
+          newSeason,
+          "poach_offer",
+          title,
+          `${body}\n\n${tf("gmCareer.inbox.offerTerms", { salary: money(terms.salary), years: terms.years })}`,
+          "/gm"
+        );
       }
     }
 
@@ -293,8 +394,15 @@ export async function advanceSeason(): Promise<void> {
     await prisma.gmProfile.update({
       where: { id: gmProfile.id },
       data: {
+        ...pointsData,
+        reputation,
+        // Contrat « à l'année » au-delà du terme, tant qu'aucune prolongation n'est signée.
+        contractYears: Math.max(1, yearsLeft),
+        pendingExtensionJson: extension ? JSON.stringify(extension) : null,
+        lastSeasonChangesJson: JSON.stringify({ ...changes, extension }),
         warningsAtCurrentTeam: nextWarnings,
         pendingOfferTeamId,
+        pendingOfferJson,
         currentExpectationTier: nextExpectations.get(member.teamId) ?? "playoffs",
       },
     });

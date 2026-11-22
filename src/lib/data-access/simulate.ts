@@ -893,6 +893,18 @@ export async function simulateAndResolveGame(
     teamStateUpdate(awayTeamState, awayWinPct, awayRoster, chemistryTrainingBonus(awayFocus, awayIntensity), awayTeam.marketAppeal, game.awayTeamId, false, homeRoster),
   ]);
 
+  // Salaire des GM humains, versé match après match en saison régulière.
+  if (/^\d{4}-\d{4}$/.test(game.season)) {
+    for (const m of memberships) {
+      const salary = m.gmProfile?.contractSalary ?? 0;
+      if (!m.gmProfile || salary <= 0) continue;
+      await prisma.gmProfile.update({
+        where: { id: m.gmProfile.id },
+        data: { personalCash: { increment: Math.round(salary / (GAMES_PER_SEASON[game.leagueId] ?? 82)) } },
+      });
+    }
+  }
+
   // Chantiers d'infrastructure arrivés à échéance (après la mise à jour des
   // états d'équipe de ce match).
   for (const [state, teamId] of [[homeTeamState, game.homeTeamId], [awayTeamState, game.awayTeamId]] as const) {

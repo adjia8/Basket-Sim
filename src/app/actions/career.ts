@@ -1,6 +1,7 @@
 "use server";
 
 import { maybeSnapshotRatings } from "@/lib/data-access/rating-history";
+import { gmSalary, HIRE_CONTRACT_YEARS } from "@/lib/careers/gm-career-rules";
 import {
   MAX_CAREERS_PER_USER,
   activeMembershipWhere,
@@ -215,8 +216,12 @@ export async function createCareer(
     ),
     leagueId
   );
+  const hireMarket = (await prisma.team.findUnique({ where: { id: teamId }, select: { marketAppeal: true } }))?.marketAppeal ?? 50;
   await prisma.gmProfile.create({
     data: {
+      // Premier contrat (voir gm-career-rules.ts).
+      contractSalary: gmSalary(leagueId, hireMarket, 45),
+      contractYears: HIRE_CONTRACT_YEARS,
       membershipId: career.memberships[0].id,
       firstName: gm.firstName,
       lastName: gm.lastName,
@@ -337,8 +342,11 @@ export async function joinCareer(
   }
 
   const expectations = await getCareerExpectations(career.id, career.leagueId);
+  const joinMarket = (await prisma.team.findUnique({ where: { id: teamId }, select: { marketAppeal: true } }))?.marketAppeal ?? 50;
   await prisma.gmProfile.create({
     data: {
+      contractSalary: gmSalary(career.leagueId, joinMarket, 45),
+      contractYears: HIRE_CONTRACT_YEARS,
       membershipId: membership.id,
       firstName: gm.firstName,
       lastName: gm.lastName,

@@ -9,6 +9,7 @@ import { reassignFranchise } from "@/app/actions/gm";
 import { getTranslator } from "@/lib/i18n/translate";
 import { franchiseCarouselLabels } from "@/lib/i18n/franchise-carousel-labels";
 import { teamFullName } from "@/lib/utils";
+import { interestedTeams } from "@/lib/careers/gm-career-rules";
 
 // Ne passe volontairement pas par getCurrentMembership() : celle-ci redirige
 // déjà ici quand GmProfile.pendingReassignment est vrai, ce qui créerait une
@@ -22,10 +23,20 @@ export default async function ReassignFranchisePage() {
   if (!membership?.gmProfile?.pendingReassignment) redirect("/");
 
   const { t, locale } = await getTranslator();
-  const [slides, oldTeam] = await Promise.all([
+  const [allSlides, oldTeam] = await Promise.all([
     getFranchiseSummariesForCareer(membership.careerId, membership.career.leagueId, true),
     getTeamById(membership.teamId),
   ]);
+  // Seuls les clubs intéressés par ce GM, selon sa réputation (voir
+  // interestedTeams) ; l'ancien club ne le reprend pas.
+  const reputation = membership.gmProfile.reputation;
+  const interested = new Set(
+    interestedTeams(
+      allSlides.filter((s) => s.team.id !== membership.teamId).map((s) => ({ id: s.team.id, marketAppeal: s.team.marketAppeal })),
+      reputation
+    ).map((t) => t.id)
+  );
+  const slides = allSlides.filter((s) => interested.has(s.team.id));
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -34,6 +45,9 @@ export default async function ReassignFranchisePage() {
         {t("onboarding.reassignBody", {
           team: oldTeam ? teamFullName(oldTeam) : t("onboarding.formerTeamFallback"),
         })}
+      </p>
+      <p className="mt-2 text-sm text-muted" data-testid="job-market">
+        {t("gmCareer.jobMarket", { reputation, count: slides.length })}
       </p>
       <div className="mt-8">
         <FranchiseCarousel

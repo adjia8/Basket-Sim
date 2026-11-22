@@ -1,4 +1,5 @@
 import "server-only";
+import { mediaRelationDelta } from "@/lib/careers/gm-career-rules";
 import { personalityFor, scaleMoraleDelta } from "@/lib/careers/personality-rules";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
@@ -575,6 +576,15 @@ async function resolveConference(
               frontOfficeApproval: Math.max(
                 0,
                 Math.min(99, membership.gmProfile.frontOfficeApproval + totals.frontOfficeApproval)
+              ),
+              // Relation avec la presse (réputation du GM, voir gm-career-rules.ts).
+              mediaRelation: Math.max(
+                0,
+                Math.min(
+                  99,
+                  membership.gmProfile.mediaRelation +
+                    mediaRelationDelta({ publicOpinion: totals.publicOpinion, skipped, refereeCriticisms })
+                )
               ),
             },
           }),

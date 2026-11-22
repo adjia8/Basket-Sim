@@ -233,6 +233,41 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       await expect(page.getByTestId("facility-progress").getByText(/Emprunts en cours/)).toBeVisible();
     });
 
+    await test.step("carrière du GM : note, réputation, contrat, prolongation, train de vie", async () => {
+      const gm = await prisma.gmProfile.findFirstOrThrow({ where: { membership: { careerId, teamId: "lal" } } });
+      expect(gm.contractSalary).toBeGreaterThan(1_000_000); // contrat dès la création
+      await prisma.gmProfile.update({
+        where: { id: gm.id },
+        data: { personalCash: 2_000_000, pendingExtensionJson: JSON.stringify({ salary: 5_000_000, years: 3 }) },
+      });
+      await expectPageOk(page, "/gm");
+      await expect(page.getByTestId("gm-rating")).toBeVisible();
+      await expect(page.getByTestId("gm-trend-offense")).toBeVisible();
+      await expect(page.getByTestId("gm-reputation")).toContainText("Presse");
+      await expect(page.getByTestId("gm-contract")).toContainText("Salaire");
+      await page.getByTestId("gm-extension").getByRole("button", { name: "Signer" }).click();
+      await expect(page.getByTestId("gm-extension")).toHaveCount(0, { timeout: 30_000 });
+      await expect(page.getByTestId("gm-contract")).toContainText("3 saison(s) restante(s)");
+      expect((await prisma.gmProfile.findUniqueOrThrow({ where: { id: gm.id } })).contractSalary).toBe(5_000_000);
+      // Train de vie : acheter une maison puis la remplacer par un appartement (revente à 60 %).
+      await page.getByTestId("gm-wealth").getByRole("link").click();
+      await page.waitForURL(/\/gm\/lifestyle/);
+      const house = page.getByTestId("lifestyle-family_house");
+      await house.getByRole("button", { name: "Acheter" }).click();
+      await expect(house.getByText(/c'est à toi/)).toBeVisible({ timeout: 30_000 });
+      await expect(house.getByText("Possédé")).toBeVisible();
+      const apt = page.getByTestId("lifestyle-apartment");
+      await apt.getByRole("button", { name: "Acheter" }).click();
+      await expect(apt.getByText(/c'est à toi/)).toBeVisible({ timeout: 30_000 });
+      const after = await prisma.gmProfile.findUniqueOrThrow({ where: { id: gm.id } });
+      expect(after.personalCash).toBe(2_000_000 - 1_200_000 + 720_000 - 450_000);
+      expect(JSON.parse(after.lifestyleJson!)).toEqual(["apartment"]);
+      if (process.env.GM_SHOT) {
+        await page.goto("/gm");
+        await page.screenshot({ path: process.env.GM_SHOT, fullPage: true });
+      }
+    });
+
     await test.step("centre des transferts : partenaires, analyse en direct, intérêt de l'IA", async () => {
       await expectPageOk(page, "/trades");
       await expect(page.getByTestId("trade-partners")).toBeVisible();
