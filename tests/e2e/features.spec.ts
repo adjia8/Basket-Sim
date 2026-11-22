@@ -150,6 +150,23 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       });
     });
 
+    await test.step("centre des transferts : partenaires, analyse en direct, intérêt de l'IA", async () => {
+      await expectPageOk(page, "/trades");
+      await expect(page.getByTestId("trade-partners")).toBeVisible();
+      await page.getByTestId("trade-partners").getByRole("link", { name: /Boston Celtics/ }).click();
+      await page.waitForURL(/\/teams\/bos\?tab=trade/);
+      const center = page.getByTestId("trade-center");
+      await expect(center).toBeVisible();
+      // Un joueur de chaque côté (le moins bien noté de mon effectif contre un de leurs remplaçants).
+      const boxes = center.locator('input[type="checkbox"]');
+      await center.locator('input[name="myPlayerIds"]').last().check();
+      await center.locator('input[name="theirPlayerIds"]').last().check();
+      expect(await boxes.count()).toBeGreaterThan(10);
+      await expect(center.getByTestId("trade-rules")).toBeVisible({ timeout: 30_000 });
+      await expect(center.getByTestId("trade-interest")).toBeVisible();
+      await page.screenshot({ path: process.env.TRADE_SHOT ?? "test-results/trade-center.png", fullPage: true });
+    });
+
     await test.step("négociation de prolongation jusqu'à la signature", async () => {
       // Un joueur sans exigence de star (renommée < 70), en dernière année.
       const contracts = await prisma.contract.findMany({

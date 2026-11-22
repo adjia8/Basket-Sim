@@ -190,3 +190,54 @@ export function evaluateTradeForAi(params: {
   else if (fairOnValue) reason = outlook === "rebuild" ? "rebuild" : outlook === "contender" ? "contender" : "value";
   return { accept, reason, received, given };
 }
+
+// ---------------------------------------------------------------------------
+// Centre des transferts : jauge d'intérêt et suggestion de complément
+
+export type TradeInterest = "high" | "medium" | "low" | "none";
+
+// Intérêt de l'IA d'après le rapport valeur reçue / valeur cédée (déjà
+// ajusté de son profil et de sa masse salariale) : « medium » et plus = elle
+// accepterait l'échange tel quel.
+export function tradeInterest(decision: Pick<AiTradeDecision, "received" | "given">): TradeInterest {
+  const ratio = decision.given <= 0 ? 2 : decision.received / decision.given;
+  if (ratio >= TRADE_ACCEPT_TOLERANCE + 0.25) return "high";
+  if (ratio >= TRADE_ACCEPT_TOLERANCE) return "medium";
+  if (ratio >= TRADE_ACCEPT_TOLERANCE - 0.2) return "low";
+  return "none";
+}
+
+export interface TradeCandidate {
+  id: string;
+  asset: TradeAsset;
+  allowed: boolean; // ajout possible sans enfreindre effectif / règles salariales
+}
+
+// Plus petit ajout de MON côté qui ferait accepter l'échange : on essaie
+// chaque élément disponible (choix de draft, joueurs) et on garde celui qui
+// suffit en coûtant le moins (valeur « neutre », hors profil de l'IA).
+export function smallestSufficientAddition(params: {
+  outlook: TeamOutlook;
+  received: TradeAsset[];
+  given: TradeAsset[];
+  candidates: TradeCandidate[];
+  picksPerRound: number;
+  payrollBefore: number;
+  taxLine: number;
+}): TradeCandidate | null {
+  const neutral = (a: TradeAsset) =>
+    a.kind === "pick" ? pickTradeValue(a.round, a.pickNumber, params.picksPerRound) : playerTradeValue(a.overall, a.age);
+  const sufficient = params.candidates.filter(
+    (c) =>
+      c.allowed &&
+      evaluateTradeForAi({
+        outlook: params.outlook,
+        received: [...params.received, c.asset],
+        given: params.given,
+        picksPerRound: params.picksPerRound,
+        payrollBefore: params.payrollBefore,
+        taxLine: params.taxLine,
+      }).accept
+  );
+  return sufficient.sort((a, b) => neutral(a.asset) - neutral(b.asset))[0] ?? null;
+}

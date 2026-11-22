@@ -10,7 +10,6 @@ import { getLeagueById } from "@/lib/data-access/leagues";
 import { getMembershipForTeam } from "@/lib/data-access/memberships";
 import { getPayrollForTeam } from "@/lib/data-access/contracts";
 import { isTradeDeadlinePassed } from "@/lib/data-access/season-windows";
-import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { checkTradeSide, type CapVerdict } from "@/lib/careers/cap-rules";
 import {
   MAX_ROSTER_SIZE,
@@ -18,22 +17,76 @@ import {
 } from "@/lib/careers/roster-rules";
 import {
   capSalary,
-  evaluateTradeForAi,
   rosterMoveAllowed,
-  teamOutlook,
-  type TradeAsset,
 } from "@/lib/careers/trade-rules";
 import { ALT_CONTRACT_SLOTS_PER_TEAM } from "@/lib/careers/contract-type-rules";
-import { NBA_TAX_LINE } from "@/lib/careers/cap-rules";
-import { getStandings } from "@/lib/data-access/standings";
-import { getCareerExpectations } from "@/lib/data-access/expectations";
-import { winPctForStandings } from "@/lib/careers/player-demands";
-import { getTranslator } from "@/lib/i18n/translate";
+import { getTranslator, type Translator } from "@/lib/i18n/translate";
+import type { Locale } from "@/lib/i18n/locale";
+import { analyzeTrade, type TradeSelection, type TradeSide } from "@/lib/data-access/trade-analysis";
 import { formatSalary } from "@/lib/utils";
 
 export interface TradeFormState {
   error?: string;
   success?: string;
+}
+
+function selectionFrom(formData: FormData): TradeSelection {
+  return {
+    opponentTeamId: String(formData.get("opponentTeamId") ?? ""),
+    myPlayerIds: formData.getAll("myPlayerIds").map(String),
+    theirPlayerIds: formData.getAll("theirPlayerIds").map(String),
+    myPickIds: formData.getAll("myPickIds").map(String),
+    theirPickIds: formData.getAll("theirPickIds").map(String),
+  };
+}
+
+// Messages d'erreur communs à l'aperçu et à la proposition.
+function capError(t: Translator, locale: Locale, cap: Exclude<CapVerdict, { ok: true }>): string {
+  const limit = formatSalary(cap.limit, locale);
+  if (cap.reason === "salary_matching") return t("tradeAction.salaryMatching", { limit });
+  if (cap.reason === "apron") return t("tradeAction.exceedsApron", { limit });
+  return t("tradeAction.exceedsCap", { cap: limit });
+}
+
+export interface TradePreview {
+  error?: string;
+  complete?: boolean;
+  me?: TradeSide;
+  them?: TradeSide;
+  salaryCap?: number;
+  taxLine?: number;
+  rosterError?: string;
+  capError?: string;
+  opponentHuman?: boolean;
+  outlook?: string;
+  interest?: string;
+  refusal?: string; // raison principale si l'IA refuserait
+  suggestion?: { kind: "pick" | "player"; id: string };
+}
+
+// Centre des transferts : aperçu en direct (aucune écriture) — chiffres,
+// règles et intérêt de l'équipe adverse pendant le montage de l'échange.
+export async function previewTrade(formData: FormData): Promise<TradePreview> {
+  const { userId } = await verifySession();
+  const { t, locale } = await getTranslator();
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId), include: { career: true } });
+  if (!membership) return { error: t("tradeAction.noCareer") };
+  const a = await analyzeTrade(membership.careerId, membership.teamId, membership.career.leagueId, membership.career.season, selectionFrom(formData));
+  if (!a.valid) return { error: t(`tradeAction.${a.error}`) };
+  return {
+    complete: a.complete,
+    me: a.me,
+    them: a.them,
+    salaryCap: a.salaryCap,
+    taxLine: a.taxLine,
+    rosterError: a.rosterOk ? undefined : t("tradeAction.rosterSizeOutOfRange", { min: a.rosterMin, max: a.rosterMax }),
+    capError: a.cap.ok ? undefined : capError(t, locale, a.cap),
+    opponentHuman: a.opponentHuman,
+    outlook: a.ai?.outlook,
+    interest: a.ai?.interest,
+    refusal: a.ai && !a.ai.decision.accept ? a.ai.decision.reason ?? "value" : undefined,
+    suggestion: a.ai?.suggestion ?? undefined,
+  };
 }
 
 export async function proposeTrade(
@@ -42,11 +95,8 @@ export async function proposeTrade(
 ): Promise<TradeFormState> {
   const { userId } = await verifySession();
   const { t, locale } = await getTranslator();
-  const opponentTeamId = String(formData.get("opponentTeamId") ?? "");
-  const myPlayerIds = formData.getAll("myPlayerIds").map(String);
-  const theirPlayerIds = formData.getAll("theirPlayerIds").map(String);
-  const myPickIds = formData.getAll("myPickIds").map(String);
-  const theirPickIds = formData.getAll("theirPickIds").map(String);
+  const sel = selectionFrom(formData);
+  const { opponentTeamId, myPlayerIds, theirPlayerIds, myPickIds, theirPickIds } = sel;
 
   const membership = await prisma.membership.findFirst({
     where: await activeMembershipWhere(userId),
@@ -57,171 +107,24 @@ export async function proposeTrade(
   if (await isTradeDeadlinePassed(membership.careerId, membership.career.season)) {
     return { error: t("tradeAction.deadlinePassed") };
   }
-
-  if (
-    myPlayerIds.length + myPickIds.length === 0 ||
-    theirPlayerIds.length + theirPickIds.length === 0
-  ) {
+  if (myPlayerIds.length + myPickIds.length === 0 || theirPlayerIds.length + theirPickIds.length === 0) {
     return { error: t("tradeAction.selectAtLeastOne") };
   }
 
-  const opponentTeam = await prisma.team.findUnique({
-    where: { id: opponentTeamId },
-  });
-  if (
-    !opponentTeam ||
-    opponentTeam.leagueId !== membership.career.leagueId ||
-    opponentTeamId === membership.teamId
-  ) {
-    return { error: t("tradeAction.invalidOpponent") };
+  // Mêmes règles que l'aperçu (voir trade-analysis.ts).
+  const analysis = await analyzeTrade(membership.careerId, membership.teamId, membership.career.leagueId, membership.career.season, sel);
+  if (!analysis.valid) return { error: t(`tradeAction.${analysis.error}`) };
+  if (!analysis.rosterOk) {
+    return { error: t("tradeAction.rosterSizeOutOfRange", { min: analysis.rosterMin, max: analysis.rosterMax }) };
   }
+  if (!analysis.cap.ok) return { error: capError(t, locale, analysis.cap) };
 
-  const [myContracts, theirContracts, myPicks, theirPicks] = await Promise.all([
-    prisma.contract.findMany({
-      where: { careerId: membership.careerId, playerId: { in: myPlayerIds } },
-      include: { player: true },
-    }),
-    prisma.contract.findMany({
-      where: { careerId: membership.careerId, playerId: { in: theirPlayerIds } },
-      include: { player: true },
-    }),
-    prisma.draftPick.findMany({ where: { id: { in: myPickIds } } }),
-    prisma.draftPick.findMany({ where: { id: { in: theirPickIds } } }),
-  ]);
-
-  const myPlayersValid =
-    myContracts.length === myPlayerIds.length &&
-    myContracts.every((c) => c.teamId === membership.teamId);
-  const theirPlayersValid =
-    theirContracts.length === theirPlayerIds.length &&
-    theirContracts.every((c) => c.teamId === opponentTeamId);
-  const myPicksValid =
-    myPicks.length === myPickIds.length &&
-    myPicks.every(
-      (p) => p.careerId === membership.careerId && p.teamId === membership.teamId && p.status === "pending"
-    );
-  const theirPicksValid =
-    theirPicks.length === theirPickIds.length &&
-    theirPicks.every(
-      (p) => p.careerId === membership.careerId && p.teamId === opponentTeamId && p.status === "pending"
-    );
-  if (!myPlayersValid || !theirPlayersValid || !myPicksValid || !theirPicksValid) {
-    return { error: t("tradeAction.invalidSelection") };
-  }
-
-  const [myRoster, theirRoster, league, myCurrentPayroll, theirCurrentPayroll] = await Promise.all([
-    prisma.contract.findMany({
-      where: { careerId: membership.careerId, teamId: membership.teamId },
-      select: { contractType: true },
-    }),
-    prisma.contract.findMany({
-      where: { careerId: membership.careerId, teamId: opponentTeamId },
-      select: { contractType: true },
-    }),
-    getLeagueById(membership.career.leagueId),
-    getPayrollForTeam(membership.careerId, membership.teamId),
-    getPayrollForTeam(membership.careerId, opponentTeamId),
-  ]);
-  // Les picks n'affectent ni l'effectif ni la masse salariale tant qu'ils
-  // n'ont pas été utilisés pour drafter un joueur : seuls les joueurs
-  // comptent dans ces deux vérifications.
-  const minRosterSize = MIN_ROSTER_SIZE[membership.career.leagueId] ?? MIN_ROSTER_SIZE.nba;
-  const maxRosterSize = MAX_ROSTER_SIZE[membership.career.leagueId] ?? MAX_ROSTER_SIZE.nba;
-  // Contrats standard et places two-way contrôlés séparément (voir
-  // rosterMoveAllowed) : seuls les standard comptent dans l'effectif.
-  const isStd = (c: { contractType: string }) => c.contractType === "standard";
-  const altSlots = ALT_CONTRACT_SLOTS_PER_TEAM[membership.career.leagueId] ?? 0;
-  const myMoveOk = rosterMoveAllowed(
-    {
-      standardBefore: myRoster.filter(isStd).length,
-      altBefore: myRoster.length - myRoster.filter(isStd).length,
-      standardOut: myContracts.filter(isStd).length,
-      altOut: myContracts.length - myContracts.filter(isStd).length,
-      standardIn: theirContracts.filter(isStd).length,
-      altIn: theirContracts.length - theirContracts.filter(isStd).length,
-    },
-    minRosterSize,
-    maxRosterSize,
-    altSlots
-  );
-  const theirMoveOk = rosterMoveAllowed(
-    {
-      standardBefore: theirRoster.filter(isStd).length,
-      altBefore: theirRoster.length - theirRoster.filter(isStd).length,
-      standardOut: theirContracts.filter(isStd).length,
-      altOut: theirContracts.length - theirContracts.filter(isStd).length,
-      standardIn: myContracts.filter(isStd).length,
-      altIn: myContracts.length - myContracts.filter(isStd).length,
-    },
-    minRosterSize,
-    maxRosterSize,
-    altSlots
-  );
-  if (!myMoveOk || !theirMoveOk) {
-    return {
-      error: t("tradeAction.rosterSizeOutOfRange", { min: minRosterSize, max: maxRosterSize }),
-    };
-  }
-
-  const salaryCap = league?.salaryCap ?? Infinity;
-  // Masse salariale : seuls les contrats standard comptent (voir capSalary).
-  const mySalaryOut = capSalary(myContracts);
-  const theirSalaryOut = capSalary(theirContracts);
-  const leagueId = membership.career.leagueId;
-  const capVerdict = [
-    checkTradeSide(leagueId, salaryCap, myCurrentPayroll, mySalaryOut, theirSalaryOut),
-    checkTradeSide(leagueId, salaryCap, theirCurrentPayroll, theirSalaryOut, mySalaryOut),
-  ].find((v): v is Exclude<CapVerdict, { ok: true }> => !v.ok);
-  if (capVerdict) {
-    const limit = formatSalary(capVerdict.limit, locale);
-    if (capVerdict.reason === "salary_matching") return { error: t("tradeAction.salaryMatching", { limit }) };
-    if (capVerdict.reason === "apron") return { error: t("tradeAction.exceedsApron", { limit }) };
-    return { error: t("tradeAction.exceedsCap", { cap: limit }) };
-  }
-
+  const opponentTeam = await prisma.team.findUniqueOrThrow({ where: { id: opponentTeamId } });
   const opponentManager = await getMembershipForTeam(membership.careerId, opponentTeamId);
-
   if (!opponentManager) {
     // Adversaire IA : il juge l'échange selon SA situation (voir
-    // evaluateTradeForAi) — une équipe en reconstruction recherche jeunes et
-    // choix de draft et fuit les gros salaires, une équipe qui joue le titre
-    // veut des joueurs utiles tout de suite — d'après la note et l'âge
-    // ACTUELS des joueurs dans la carrière.
-    const [leagueTeams, states, standings, expectations] = await Promise.all([
-      getTeamsByLeague(membership.career.leagueId),
-      prisma.playerState.findMany({
-        where: { careerId: membership.careerId, playerId: { in: [...myPlayerIds, ...theirPlayerIds] } },
-        select: { playerId: true, overallRating: true, age: true },
-      }),
-      getStandings(membership.careerId, membership.career.leagueId, membership.career.season),
-      getCareerExpectations(membership.careerId, membership.career.leagueId),
-    ]);
-    const stateById = new Map(states.map((st) => [st.playerId, st]));
-    const asPlayer = (c: (typeof myContracts)[number]): TradeAsset => {
-      const st = stateById.get(c.playerId);
-      return {
-        kind: "player",
-        overall: st?.overallRating ?? c.player.overallRating,
-        age: st?.age ?? c.player.age,
-        salary: c.salary,
-        standard: c.contractType === "standard",
-      };
-    };
-    const asPick = (p: (typeof myPicks)[number]): TradeAsset => ({ kind: "pick", round: p.round, pickNumber: p.pickNumber });
-    const row = standings.find((r) => r.teamId === opponentTeamId);
-    const outlook = teamOutlook({
-      winPct: winPctForStandings(row?.wins ?? 0, row?.losses ?? 0),
-      gamesPlayed: (row?.wins ?? 0) + (row?.losses ?? 0),
-      expectation: expectations.get(opponentTeamId) ?? null,
-    });
-    const decision = evaluateTradeForAi({
-      outlook,
-      received: [...myContracts.map(asPlayer), ...myPicks.map(asPick)],
-      given: [...theirContracts.map(asPlayer), ...theirPicks.map(asPick)],
-      picksPerRound: leagueTeams.length,
-      payrollBefore: theirCurrentPayroll,
-      taxLine: leagueId === "nba" ? NBA_TAX_LINE : Infinity,
-    });
+    // evaluateTradeForAi) — reconstruction, milieu de tableau ou prétendant.
+    const decision = analysis.ai!.decision;
     if (!decision.accept) {
       const team = `${opponentTeam.city} ${opponentTeam.name}`;
       const key =

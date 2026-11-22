@@ -8,6 +8,18 @@ import { TradeDeadlineNotice } from "@/components/team/TradeDeadlineNotice";
 import { cancelTradeOffer, respondToTradeOffer } from "@/app/actions/trade";
 import { getTranslator, type Translator } from "@/lib/i18n/translate";
 import { teamFullName } from "@/lib/utils";
+import { getTeamsByLeague } from "@/lib/data-access/teams";
+import { getStandings } from "@/lib/data-access/standings";
+import { getCareerExpectations } from "@/lib/data-access/expectations";
+import { teamOutlook } from "@/lib/careers/trade-rules";
+import { winPctForStandings } from "@/lib/careers/player-demands";
+import type { DictionaryKey } from "@/lib/i18n/dictionary";
+
+const OUTLOOK_TONE: Record<string, string> = {
+  rebuild: "bg-info/15 text-info",
+  middle: "bg-surface-3 text-soft",
+  contender: "bg-accent/15 text-accent-text",
+};
 import type { Team } from "@/lib/types";
 
 export default async function TradesPage() {
@@ -84,6 +96,26 @@ export default async function TradesPage() {
     ));
   }
 
+  // Partenaires possibles (autres équipes) avec leur profil d'échange.
+  const [leagueTeams, standings, expectations] = await Promise.all([
+    getTeamsByLeague(membership.leagueId),
+    getStandings(membership.careerId, membership.leagueId, membership.season),
+    getCareerExpectations(membership.careerId, membership.leagueId),
+  ]);
+  const partners = leagueTeams
+    .filter((team) => team.id !== membership.teamId)
+    .map((team) => {
+      const row = standings.find((r) => r.teamId === team.id);
+      const wins = row?.wins ?? 0;
+      const losses = row?.losses ?? 0;
+      return {
+        team,
+        record: `${wins}-${losses}`,
+        outlook: teamOutlook({ winPct: winPctForStandings(wins, losses), gamesPlayed: wins + losses, expectation: expectations.get(team.id) ?? null }),
+      };
+    })
+    .sort((a, b) => teamFullName(a.team).localeCompare(teamFullName(b.team)));
+
   return (
     <div className="mx-auto max-w-6xl px-4 lg:px-8 py-8">
       <h1 className="text-2xl font-bold tracking-tight">{t("tradeOffers.title")}</h1>
@@ -92,6 +124,32 @@ export default async function TradesPage() {
         <p className="mt-4 text-sm text-bad">{t("tradeOffers.deadlinePassedNotice")}</p>
       )}
       <TradeDeadlineNotice info={deadlineInfo} t={t} locale={locale} className="mt-4" />
+
+      {/* Lancer un échange : chaque équipe avec son profil (ce qu'elle
+          recherche), pour cibler le bon partenaire. */}
+      {!tradeDeadlinePassed && (
+        <section className="mt-8" data-testid="trade-partners">
+          <h2 className="text-lg font-semibold">{t("tradeOffers.newTrade")}</h2>
+          <p className="mt-1 text-sm text-muted">{t("tradeOffers.newTradeHint")}</p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {partners.map((p) => (
+              <Link
+                key={p.team.id}
+                href={`/teams/${p.team.id}?tab=trade`}
+                className="card flex items-center justify-between gap-2 px-3 py-2 text-sm transition hover:bg-surface-2"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{teamFullName(p.team)}</span>
+                  <span className="text-xs text-faint tabular">{p.record}</span>
+                </span>
+                <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold ${OUTLOOK_TONE[p.outlook]}`}>
+                  {t(`trade.outlook.${p.outlook}` as DictionaryKey)}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mt-8">
         <h2 className="text-lg font-semibold">{t("tradeOffers.received")}</h2>

@@ -3,6 +3,8 @@
 // pris par team.ts qui couvre TradeProposalForm) pour éviter toute ambiguïté.
 export const keys = [
   "tradeOffers.title",
+  "tradeOffers.newTrade",
+  "tradeOffers.newTradeHint",
   "tradeOffers.deadlinePassedNotice",
   "tradeOffers.received",
   "tradeOffers.sent",
@@ -34,6 +36,8 @@ export type TradeOffersKey = (typeof keys)[number];
 
 export const fr: Record<TradeOffersKey, string> = {
   "tradeOffers.title": "Échanges",
+  "tradeOffers.newTrade": "Monter un échange",
+  "tradeOffers.newTradeHint": "Choisis un partenaire. Son profil indique ce qu'il recherche : une équipe en reconstruction aime les jeunes et les choix de draft, un prétendant veut des joueurs prêts tout de suite.",
   "tradeOffers.deadlinePassedNotice":
     "Date limite des échanges dépassée pour cette saison — les offres en attente ne peuvent plus être acceptées, seulement refusées ou annulées.",
   "tradeOffers.received": "Propositions reçues",
@@ -66,6 +70,8 @@ export const fr: Record<TradeOffersKey, string> = {
 
 export const en: Record<TradeOffersKey, string> = {
   "tradeOffers.title": "Trades",
+  "tradeOffers.newTrade": "Build a trade",
+  "tradeOffers.newTradeHint": "Pick a partner. Their profile shows what they want: a rebuilding team likes youth and draft picks, a contender wants win-now players.",
   "tradeOffers.deadlinePassedNotice":
     "Trade deadline has passed for this season — pending offers can no longer be accepted, only rejected or cancelled.",
   "tradeOffers.received": "Received offers",

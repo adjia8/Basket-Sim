@@ -150,3 +150,27 @@ test("effectif : 21 contrats en intersaison, retour aux bornes de saison avant l
   // À niveau égal, on coupe d'abord le contrat non garanti (pas d'argent mort).
   assert.deepEqual(order.map((p) => p.id), ["rookie2", "vet", "star"]);
 });
+
+test("centre des transferts : jauge d'intérêt et plus petit ajout suffisant", async () => {
+  const { tradeInterest, smallestSufficientAddition, evaluateTradeForAi } = await import("../../src/lib/careers/trade-rules");
+  assert.equal(tradeInterest({ received: 150, given: 100 }), "high");
+  assert.equal(tradeInterest({ received: 95, given: 100 }), "medium");
+  assert.equal(tradeInterest({ received: 80, given: 100 }), "low");
+  assert.equal(tradeInterest({ received: 40, given: 100 }), "none");
+
+  // Équipe en reconstruction : on lui demande un bon jeune contre un remplaçant.
+  const base = { outlook: "rebuild" as const, picksPerRound: 30, payrollBefore: 150e6, taxLine: 200e6 };
+  const received = [{ kind: "player" as const, overall: 72, age: 27, salary: 5e6, standard: true }];
+  const given = [{ kind: "player" as const, overall: 80, age: 22, salary: 5e6, standard: true }];
+  assert.equal(evaluateTradeForAi({ ...base, received, given }).accept, false);
+  const pick1 = { id: "pick:1", asset: { kind: "pick" as const, round: 1, pickNumber: null }, allowed: true };
+  const pick2 = { id: "pick:2", asset: { kind: "pick" as const, round: 2, pickNumber: null }, allowed: true };
+  const star = { id: "player:s", asset: { kind: "player" as const, overall: 90, age: 26, salary: 5e6, standard: true }, allowed: false };
+  const best = smallestSufficientAddition({ ...base, received, given, candidates: [star, pick1, pick2] });
+  assert.ok(best, "une suggestion existe");
+  // Jamais un élément interdit (effectif / règles salariales).
+  assert.notEqual(best!.id, "player:s");
+  // Si le 2e tour suffit, il passe avant le 1er tour (moins cher).
+  const with2 = evaluateTradeForAi({ ...base, received: [...received, pick2.asset], given }).accept;
+  assert.equal(best!.id, with2 ? "pick:2" : "pick:1");
+});
