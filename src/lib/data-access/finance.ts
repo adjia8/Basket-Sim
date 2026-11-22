@@ -3,10 +3,12 @@ import { starPower } from "@/lib/careers/attendance-rules";
 import { prisma } from "@/lib/prisma";
 import { getPayrollForTeam } from "@/lib/data-access/contracts";
 import { NBA_TAX_LINE } from "@/lib/careers/cap-rules";
+import { chargeLoans, facilityBonuses, parsePlan } from "@/lib/careers/facility-projects-rules";
 import {
   ANNUAL_DEGRADATION,
   OWNER_PROFIT_SHARE,
   clampFacilityLevel,
+  GAMES_PER_SEASON,
   homeGameRevenue,
   luxuryTaxBill,
   perGameExpenses,
@@ -91,6 +93,7 @@ export async function computeGameFinances(p: {
     concessionPriceLevel: number;
     arenaLevel: number;
     financeLedgerJson: string | null;
+    facilityProjectsJson?: string | null;
   };
   roster: Player[];
   // Joueurs réellement disponibles ce soir (ni blessés, ni au repos), des
@@ -104,6 +107,8 @@ export async function computeGameFinances(p: {
   const ledger = parseLedger(p.state.financeLedgerJson, season);
   const cur = ledger.current;
   let delta = 0;
+  // Projets d'infrastructure livrés : recettes en plus, entretien.
+  const fx = facilityBonuses(parsePlan(p.state.facilityProjectsJson), p.leagueId);
 
   if (regular) {
     const [payroll, staff] = await Promise.all([
@@ -116,8 +121,10 @@ export async function computeGameFinances(p: {
       marketAppeal: p.marketAppeal,
       winPct: p.winPct,
       publicOpinion: p.state.publicOpinion,
+      sponsorBoost: fx.sponsors,
     });
     const costs = perGameExpenses({ leagueId: p.leagueId, payroll, staffCost: staff._sum.salary ?? 0, home: p.home });
+    costs.operations += Math.round(fx.upkeep / (GAMES_PER_SEASON[p.leagueId] ?? 82));
     cur.revenue.nationalTv += shares.nationalTv;
     cur.revenue.localMedia += shares.localMedia;
     cur.revenue.sponsors += shares.sponsors;
@@ -146,6 +153,7 @@ export async function computeGameFinances(p: {
         };
       })(),
       playoff: p.gameSeason.endsWith("-playoffs"),
+      boost: { fill: fx.fill, premium: fx.premium, concessions: fx.concessions, merch: fx.merch, works: fx.arenaWorks },
     });
     cur.homeGames += 1;
     cur.attendees += gate.attendees;
@@ -180,10 +188,14 @@ export async function closeSeasonFinances(careerId: string, teamId: string, leag
   const profit = totalRevenue(cur) - totalExpenses(cur);
   const ownerShare = profit > 0 ? Math.round(profit * OWNER_PROFIT_SHARE) : 0;
   cur.expenses.ownerShare += ownerShare;
+  // Échéances des emprunts d'infrastructure.
+  const loans = chargeLoans(state.facilityProjectsJson);
+  cur.expenses.upgrades += loans.paid;
   await prisma.teamState.update({
     where: { id: state.id },
     data: {
-      finances: state.finances - tax - ownerShare,
+      finances: state.finances - tax - ownerShare - loans.paid,
+      facilityProjectsJson: loans.json,
       facilitiesLevel: clampFacilityLevel(state.facilitiesLevel - ANNUAL_DEGRADATION),
       arenaLevel: clampFacilityLevel(state.arenaLevel - ANNUAL_DEGRADATION),
       financeLedgerJson: JSON.stringify({ current: emptySeasonLedger(`${Number(season.slice(0, 4)) + 1}-${Number(season.slice(5, 9)) + 1}`), previous: cur }),

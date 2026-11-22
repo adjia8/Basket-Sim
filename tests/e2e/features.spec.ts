@@ -169,6 +169,37 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       if (process.env.ADVICE_SHOT) await advice.screenshot({ path: process.env.ADVICE_SHOT });
     });
 
+    await test.step("infrastructures : lancer un chantier, livraison, effets", async () => {
+      await expectPageOk(page, "/franchise");
+      await expect(page.getByTestId("facilities")).toBeVisible();
+      const card = page.getByTestId("project-recovery_center");
+      await card.getByLabel(/Comptant/).check();
+      await card.getByRole("button", { name: "Lancer le chantier" }).click();
+      await expect(card.getByText(/Chantier lancé/)).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId("facility-progress").getByText(/Centre de récupération/)).toBeVisible();
+      // Le choix exclusif : des loges rendent la tribune populaire impossible.
+      const suites = page.getByTestId("project-premium_suites");
+      await suites.getByLabel(/Emprunt/).check();
+      await suites.getByRole("button", { name: "Lancer le chantier" }).click();
+      await expect(suites.getByText(/Chantier lancé/)).toBeVisible({ timeout: 30_000 });
+      await page.reload();
+      await expect(page.getByTestId("project-fan_stand").getByText(/Incompatible avec/)).toBeVisible();
+      if (process.env.FACILITY_SHOT) await page.getByTestId("facilities").screenshot({ path: process.env.FACILITY_SHOT });
+      // Livraison : on avance la date de fin du chantier.
+      const state = await prisma.teamState.findFirstOrThrow({ where: { careerId, teamId: "lal" } });
+      const plan = JSON.parse(state.facilityProjectsJson!);
+      for (const p of plan.projects) p.completesOn = "2000-01-01T00:00:00.000Z";
+      await prisma.teamState.update({ where: { id: state.id }, data: { facilityProjectsJson: JSON.stringify(plan) } });
+      await expectPageOk(page, "/franchise");
+      await expect(page.getByTestId("facilities").getByText(/Récupération \+4 %/).first()).toBeVisible();
+      await expect(page.getByTestId("facilities").getByText(/Recettes loges et premium \+15 %/).first()).toBeVisible();
+      const after = await prisma.teamState.findFirstOrThrow({ where: { careerId, teamId: "lal" } });
+      expect(after.facilitiesLevel).toBe(state.facilitiesLevel + 3);
+      expect(after.publicOpinion).toBe(state.publicOpinion - 2);
+      expect(await prisma.inboxMessage.count({ where: { careerId, teamId: "lal", type: "facility" } })).toBe(2);
+      await expect(page.getByTestId("facility-progress").getByText(/Emprunts en cours/)).toBeVisible();
+    });
+
     await test.step("centre des transferts : partenaires, analyse en direct, intérêt de l'IA", async () => {
       await expectPageOk(page, "/trades");
       await expect(page.getByTestId("trade-partners")).toBeVisible();

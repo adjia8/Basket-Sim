@@ -1,6 +1,4 @@
 import { getCurrentMembership } from "@/lib/auth/dal";
-import { getScheduleForCareer } from "@/lib/data-access/schedule";
-import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import {
   getChampionshipsForTeam,
@@ -8,28 +6,140 @@ import {
   getLegendsForTeam,
 } from "@/lib/data-access/franchise-history";
 import { PRICE_LEVELS, healthyFinancesThreshold, upgradeCost } from "@/lib/careers/finance-rules";
+import {
+  facilityBonuses,
+  financingPlan,
+  MAX_CONCURRENT_PROJECTS,
+  ownersAcceptChance,
+  parsePlan,
+  projectOptions,
+  type FacilityDomain,
+} from "@/lib/careers/facility-projects-rules";
+import { tierEffectLines } from "@/lib/careers/facility-effects-text";
+import { settleFacilityProjects } from "@/lib/data-access/facility-projects";
+import { getGameClock } from "@/lib/data-access/game-clock";
+import { prisma } from "@/lib/prisma";
+import { FacilityProjectCard, type ProjectCardView } from "@/components/franchise/FacilityProjectCard";
+import type { DictionaryKey } from "@/lib/i18n/dictionary";
 import { parseLedger, totalExpenses, totalRevenue } from "@/lib/data-access/finance";
-import { setPricing, upgradeFacility } from "@/app/actions/franchise";
+import { setPricing } from "@/app/actions/franchise";
 import { getTranslator } from "@/lib/i18n/translate";
 import Link from "next/link";
-import { formatSalary, playerHref } from "@/lib/utils";
+import { formatLongDate, formatSalary, playerHref } from "@/lib/utils";
 import { financeTone, ratingTone, toneClass } from "@/lib/color-scale";
 
 export default async function FranchisePage() {
   const membership = await getCurrentMembership();
   const { t, locale } = await getTranslator();
 
-  const games = await getScheduleForCareer(membership.careerId, membership.season);
-  const seasonComplete = games.length > 0 && games.every((g) => g.status === "final");
-  const playoffs = seasonComplete
-    ? await getOrAdvancePlayoffs(membership.careerId, membership.season, membership.leagueId)
-    : null;
-  const isOffseasonWindow = seasonComplete && !!playoffs?.champion;
 
-  const teamState = await getOrCreateTeamState(membership.careerId, membership.teamId, membership.leagueId);
-  const facilitiesCost = upgradeCost(teamState.facilitiesLevel, membership.leagueId, "training");
-  const arenaCost = upgradeCost(teamState.arenaLevel, membership.leagueId, "arena");
+  // Chantiers arrivés à échéance (ex. livrés pendant l'intersaison).
+  const clock = await getGameClock(membership.careerId, membership.teamId);
+  const today = clock.today ?? new Date();
+  await settleFacilityProjects(membership.careerId, membership.teamId, membership.season, today, locale);
+  const [teamState, gm] = await Promise.all([
+    getOrCreateTeamState(membership.careerId, membership.teamId, membership.leagueId),
+    prisma.gmProfile.findFirst({ where: { membership: { careerId: membership.careerId, teamId: membership.teamId } }, select: { frontOfficeApproval: true } }),
+  ]);
   const ledger = parseLedger(teamState.financeLedgerJson, membership.season);
+
+  // Projets d'infrastructure (voir facility-projects-rules.ts).
+  const plan = parsePlan(teamState.facilityProjectsJson);
+  const bonuses = facilityBonuses(plan, membership.leagueId);
+  const options = projectOptions(plan, membership.leagueId, {
+    training: upgradeCost(teamState.facilitiesLevel, membership.leagueId, "training"),
+    arena: upgradeCost(teamState.arenaLevel, membership.leagueId, "arena"),
+  });
+  const money = (v: number) => formatSalary(v, locale);
+  const projectName = (key: string) => t(`facility.project.${key}.name` as DictionaryKey);
+  const ownersAsked = plan.ownersRequestSeason === membership.season;
+  const views = (domain: FacilityDomain): ProjectCardView[] =>
+    options
+      .filter((o) => o.def.domain === domain)
+      .map((o) => {
+        const total = o.def.tiers.length;
+        let status: ProjectCardView["status"] = null;
+        let progressPct: number | null = null;
+        if (o.building) {
+          status = { text: t("facility.status.building", { date: formatLongDate(o.building.completesOn, locale) }), tone: "info" };
+          const start = new Date(o.building.startedOn).getTime();
+          const end = new Date(o.building.completesOn).getTime();
+          progressPct = Math.round(Math.min(1, Math.max(0, (today.getTime() - start) / Math.max(1, end - start))) * 100);
+        } else if (o.blockedBy === "maxed") status = { text: t("facility.status.maxed"), tone: "muted" };
+        else if (o.blockedBy === "exclusive") status = { text: t("facility.status.exclusive", { other: projectName(o.def.exclusiveWith!) }), tone: "warn" };
+        else if (o.blockedBy === "concurrent") status = { text: t("facility.status.concurrent", { max: MAX_CONCURRENT_PROJECTS }), tone: "warn" };
+        const next = o.next;
+        const fin = next
+          ? {
+              cash: financingPlan(next.cost, "cash"),
+              loan: financingPlan(next.cost, "loan"),
+              owners: financingPlan(next.cost, "owners"),
+            }
+          : null;
+        const chance = next ? Math.round(ownersAcceptChance(gm?.frontOfficeApproval ?? 50, teamState.finances / Math.max(1, next.cost)) * 100) : 0;
+        return {
+          key: o.def.key,
+          name: projectName(o.def.key),
+          desc: t(`facility.project.${o.def.key}.desc` as DictionaryKey),
+          tierLabel: o.def.repeatable ? t("facility.repeatable") : t("facility.tier", { n: o.built, max: total }),
+          builtDots: o.def.repeatable ? null : { total, built: o.built },
+          status,
+          progressPct,
+          next:
+            next && !o.building && o.blockedBy !== "exclusive"
+              ? {
+                  title: o.def.repeatable ? t("facility.repeatable") : t("facility.nextTier", { n: next.tier }),
+                  effects: tierEffectLines(next, t, locale),
+                  cost: money(next.cost),
+                  duration: t("facility.duration", { days: next.days }),
+                  upkeep: next.upkeep > 0 ? t("facility.upkeepShort", { amount: money(next.upkeep) }) : null,
+                }
+              : null,
+          financing: fin
+            ? [
+                { value: "cash" as const, label: t("facility.financing.cash", { now: money(fin.cash.now) }), disabled: teamState.finances < fin.cash.now },
+                {
+                  value: "loan" as const,
+                  label: t("facility.financing.loan", { now: money(fin.loan.now), per: money(fin.loan.perSeason) }),
+                  disabled: teamState.finances < fin.loan.now,
+                },
+                {
+                  value: "owners" as const,
+                  label: ownersAsked ? t("facility.financing.ownersAsked") : t("facility.financing.owners", { chance }),
+                  disabled: ownersAsked || teamState.finances < fin.owners.now,
+                },
+              ]
+            : [],
+          canStart: !!next && !o.building && !o.blockedBy,
+          warning: domain === "arena" ? t("facility.worksWarning") : null,
+        };
+      });
+  const activeEffects = tierEffectLines(
+    {
+      level: 0,
+      effects: {
+        recovery: bonuses.recovery,
+        medical: bonuses.medical,
+        development: bonuses.development,
+        tactical: bonuses.tactical,
+        homeCourt: bonuses.homeCourt,
+        fill: bonuses.fill,
+        premium: bonuses.premium,
+        concessions: bonuses.concessions,
+        merch: bonuses.merch,
+        sponsors: bonuses.sponsors,
+      },
+    },
+    t,
+    locale
+  ).slice(0, -1); // sans la ligne « niveau global »
+  const building = plan.projects.filter((p) => p.status === "building");
+  const cardLabels = {
+    financingTitle: t("facility.financing.title"),
+    start: t("facility.start"),
+    starting: t("facility.starting"),
+    cost: t("facility.cost"),
+  };
 
   const [championships, records, legends] = await Promise.all([
     getChampionshipsForTeam(membership.careerId, membership.teamId),
@@ -72,30 +182,73 @@ export default async function FranchisePage() {
         </div>
       </div>
 
-      {!isOffseasonWindow && (
-        <p className="mt-4 text-sm text-bad">{t("franchisePage.offseasonOnly")}</p>
-      )}
+      <section className="mt-8" data-testid="facilities">
+        <h2 className="text-lg font-semibold">{t("facility.title")}</h2>
+        <p className="mt-1 text-sm text-muted">{t("facility.intro")}</p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <FacilityCard
-          label={t("finance.training")}
-          description={t("franchisePage.facilitiesDescription")}
-          level={teamState.facilitiesLevel}
-          canAfford={teamState.finances >= facilitiesCost}
-          canUpgrade={isOffseasonWindow}
-          component="facilities"
-          upgradeLabel={t("franchisePage.upgrade", { cost: formatSalary(facilitiesCost, locale) })}
-        />
-        <FacilityCard
-          label={t("finance.arena")}
-          description={t("finance.arenaDescription")}
-          level={teamState.arenaLevel}
-          canAfford={teamState.finances >= arenaCost}
-          canUpgrade={isOffseasonWindow}
-          component="arena"
-          upgradeLabel={t("franchisePage.upgrade", { cost: formatSalary(arenaCost, locale) })}
-        />
-        <div className="card p-4">
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="card p-4 text-sm">
+            <p className="eyebrow">{t("facility.activeBonuses")}</p>
+            {activeEffects.length === 0 ? (
+              <p className="mt-1 text-xs text-muted">{t("facility.noBonus")}</p>
+            ) : (
+              <ul className="mt-1 space-y-0.5 text-xs text-good">
+                {activeEffects.map((e) => (
+                  <li key={e}>+ {e}</li>
+                ))}
+              </ul>
+            )}
+            {bonuses.upkeep > 0 && <p className="mt-2 text-xs text-muted">{t("facility.upkeep", { amount: money(bonuses.upkeep) })}</p>}
+          </div>
+          <div className="card p-4 text-sm" data-testid="facility-progress">
+            <p className="eyebrow">{t("facility.inProgress")}</p>
+            {building.length === 0 ? (
+              <p className="mt-1 text-xs text-muted">{t("facility.noneInProgress")}</p>
+            ) : (
+              <ul className="mt-1 space-y-0.5 text-xs">
+                {building.map((p) => (
+                  <li key={p.key}>
+                    {t("facility.progressLine", { name: projectName(p.key), tier: p.tier, date: formatLongDate(p.completesOn, locale) })}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {plan.loans.length > 0 && (
+              <>
+                <p className="eyebrow mt-3">{t("facility.loans")}</p>
+                <ul className="mt-1 space-y-0.5 text-xs text-muted">
+                  {plan.loans.map((l, i) => (
+                    <li key={i}>
+                      {t("facility.loanLine", { name: projectName(l.key), tier: l.tier, per: money(l.perSeason), n: l.seasonsLeft })}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        </div>
+
+        {(["training", "arena"] as const).map((domain) => {
+          const level = domain === "training" ? teamState.facilitiesLevel : teamState.arenaLevel;
+          return (
+            <div key={domain} className="mt-6" data-testid={`facility-${domain}`}>
+              <div className="flex items-baseline justify-between gap-3">
+                <h3 className="font-semibold">{t(`facility.domain.${domain}`)}</h3>
+                <span className={`text-sm font-semibold ${toneClass(ratingTone(level))}`}>{t("facility.level", { level })}</span>
+              </div>
+              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-3">
+                <div className="h-full rounded-full bg-accent" style={{ width: `${level}%` }} />
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {views(domain).map((v) => (
+                  <FacilityProjectCard key={v.key} view={v} labels={cardLabels} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+
+        <div className="mt-6 card p-4">
           <p className="text-xs uppercase tracking-wide text-muted">{t("common.nav.staff")}</p>
           <p className={`mt-1 text-2xl font-semibold ${toneClass(ratingTone(teamState.trainingStaffLevel))}`}>
             {teamState.trainingStaffLevel} / 99
@@ -105,7 +258,7 @@ export default async function FranchisePage() {
             {t("staff.title")} →
           </Link>
         </div>
-      </div>
+      </section>
 
       <section className="mt-8" data-testid="finances">
         <h2 className="text-lg font-semibold">{t("finance.title")}</h2>
@@ -275,50 +428,6 @@ export default async function FranchisePage() {
           <p className="mt-2 text-sm text-muted">{t("franchisePage.noLegends")}</p>
         )}
       </div>
-    </div>
-  );
-}
-
-function FacilityCard({
-  label,
-  description,
-  level,
-  canAfford,
-  canUpgrade,
-  component,
-  upgradeLabel,
-}: {
-  label: string;
-  description: string;
-  level: number;
-  canAfford: boolean;
-  canUpgrade: boolean;
-  component: "facilities" | "arena";
-  upgradeLabel: string;
-}) {
-  return (
-    <div className="card p-4">
-      <p className="font-medium">{label}</p>
-      <p className="mt-1 text-xs text-muted">{description}</p>
-      <p className={`mt-3 text-xl font-semibold ${toneClass(ratingTone(level))}`}>{level} / 99</p>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-3">
-        <div
-          className="h-full rounded-full bg-accent"
-          style={{ width: `${level}%` }}
-        />
-      </div>
-      {canUpgrade && (
-        <form action={upgradeFacility} className="mt-4">
-          <input type="hidden" name="component" value={component} />
-          <button
-            type="submit"
-            disabled={!canAfford}
-            className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-fg transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {upgradeLabel}
-          </button>
-        </form>
-      )}
     </div>
   );
 }

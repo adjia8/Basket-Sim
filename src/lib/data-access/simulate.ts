@@ -18,6 +18,8 @@ import { translatorFor } from "@/lib/i18n/translate";
 import { advancePlayerRenown } from "@/lib/data-access/renown";
 import { advanceRosterFatigue, getRestDays } from "@/lib/data-access/fatigue";
 import { fatigueAtTipOff } from "@/lib/careers/fatigue-rules";
+import { facilityBonuses, parsePlan, withFacilityBonuses } from "@/lib/careers/facility-projects-rules";
+import { settleFacilityProjects } from "@/lib/data-access/facility-projects";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { advanceRosterDevelopment, advanceRosterTraining } from "@/lib/data-access/training";
 import { AI_MAX_RESTED_PER_GAME, WEAR_AI_AUTO_REST } from "@/lib/careers/wear-rules";
@@ -452,8 +454,18 @@ export async function simulateAndResolveGame(
   // progression, usure, fatigue, blessures.
   const homeProfile = staffProfiles.get(game.homeTeamId) ?? NEUTRAL_STAFF_PROFILE;
   const awayProfile = staffProfiles.get(game.awayTeamId) ?? NEUTRAL_STAFF_PROFILE;
-  const homeStaff = staffEffects(homeProfile);
-  const awayStaff = staffEffects(awayProfile);
+  // Staff, corrigé des installations livrées (récupération, médical,
+  // progression, vidéo, ambiance à domicile — voir facility-projects-rules.ts).
+  const homeStaff = withFacilityBonuses(
+    staffEffects(homeProfile),
+    facilityBonuses(parsePlan(homeTeamState.facilityProjectsJson), game.leagueId),
+    true
+  );
+  const awayStaff = withFacilityBonuses(
+    staffEffects(awayProfile),
+    facilityBonuses(parsePlan(awayTeamState.facilityProjectsJson), game.leagueId),
+    false
+  );
   // Énergie au coup d'envoi : la fatigue enregistrée date de la fin du
   // match précédent ; les jours de repos depuis la font redescendre AVANT
   // ce match (moteur, risque de blessure). advanceRosterFatigue repart des
@@ -880,6 +892,14 @@ export async function simulateAndResolveGame(
     teamStateUpdate(homeTeamState, homeWinPct, homeRoster, chemistryTrainingBonus(homeFocus, homeIntensity), homeTeam.marketAppeal, game.homeTeamId, true, awayRoster),
     teamStateUpdate(awayTeamState, awayWinPct, awayRoster, chemistryTrainingBonus(awayFocus, awayIntensity), awayTeam.marketAppeal, game.awayTeamId, false, homeRoster),
   ]);
+
+  // Chantiers d'infrastructure arrivés à échéance (après la mise à jour des
+  // états d'équipe de ce match).
+  for (const [state, teamId] of [[homeTeamState, game.homeTeamId], [awayTeamState, game.awayTeamId]] as const) {
+    if (state.facilityProjectsJson?.includes('"building"')) {
+      await settleFacilityProjects(careerId, teamId, game.season.slice(0, 9), gameDate, locale);
+    }
+  }
 
   // Star blessée pour longtemps, quelle que soit l'équipe (voir
   // isNotableInjury) : chaque GM humain est averti dans l'onglet Médical de sa

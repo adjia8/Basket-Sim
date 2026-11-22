@@ -33,6 +33,7 @@ const CATEGORY_BY_TYPE: Record<string, InboxCategory> = {
   fine: "press",
   board: "board",
   staff: "board",
+  facility: "board",
   poach_offer: "board",
   standings: "competitions",
   cup: "competitions",

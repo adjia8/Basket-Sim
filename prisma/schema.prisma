@@ -682,6 +682,7 @@ model TeamState {
   ticketPriceLevel         Int       @default(100) // prix des billets, % du prix « marché » (70-150) — voir finance-rules.ts
   concessionPriceLevel     Int       @default(100) // prix de la restauration, % (70-150)
   arenaLevel               Int       @default(50) // confort de la salle 0-99 (remplissage, loges, dépenses des fans)
+  facilityProjectsJson     String? // projets d'infrastructure (chantiers, paliers, emprunts) — voir facility-projects-rules.ts
   financeLedgerJson        String? // compte de résultat de la saison en cours et de la précédente — voir finance.ts
   morale                   Int       @default(50) // 0-99, piloté par les réponses en conférence de presse
   publicOpinion            Int       @default(50) // 0-99, opinion fans/autres franchises, pilotée par les réponses en conférence de presse

@@ -81,3 +81,78 @@ test("soir de match : star absente = moins de spectateurs, star adverse = plus",
   // Jamais au-delà de la capacité.
   assert.ok(gate({ homeAvailable: 1, homeMissing: 0, awayAvailable: 1 }) <= 18_500);
 });
+
+import {
+  chargeLoans,
+  dueProjects,
+  facilityBonuses,
+  financingPlan,
+  ownersAcceptChance,
+  parsePlan,
+  projectOptions,
+  withFacilityBonuses,
+  type FacilityPlan,
+} from "../../src/lib/careers/facility-projects-rules";
+import { homeGameRevenue } from "../../src/lib/careers/finance-rules";
+
+test("projets d'infrastructure : paliers, exclusivité, chantiers simultanés", () => {
+  const reno = { training: 20_000_000, arena: 30_000_000 };
+  const plan: FacilityPlan = { projects: [], loans: [], ownersRequestSeason: null };
+  let opts = projectOptions(plan, "nba", reno);
+  const suites = opts.find((o) => o.def.key === "premium_suites")!;
+  assert.equal(suites.next?.tier, 1);
+  assert.equal(suites.blockedBy, null);
+  // Loges construites → tribune populaire impossible.
+  plan.projects.push({ key: "premium_suites", tier: 1, status: "done", startedOn: "2026-10-01T00:00:00Z", completesOn: "2027-01-01T00:00:00Z", cost: 1, financing: "cash" });
+  opts = projectOptions(plan, "nba", reno);
+  assert.equal(opts.find((o) => o.def.key === "fan_stand")!.blockedBy, "exclusive");
+  assert.equal(opts.find((o) => o.def.key === "premium_suites")!.next?.tier, 2);
+  // Deux chantiers en cours → les autres attendent.
+  for (const key of ["recovery_center", "video_board"] as const) {
+    plan.projects.push({ key, tier: 1, status: "building", startedOn: "2026-10-01T00:00:00Z", completesOn: "2026-12-01T00:00:00Z", cost: 1, financing: "cash" });
+  }
+  opts = projectOptions(plan, "nba", reno);
+  assert.equal(opts.find((o) => o.def.key === "medical_center")!.blockedBy, "concurrent");
+  // Rénovation : coût selon le niveau, relançable.
+  assert.equal(opts.find((o) => o.def.key === "arena_renovation")!.next?.cost, 30_000_000);
+  // Livraison à la date prévue.
+  assert.equal(dueProjects(plan, "2026-11-30T00:00:00Z").length, 0);
+  assert.equal(dueProjects(plan, "2026-12-01T00:00:00Z").length, 2);
+  // Effets : seuls les projets livrés comptent ; travaux dans la salle signalés.
+  const b = facilityBonuses(plan, "nba");
+  assert.equal(b.premium, 0.15);
+  assert.equal(b.recovery, 0);
+  assert.equal(b.arenaWorks, true);
+});
+
+test("financement, effets et recettes des projets", () => {
+  const loan = financingPlan(20_000_000, "loan");
+  assert.equal(loan.now, 5_000_000);
+  assert.equal(loan.seasons, 3);
+  assert.ok(loan.perSeason * 3 > 15_000_000); // intérêts
+  assert.equal(financingPlan(20_000_000, "owners").ownersPay, 10_000_000);
+  assert.ok(ownersAcceptChance(90, 0.5) > ownersAcceptChance(20, 0.5));
+  // Emprunt payé saison après saison puis soldé.
+  let json: string | null = JSON.stringify({ projects: [], loans: [{ key: "fan_zone", tier: 1, perSeason: 100, seasonsLeft: 2 }], ownersRequestSeason: null });
+  let r = chargeLoans(json);
+  assert.equal(r.paid, 100);
+  r = chargeLoans(r.json);
+  assert.equal(r.paid, 100);
+  assert.equal(parsePlan(r.json).loans.length, 0);
+  json = r.json;
+  assert.equal(chargeLoans(json).paid, 0);
+  // Staff corrigé : récupération et ambiance à domicile seulement.
+  const staff = { fatigueRecoveryFactor: 1, wearFactor: 1, medicalLevel: 50, developmentLevel: 50, strengthBonus: 0 };
+  const fx = { recovery: 0.1, medical: 10, development: 5, tactical: 0.3, homeCourt: 0.5 };
+  assert.equal(withFacilityBonuses(staff, fx, true).strengthBonus, 0.8);
+  assert.equal(withFacilityBonuses(staff, fx, false).strengthBonus, 0.3);
+  assert.equal(withFacilityBonuses(staff, fx, true).wearFactor, 0.9);
+  // Recettes : loges +30 %, travaux = moins de spectateurs.
+  const base = { leagueId: "nba", attendance: 80, marketAppeal: 60, ticketLevel: 100, concessionLevel: 100, arenaLevel: 60, starRenown: 60 };
+  const plain = homeGameRevenue(base);
+  const boosted = homeGameRevenue({ ...base, boost: { fill: 0, premium: 0.3, concessions: 0.3, merch: 0, works: false } });
+  assert.ok(boosted.premium > plain.premium * 1.25);
+  assert.ok(boosted.concessions > plain.concessions);
+  const works = homeGameRevenue({ ...base, boost: { fill: 0, premium: 0, concessions: 0, merch: 0, works: true } });
+  assert.ok(works.attendees < plain.attendees);
+});

@@ -9,6 +9,7 @@
 // taxe de luxe et la part des propriétaires en fin de saison.
 
 import { nightStarFactor } from "./attendance-rules";
+import { ARENA_WORKS_FILL_PENALTY } from "./facility-projects-rules";
 
 export const GAMES_PER_SEASON: Record<string, number> = { nba: 82, wnba: 44 };
 
@@ -113,18 +114,23 @@ export function homeGameRevenue(p: {
   // Pouvoir d'attraction des stars ce soir (voir starPower, attendance-rules.ts).
   stars?: { homeAvailable: number; homeMissing: number; awayAvailable: number };
   playoff?: boolean;
+  // Projets d'infrastructure livrés (voir facility-projects-rules.ts) ;
+  // `works` : travaux en cours dans la salle (places condamnées).
+  boost?: { fill: number; premium: number; concessions: number; merch: number; works: boolean };
 }): HomeGameRevenue {
   const e = eco(p.leagueId);
+  const b = p.boost ?? { fill: 0, premium: 0, concessions: 0, merch: 0, works: false };
   const arena = (p.arenaLevel - 50) / 100; // -0,5 à +0,5
   const night = p.stars ? nightStarFactor(p.stars.homeAvailable, p.stars.homeMissing, p.stars.awayAvailable) : 1;
-  const fillRate = Math.max(0.3, Math.min(1, (p.attendance / 100) * priceDemand(p.ticketLevel) * (1 + arena * 0.2) * night));
+  const works = b.works ? 1 - ARENA_WORKS_FILL_PENALTY : 1;
+  const fillRate = Math.max(0.3, Math.min(1, (p.attendance / 100) * priceDemand(p.ticketLevel) * (1 + arena * 0.2) * night * (1 + b.fill))) * works;
   const attendees = Math.round(e.capacity * fillRate);
   const price = lerp(e.ticketPrice, market01(p.marketAppeal)) * (p.ticketLevel / 100) * (p.playoff ? 1.6 : 1);
   const tickets = attendees * price;
-  const premium = tickets * (0.4 + arena * 0.3);
+  const premium = tickets * (0.4 + arena * 0.3) * (1 + b.premium);
   // Restauration : plus cher = plus par achat, mais moins d'acheteurs.
-  const concessions = attendees * e.concessionSpend * (p.concessionLevel / 100) * priceDemand(p.concessionLevel) * (1 + arena * 0.3);
-  const merchandise = attendees * e.merchPerFan * (1 + Math.max(0, p.starRenown - 50) / 50);
+  const concessions = attendees * e.concessionSpend * (p.concessionLevel / 100) * priceDemand(p.concessionLevel) * (1 + arena * 0.3) * (1 + b.concessions);
+  const merchandise = attendees * e.merchPerFan * (1 + Math.max(0, p.starRenown - 50) / 50) * (1 + b.merch);
   return {
     fillRate,
     attendees,
@@ -148,6 +154,7 @@ export function perGameShares(p: {
   marketAppeal: number;
   winPct: number;
   publicOpinion: number;
+  sponsorBoost?: number; // projets d'infrastructure (écran géant, fan zone)
 }): SeasonShares {
   const e = eco(p.leagueId);
   const games = GAMES_PER_SEASON[p.leagueId] ?? 82;
@@ -157,7 +164,7 @@ export function perGameShares(p: {
   return {
     nationalTv: Math.round(nationalTvForSeason(p.leagueId, p.season) / games),
     localMedia: Math.round((lerp(e.localMedia, m) * form) / games),
-    sponsors: Math.round((lerp(e.sponsors, m) * form * opinion) / games),
+    sponsors: Math.round((lerp(e.sponsors, m) * form * opinion * (1 + (p.sponsorBoost ?? 0))) / games),
   };
 }
 
