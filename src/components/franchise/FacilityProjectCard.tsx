@@ -21,7 +21,14 @@ export interface ProjectCardView {
   builtDots: { total: number; built: number } | null;
   status: { text: string; tone: "info" | "muted" | "warn" } | null;
   progressPct: number | null; // chantier en cours
-  next: { title: string; effects: string[]; cost: string; duration: string; upkeep: string | null } | null;
+  next: {
+    title: string;
+    effects: string[];
+    cost: string;
+    duration: string;
+    upkeep: string | null;
+    afterCash: { text: string; tone: "good" | "warn" | "bad" };
+  } | null;
   financing: FinancingOption[];
   canStart: boolean;
   warning: string | null;
@@ -95,6 +102,12 @@ export function FacilityProjectCard({
           <p className="mt-1.5 text-faint">
             {labels.cost} <span className="font-semibold text-soft tabular">{view.next.cost}</span> · {view.next.duration}
             {view.next.upkeep && ` · ${view.next.upkeep}`}
+          </p>
+          <p
+            className={`mt-0.5 ${view.next.afterCash.tone === "good" ? "text-good" : view.next.afterCash.tone === "warn" ? "text-warn" : "text-bad"}`}
+            data-testid="after-cash"
+          >
+            {view.next.afterCash.text}
           </p>
         </div>
       )}

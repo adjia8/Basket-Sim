@@ -123,6 +123,15 @@ export default async function FranchisePage() {
                   cost: money(next.cost),
                   duration: t("facility.duration", { days: next.days }),
                   upkeep: next.upkeep > 0 ? t("facility.upkeepShort", { amount: money(next.upkeep) }) : null,
+                  afterCash: {
+                    text: t("facility.afterCash", { amount: money(teamState.finances - next.cost) }),
+                    tone:
+                      teamState.finances - next.cost < 0
+                        ? ("bad" as const)
+                        : teamState.finances - next.cost < healthyFinancesThreshold(membership.leagueId)
+                          ? ("warn" as const)
+                          : ("good" as const),
+                  },
                 }
               : null,
           financing: fin
@@ -173,6 +182,26 @@ export default async function FranchisePage() {
     locale
   ).slice(0, -1); // sans la ligne « niveau global »
   const building = plan.projects.filter((p) => p.status === "building");
+  // Budget travaux : ce que le club peut investir sans fragiliser sa trésorerie.
+  const reserve = healthyFinancesThreshold(membership.leagueId);
+  const investable = Math.max(0, teamState.finances - reserve);
+  const loansNext = plan.loans.reduce((s, l) => s + l.perSeason, 0);
+  const loansTotal = plan.loans.reduce((s, l) => s + l.perSeason * l.seasonsLeft, 0);
+  const seasonNet = totalRevenue(ledger.current) - totalExpenses(ledger.current);
+  const budget = [
+    { label: t("facility.budget.treasury"), value: money(teamState.finances), tone: teamState.finances >= reserve ? "text-good" : "text-bad", strong: true },
+    { label: t("facility.budget.reserve"), value: money(reserve), tone: "text-muted", strong: false },
+    { label: t("facility.budget.investable"), value: money(investable), tone: investable > 0 ? "text-good" : "text-bad", strong: true },
+    { label: t("facility.budget.seasonNet"), value: money(seasonNet), tone: seasonNet >= 0 ? "text-good" : "text-bad", strong: false },
+    { label: t("facility.budget.loans"), value: loansTotal > 0 ? t("facility.budget.loansValue", { next: money(loansNext), total: money(loansTotal) }) : "—", tone: loansTotal > 0 ? "text-warn" : "text-muted", strong: false },
+    { label: t("facility.budget.upkeep"), value: bonuses.upkeep > 0 ? money(bonuses.upkeep) : "—", tone: "text-muted", strong: false },
+    {
+      label: t("facility.budget.owners"),
+      value: t("facility.budget.ownersValue", { approval: gm?.frontOfficeApproval ?? 50 }),
+      tone: (gm?.frontOfficeApproval ?? 50) >= 60 ? "text-good" : (gm?.frontOfficeApproval ?? 50) >= 40 ? "text-soft" : "text-bad",
+      strong: false,
+    },
+  ];
   const cardLabels = {
     financingTitle: t("facility.financing.title"),
     start: t("facility.start"),
@@ -224,6 +253,19 @@ export default async function FranchisePage() {
       <section className="mt-8" data-testid="facilities">
         <h2 className="text-lg font-semibold">{t("facility.title")}</h2>
         <p className="mt-1 text-sm text-muted">{t("facility.intro")}</p>
+
+        <div className="mt-3 card p-4 text-sm" data-testid="facility-budget">
+          <p className="eyebrow">{t("facility.budget.title")}</p>
+          <dl className="mt-2 grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+            {budget.map((b) => (
+              <div key={b.label} className="flex items-baseline justify-between gap-3">
+                <dt className="text-xs text-muted">{b.label}</dt>
+                <dd className={`tabular ${b.strong ? "font-semibold" : "text-xs"} ${b.tone}`}>{b.value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-2 text-[11px] text-faint">{t("facility.budget.hint", { reserve: money(reserve) })}</p>
+        </div>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <div className="card p-4 text-sm">

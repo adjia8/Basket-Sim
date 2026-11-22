@@ -11,6 +11,8 @@
 // Financement au choix : comptant, emprunt sur 3 saisons (intérêts), ou
 // demande de co-financement aux propriétaires (selon leur confiance).
 
+import { NBA_FACILITIES } from "@/lib/mock-data/nba-facilities";
+
 export type FacilityDomain = "training" | "arena";
 
 export type ProjectKey =
@@ -228,7 +230,34 @@ function hash01(seed: string): number {
   }
   return ((h >>> 0) % 1000) / 999;
 }
+// Palier correspondant à une note sur 5 (1 étoile = rien, 5 = maximum).
+function tierFromStars(stars: number, maxTier: number): number {
+  return Math.max(0, Math.min(maxTier, Math.round(((stars - 1) / 4) * maxTier)));
+}
+
+// Équipes NBA : installations réelles (voir nba-facilities.ts) ; les autres
+// (WNBA…) d'après le marché, avec une part de hasard stable.
 export function baselineTiers(teamId: string, marketAppeal: number): Baseline {
+  const real = NBA_FACILITIES[teamId];
+  if (real) {
+    const out: Baseline = {};
+    const t = (key: ProjectKey, stars: number) => {
+      out[key] = tierFromStars(Math.max(1, Math.min(5, stars)), projectDef(key)!.tiers.length);
+    };
+    t("recovery_center", real.training);
+    t("medical_center", real.training + (real.medical ?? 0));
+    t("performance_lab", real.training);
+    t("video_room", real.training);
+    t("player_residence", real.training - 1); // le « campus » reste un luxe
+    // Salles haut de gamme : loges premium ; les autres n'ont ni loges
+    // modernes ni tribune populaire.
+    t("premium_suites", real.arena >= 3 ? real.arena : 1);
+    out.fan_stand = 0;
+    t("video_board", real.arena);
+    t("food_court", real.arena);
+    t("fan_zone", real.arena - 0.5);
+    return out;
+  }
   const out: Baseline = {};
   for (const def of PROJECTS) {
     if (def.repeatable) continue;

@@ -9,6 +9,7 @@ import { attendanceTarget, nextAttendance } from "@/lib/careers/attendance-rules
 import {
   clampFacilityLevel,
   UPGRADE_INCREMENT,
+  initialArenaLevel,
   initialFacilityLevel,
   initialFinances,
   initialTrainingStaffLevel,
@@ -41,7 +42,7 @@ export async function getOrCreateTeamState(
   const trainingStaffLevel = initialTrainingStaffLevel(marketAppeal, teamId);
   try {
     return await prisma.teamState.create({
-      data: { careerId, teamId, finances, facilitiesLevel, trainingStaffLevel },
+      data: { careerId, teamId, finances, facilitiesLevel, arenaLevel: initialArenaLevel(teamId), trainingStaffLevel },
     });
   } catch (err) {
     if (err instanceof Error && "code" in err && err.code === "P2002") {

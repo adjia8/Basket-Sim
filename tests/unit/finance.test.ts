@@ -160,7 +160,7 @@ import { baselineTiers, effectiveTier, projectDef as defOf, projectStars, PROJEC
 import { desiredFacility, facilityRequestOutcome } from "../../src/lib/careers/facility-request-rules";
 
 test("installations existantes : jamais au maximum, une seule tribune, étoiles", () => {
-  for (const id of ["lal", "nyk", "uta", "okc", "mem"]) {
+  for (const id of ["wnba-a", "wnba-b", "wnba-c", "wnba-d", "wnba-e"]) {
     for (const market of [10, 50, 95]) {
       const b = baselineTiers(id, market);
       for (const def of PROJECTS) if (!def.repeatable) assert.ok((b[def.key] ?? 0) < def.tiers.length);
@@ -179,6 +179,12 @@ test("installations existantes : jamais au maximum, une seule tribune, étoiles"
   assert.equal(projectStars(med, 0, 50), 1);
   assert.equal(projectStars(med, 3, 50), 5);
   assert.equal(projectStars(defOf("arena_renovation")!, 0, 70), 3.5);
+  // Équipes NBA : installations réelles (nba-facilities.ts).
+  const det = baselineTiers("det", 50);
+  const mia = baselineTiers("mia", 50);
+  assert.equal(det.medical_center, 3); // Henry Ford : centre médical au maximum
+  assert.equal(mia.recovery_center, 0); // le Heat s'entraîne encore dans sa salle
+  assert.ok((baselineTiers("sac", 50).video_board ?? 0) > (baselineTiers("sas", 50).video_board ?? 0)); // Golden 1 Center > Frost Bank Center
 });
 
 test("demandes d'installations : besoin selon le profil, issue", () => {

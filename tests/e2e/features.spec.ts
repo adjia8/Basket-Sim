@@ -170,8 +170,9 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
     });
 
     await test.step("infrastructures : étoiles, comparaison, demande d'un joueur, chantier, livraison", async () => {
-      // Les Lakers (grand marché) partent avec des installations existantes :
-      // récupération palier 2/3, loges premium palier 1/2.
+      // Les Lakers partent avec leurs installations réelles (centre
+      // d'entraînement 4/5, salle 4/5) : récupération palier 2/3, loges
+      // premium au maximum, fan zone palier 1/2.
       const star = await prisma.playerState.findFirstOrThrow({
         where: { careerId, player: { contracts: { some: { careerId, teamId: "lal" } } } },
         orderBy: { renown: "desc" },
@@ -183,6 +184,8 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       });
       await expectPageOk(page, "/franchise");
       await expect(page.getByTestId("facilities")).toBeVisible();
+      await expect(page.getByTestId("facility-budget")).toContainText("Investissable sans fragiliser le club");
+      await expect(page.getByTestId("project-recovery_center").getByTestId("after-cash")).toContainText("Trésorerie après paiement comptant");
       await expect(page.getByTestId("facility-training-compare")).toContainText(/Ligue : \d+(er|e)( ex æquo)? sur 30/);
       expect(await page.getByTestId("project-rating").count()).toBeGreaterThanOrEqual(10);
       const card = page.getByTestId("project-recovery_center");
@@ -205,10 +208,11 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       await expect(page.getByTestId("facility-progress").getByText(/Centre de récupération/)).toBeVisible();
       // Choix exclusif : les loges existent déjà, la tribune populaire est impossible.
       await expect(page.getByTestId("project-fan_stand").getByText(/Incompatible avec/)).toBeVisible();
-      const suites = page.getByTestId("project-premium_suites");
-      await suites.getByLabel(/Emprunt/).check();
-      await suites.getByRole("button", { name: "Lancer le chantier" }).click();
-      await expect(suites.getByText(/Chantier lancé/)).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId("project-premium_suites").getByText("Palier maximum atteint")).toBeVisible();
+      const zone = page.getByTestId("project-fan_zone");
+      await zone.getByLabel(/Emprunt/).check();
+      await zone.getByRole("button", { name: "Lancer le chantier" }).click();
+      await expect(zone.getByText(/Chantier lancé/)).toBeVisible({ timeout: 30_000 });
       if (process.env.FACILITY_SHOT) {
         await page.reload();
         await page.getByTestId("facilities").screenshot({ path: process.env.FACILITY_SHOT });
@@ -220,11 +224,11 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       await prisma.teamState.update({ where: { id: state.id }, data: { facilityProjectsJson: JSON.stringify(plan) } });
       await expectPageOk(page, "/franchise");
       await expect(page.getByTestId("facilities").getByText(/Récupération \+12 %/).first()).toBeVisible();
-      await expect(page.getByTestId("facilities").getByText(/Recettes loges et premium \+30 %/).first()).toBeVisible();
+      await expect(zone.getByText("Palier maximum atteint")).toBeVisible();
       await expect(card.getByText("Palier maximum atteint")).toBeVisible();
       const after = await prisma.teamState.findFirstOrThrow({ where: { careerId, teamId: "lal" } });
       expect(after.facilitiesLevel).toBe(state.facilitiesLevel + 4);
-      expect(after.publicOpinion).toBe(state.publicOpinion - 2);
+      expect(after.publicOpinion).toBe(state.publicOpinion + 4);
       expect(await prisma.inboxMessage.count({ where: { careerId, teamId: "lal", type: "facility" } })).toBe(2);
       await expect(page.getByTestId("facility-progress").getByText(/Emprunts en cours/)).toBeVisible();
     });

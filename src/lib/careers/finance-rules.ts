@@ -9,6 +9,7 @@
 // taxe de luxe et la part des propriétaires en fin de saison.
 
 import { nightStarFactor } from "./attendance-rules";
+import { NBA_FACILITIES, levelFromStars } from "@/lib/mock-data/nba-facilities";
 import { ARENA_WORKS_FILL_PENALTY } from "./facility-projects-rules";
 
 export const GAMES_PER_SEASON: Record<string, number> = { nba: 82, wnba: 44 };
@@ -238,8 +239,18 @@ function seededVariance(seed: string, spread: number): number {
 // plus), avec une variation par équipe pour éviter que toutes les franchises
 // démarrent avec une barre identique.
 export function initialFacilityLevel(marketAppeal: number, seed: string): number {
+  // Équipes NBA : qualité réelle du centre d'entraînement (nba-facilities.ts).
+  const real = NBA_FACILITIES[seed];
+  if (real) return clampFacilityLevel(levelFromStars(real.training));
   const base = 30 + (Math.max(0, Math.min(99, marketAppeal)) / 99) * 40; // 30-70
   return clampFacilityLevel(Math.round(base + seededVariance(`${seed}-facilities`, 15)));
+}
+
+// Niveau de départ de la salle : réel pour la NBA (classement ESPN des
+// salles, voir nba-facilities.ts), sinon neutre.
+export function initialArenaLevel(teamId: string): number {
+  const real = NBA_FACILITIES[teamId];
+  return real ? clampFacilityLevel(levelFromStars(real.arena)) : 50;
 }
 
 export function initialTrainingStaffLevel(marketAppeal: number, seed: string): number {
