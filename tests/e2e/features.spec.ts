@@ -186,6 +186,41 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       await page.screenshot({ path: process.env.TRADE_SHOT ?? "test-results/trade-center.png", fullPage: true });
     });
 
+    await test.step("offre reçue : détail, avis de l'adjoint, réactions fans/direction", async () => {
+      // Boston propose un joueur au salaire proche contre le joueur le plus populaire des Lakers.
+      const mine = await prisma.contract.findMany({ where: { careerId, teamId: "lal", contractType: "standard" } });
+      const states = await prisma.playerState.findMany({ where: { careerId, playerId: { in: mine.map((c) => c.playerId) } } });
+      const fav = [...states].sort((a, b) => b.renown - a.renown)[0];
+      const favContract = mine.find((c) => c.playerId === fav.playerId)!;
+      const theirs = await prisma.contract.findMany({ where: { careerId, teamId: "bos", contractType: "standard" } });
+      const match = [...theirs].sort((a, b) => Math.abs(a.salary - favContract.salary) - Math.abs(b.salary - favContract.salary))[0];
+      await prisma.tradeOffer.create({
+        data: {
+          careerId,
+          fromTeamId: "bos",
+          toTeamId: "lal",
+          items: { create: [{ playerId: match.playerId, side: "from" }, { playerId: fav.playerId, side: "to" }] },
+        },
+      });
+      const opinionBefore = (await prisma.teamState.findFirstOrThrow({ where: { careerId, teamId: "lal" } })).publicOpinion;
+      await expectPageOk(page, "/trades");
+      const offer = page.getByTestId("received-offer").first();
+      await expect(offer.getByTestId("offer-detail")).toBeVisible();
+      await expect(offer.getByTestId("offer-player")).toHaveCount(2);
+      await expect(offer.getByTestId("offer-review")).toBeVisible();
+      await expect(offer.getByTestId("offer-verdict")).toBeVisible();
+      if (process.env.OFFER_SHOT) await offer.screenshot({ path: process.env.OFFER_SHOT });
+      await offer.getByRole("button", { name: "Accepter" }).click();
+      await expect(page.getByTestId("received-offer")).toHaveCount(0, { timeout: 30_000 });
+      const reaction = await prisma.inboxMessage.findFirst({ where: { careerId, teamId: "lal", type: "trade_reaction" } });
+      expect(reaction?.body).toContain("Les fans");
+      expect(reaction?.body).toContain("La direction");
+      const opinionAfter = (await prisma.teamState.findFirstOrThrow({ where: { careerId, teamId: "lal" } })).publicOpinion;
+      expect(opinionAfter).toBeLessThan(opinionBefore); // le chouchou est parti
+      await expectPageOk(page, "/inbox");
+      await expect(page.getByText(/Réactions à l'échange/).first()).toBeVisible();
+    });
+
     await test.step("négociation de prolongation jusqu'à la signature", async () => {
       // Un joueur sans exigence de star (renommée < 70), en dernière année.
       const contracts = await prisma.contract.findMany({

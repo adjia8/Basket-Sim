@@ -174,3 +174,65 @@ test("centre des transferts : jauge d'intérêt et plus petit ajout suffisant", 
   const with2 = evaluateTradeForAi({ ...base, received: [...received, pick2.asset], given }).accept;
   assert.equal(best!.id, with2 ? "pick:2" : "pick:1");
 });
+
+import { assistantTradeReview, tradeReactions, type ReviewAsset } from "../../src/lib/careers/trade-review-rules";
+
+const rp = (id: string, overall: number, age: number, extra: Partial<Extract<ReviewAsset, { kind: "player" }>> = {}): ReviewAsset => ({
+  kind: "player",
+  id,
+  name: id,
+  position: "SF",
+  overall,
+  age,
+  salary: 20_000_000,
+  standard: true,
+  yearsRemaining: 2,
+  renown: 50,
+  ...extra,
+});
+
+test("avis de l'adjoint : star reçue contre remplaçants = plus-value", () => {
+  const base = { outlook: "middle" as const, picksPerRound: 30, payrollBefore: 150_000_000, taxLine: 200_000_000, roster: [], skill: 90, seed: "x" };
+  const good = assistantTradeReview({ ...base, incoming: [rp("star", 88, 27)], outgoing: [rp("a", 74, 28), rp("b", 72, 29)] });
+  assert.ok(["gain", "big_gain"].includes(good.verdict), good.verdict);
+  assert.ok(good.points.some((p) => p.kind === "upgrade"));
+  const bad = assistantTradeReview({ ...base, incoming: [rp("a", 72, 31)], outgoing: [rp("star", 88, 25)] });
+  assert.ok(["loss", "big_loss"].includes(bad.verdict), bad.verdict);
+  assert.ok(bad.points.some((p) => p.kind === "downgrade"));
+  // Adjoint médiocre : moins d'arguments relevés.
+  const weak = assistantTradeReview({ ...base, skill: 10, incoming: [rp("a", 72, 31)], outgoing: [rp("star", 88, 25, { renown: 90 })] });
+  assert.equal(weak.confidence, "low");
+  assert.ok(weak.points.length <= 2);
+});
+
+test("avis de l'adjoint : poste laissé vide et taxe de luxe", () => {
+  const review = assistantTradeReview({
+    outlook: "middle",
+    picksPerRound: 30,
+    payrollBefore: 195_000_000,
+    taxLine: 200_000_000,
+    roster: [
+      { id: "c1", position: "C", overall: 80 },
+      { id: "pg", position: "PG", overall: 78 },
+    ],
+    skill: 99,
+    incoming: [rp("w", 82, 27, { salary: 35_000_000 })],
+    outgoing: [rp("c1", 80, 27, { position: "C", salary: 25_000_000 })],
+  });
+  assert.ok(review.points.some((p) => p.kind === "positionGap" && p.position === "C"));
+  assert.ok(review.points.some((p) => p.kind === "taxCrossed"));
+});
+
+test("réactions : chouchou cédé = fans mécontents ; star reçue = fans ravis", () => {
+  const base = { outlook: "middle" as const, picksPerRound: 30, payrollBefore: 150_000_000, taxLine: 200_000_000 };
+  const sad = tradeReactions({ ...base, incoming: [rp("x", 74, 26)], outgoing: [rp("fav", 82, 29, { renown: 90 })] });
+  assert.ok(sad.fans.delta < 0 && ["upset", "furious"].includes(sad.fans.mood));
+  assert.equal(sad.fans.favourite, "fav");
+  assert.ok(sad.board.delta < 0);
+  const happy = tradeReactions({ ...base, incoming: [rp("star", 90, 27, { renown: 92 })], outgoing: [rp("a", 75, 28), rp("b", 74, 30)] });
+  assert.ok(happy.fans.delta > 0 && ["pleased", "thrilled"].includes(happy.fans.mood));
+  assert.equal(happy.fans.star, "star");
+  // Passage au-dessus de la taxe : la direction tique.
+  const tax = tradeReactions({ ...base, payrollBefore: 198_000_000, incoming: [rp("s", 80, 27, { salary: 40_000_000 })], outgoing: [rp("t", 80, 27, { salary: 20_000_000 })] });
+  assert.equal(tax.board.reason, "tax");
+});

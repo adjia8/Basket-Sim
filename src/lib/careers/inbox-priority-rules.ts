@@ -24,6 +24,7 @@ const CATEGORY_BY_TYPE: Record<string, InboxCategory> = {
   league_injury: "medical",
   trade_request: "transfers",
   trade_offer: "transfers",
+  trade_reaction: "transfers",
   free_agent: "transfers",
   free_agency: "transfers",
   contract: "transfers",

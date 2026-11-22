@@ -24,6 +24,8 @@ import { getTranslator, type Translator } from "@/lib/i18n/translate";
 import type { Locale } from "@/lib/i18n/locale";
 import { analyzeTrade, type TradeSelection, type TradeSide } from "@/lib/data-access/trade-analysis";
 import { formatSalary } from "@/lib/utils";
+import { applyTradeReactions } from "@/lib/data-access/trade-review";
+import type { DictionaryKey } from "@/lib/i18n/dictionary";
 
 export interface TradeFormState {
   error?: string;
@@ -178,13 +180,33 @@ export async function proposeTrade(
       myPlayerIds,
       locale
     );
+    // Réactions des fans et de la direction (opinion, confiance, message).
+    const reactions = await applyTradeReactions({
+      careerId: membership.careerId,
+      season: membership.career.season,
+      leagueId: membership.career.leagueId,
+      teamId: membership.teamId,
+      incomingPlayerIds: theirPlayerIds,
+      outgoingPlayerIds: myPlayerIds,
+      incomingPickIds: theirPickIds,
+      outgoingPickIds: myPickIds,
+      t,
+    });
 
     revalidatePath("/");
+    revalidatePath("/inbox");
     revalidatePath(`/teams/${membership.teamId}`);
     revalidatePath(`/teams/${opponentTeamId}`);
     revalidatePath("/draft");
 
-    return { success: t("tradeAction.accepted") };
+    const suffix = reactions
+      ? " " +
+        t("tradeReaction.successSuffix", {
+          fans: t(`tradeReaction.mood.${reactions.fans.mood}` as DictionaryKey),
+          board: t(`tradeReaction.mood.${reactions.board.mood}` as DictionaryKey),
+        })
+      : "";
+    return { success: t("tradeAction.accepted") + suffix };
   }
 
   // Adversaire humain : l'échange doit être confirmé par lui, pas exécuté immédiatement.
@@ -375,6 +397,26 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
     toPlayerIds,
     await getLocale()
   );
+  // Réactions des fans et de la direction, pour chaque équipe humaine.
+  const { t } = await getTranslator();
+  const base = { careerId: membership.careerId, season: membership.career.season, leagueId: membership.career.leagueId, t };
+  await applyTradeReactions({
+    ...base,
+    teamId: offer.toTeamId,
+    incomingPlayerIds: fromPlayerIds,
+    outgoingPlayerIds: toPlayerIds,
+    incomingPickIds: fromPickIds,
+    outgoingPickIds: toPickIds,
+  });
+  await applyTradeReactions({
+    ...base,
+    teamId: offer.fromTeamId,
+    incomingPlayerIds: toPlayerIds,
+    outgoingPlayerIds: fromPlayerIds,
+    incomingPickIds: toPickIds,
+    outgoingPickIds: fromPickIds,
+  });
+  revalidatePath("/inbox");
 
   revalidatePath("/");
   revalidatePath(`/teams/${offer.fromTeamId}`);

@@ -41,6 +41,7 @@ import * as loadplan from "./dict/loadplan";
 import * as finance from "./dict/finance";
 import * as injuries from "./dict/injuries";
 import * as report from "./dict/report";
+import * as tradeReview from "./dict/tradeReview";
 
 // Chaque module dict/<zone>.ts exporte { fr, en } avec les MÊMES clés (voir
 // common.ts pour le patron : un tableau `keys as const`, puis deux
@@ -92,6 +93,7 @@ const sources = [
   finance,
   injuries,
   report,
+  tradeReview,
 ];
 
 export const dictionaries = {
@@ -139,6 +141,7 @@ export const dictionaries = {
     ...finance.fr,
     ...injuries.fr,
     ...report.fr,
+    ...tradeReview.fr,
   },
   en: {
     ...common.en,
@@ -184,6 +187,7 @@ export const dictionaries = {
     ...finance.en,
     ...injuries.en,
     ...report.en,
+    ...tradeReview.en,
   },
 };
 

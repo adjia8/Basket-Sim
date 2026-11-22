@@ -14,6 +14,8 @@ import { getCareerExpectations } from "@/lib/data-access/expectations";
 import { teamOutlook } from "@/lib/careers/trade-rules";
 import { winPctForStandings } from "@/lib/careers/player-demands";
 import type { DictionaryKey } from "@/lib/i18n/dictionary";
+import { getOfferDetails } from "@/lib/data-access/trade-review";
+import { TradeOfferDetail } from "@/components/trades/TradeOfferDetail";
 
 const OUTLOOK_TONE: Record<string, string> = {
   rebuild: "bg-info/15 text-info",
@@ -57,6 +59,15 @@ export default async function TradesPage() {
     prisma.draftPick.findMany({ where: { id: { in: pickIds } }, include: { originalTeam: true } }),
     Promise.all(teamIds.map((id) => getTeamById(id))),
   ]);
+  // Détail (âge, poste, stats, contrat) et avis de l'adjoint sur les offres reçues.
+  const details = await getOfferDetails(
+    membership.careerId,
+    membership.teamId,
+    membership.leagueId,
+    membership.season,
+    allOffers,
+    (o) => o.toTeamId === membership.teamId
+  );
   const playerById = new Map(players.map((p) => [p.id, p]));
   const pickById = new Map(picks.map((p) => [p.id, p]));
   const teamById = new Map<string, Team>(
@@ -160,7 +171,7 @@ export default async function TradesPage() {
             {received.map((offer) => {
               const fromTeam = teamById.get(offer.fromTeamId);
               return (
-                <div key={offer.id} className="card p-4">
+                <div key={offer.id} className="card p-4" data-testid="received-offer">
                   <p className="text-sm">
                     <span className="font-medium">
                       {fromTeam ? (
@@ -174,6 +185,7 @@ export default async function TradesPage() {
                     {t("tradeOffers.proposesVerb")} <strong>{assetLabels(t, offer, "from")}</strong>{" "}
                     {t("tradeOffers.forVerb")} <strong>{assetLabels(t, offer, "to")}</strong>
                   </p>
+                  {details.get(offer.id) && <TradeOfferDetail detail={details.get(offer.id)!} t={t} locale={locale} />}
                   <div className="mt-3 flex gap-2">
                     {!tradeDeadlinePassed && (
                       <form action={respondToTradeOffer}>
@@ -227,6 +239,7 @@ export default async function TradesPage() {
                     : <strong>{assetLabels(t, offer, "from")}</strong> {t("tradeOffers.forVerb")}{" "}
                     <strong>{assetLabels(t, offer, "to")}</strong>
                   </p>
+                  {details.get(offer.id) && <TradeOfferDetail detail={details.get(offer.id)!} t={t} locale={locale} />}
                   <form action={cancelTradeOffer} className="mt-3">
                     <input type="hidden" name="tradeOfferId" value={offer.id} />
                     <button
