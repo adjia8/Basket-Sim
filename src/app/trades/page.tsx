@@ -11,7 +11,7 @@ import { teamFullName } from "@/lib/utils";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { getStandings } from "@/lib/data-access/standings";
 import { getCareerExpectations } from "@/lib/data-access/expectations";
-import { teamOutlook } from "@/lib/careers/trade-rules";
+import { NEGOTIATION_MAX_COUNTERS, teamOutlook } from "@/lib/careers/trade-rules";
 import { winPctForStandings } from "@/lib/careers/player-demands";
 import type { DictionaryKey } from "@/lib/i18n/dictionary";
 import { getOfferDetails } from "@/lib/data-access/trade-review";
@@ -186,7 +186,12 @@ export default async function TradesPage() {
                     {t("tradeOffers.forVerb")} <strong>{assetLabels(t, offer, "to")}</strong>
                   </p>
                   {details.get(offer.id) && <TradeOfferDetail detail={details.get(offer.id)!} t={t} locale={locale} />}
-                  <div className="mt-3 flex gap-2">
+                  {offer.counterAttempts > 0 && (
+                    <p className="mt-2 text-xs text-warn">
+                      {t("tradeOffers.counterAttempts", { n: offer.counterAttempts, max: NEGOTIATION_MAX_COUNTERS })}
+                    </p>
+                  )}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
                     {!tradeDeadlinePassed && (
                       <form action={respondToTradeOffer}>
                         <input type="hidden" name="tradeOfferId" value={offer.id} />
@@ -198,6 +203,16 @@ export default async function TradesPage() {
                           {t("tradeOffers.accept")}
                         </button>
                       </form>
+                    )}
+                    {!tradeDeadlinePassed && (
+                      <Link
+                        href={`/teams/${offer.fromTeamId}?tab=trade&counter=${offer.id}`}
+                        title={t("tradeOffers.negotiateHint")}
+                        className="rounded-md border border-accent/50 px-4 py-1.5 text-xs font-medium text-accent-text transition hover:bg-accent/10"
+                        data-testid="negotiate-offer"
+                      >
+                        {t("tradeOffers.negotiate")}
+                      </Link>
                     )}
                     <form action={respondToTradeOffer}>
                       <input type="hidden" name="tradeOfferId" value={offer.id} />

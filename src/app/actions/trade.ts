@@ -17,6 +17,7 @@ import {
 } from "@/lib/careers/roster-rules";
 import {
   capSalary,
+  NEGOTIATION_MAX_COUNTERS,
   rosterMoveAllowed,
 } from "@/lib/careers/trade-rules";
 import { ALT_CONTRACT_SLOTS_PER_TEAM } from "@/lib/careers/contract-type-rules";
@@ -30,6 +31,7 @@ import type { DictionaryKey } from "@/lib/i18n/dictionary";
 export interface TradeFormState {
   error?: string;
   success?: string;
+  negotiationOver?: boolean; // l'équipe a rompu la négociation (offre retirée)
 }
 
 function selectionFrom(formData: FormData): TradeSelection {
@@ -123,6 +125,13 @@ export async function proposeTrade(
 
   const opponentTeam = await prisma.team.findUniqueOrThrow({ where: { id: opponentTeamId } });
   const opponentManager = await getMembershipForTeam(membership.careerId, opponentTeamId);
+  // Contre-proposition à une offre reçue de cette équipe (négociation).
+  const counterOfferId = String(formData.get("counterOfferId") ?? "");
+  const counter = counterOfferId
+    ? await prisma.tradeOffer.findFirst({
+        where: { id: counterOfferId, careerId: membership.careerId, toTeamId: membership.teamId, fromTeamId: opponentTeamId, status: "pending" },
+      })
+    : null;
   if (!opponentManager) {
     // Adversaire IA : il juge l'échange selon SA situation (voir
     // evaluateTradeForAi) — reconstruction, milieu de tableau ou prétendant.
@@ -137,10 +146,24 @@ export async function proposeTrade(
             : decision.reason === "salary"
               ? "tradeAction.aiRefusesSalary"
               : "tradeAction.aiRefuses";
+      if (counter) {
+        // Chaque contre-proposition refusée entame la patience de l'équipe ;
+        // à bout, elle retire son offre.
+        const attempts = counter.counterAttempts + 1;
+        if (attempts >= NEGOTIATION_MAX_COUNTERS) {
+          await prisma.tradeOffer.update({ where: { id: counter.id }, data: { status: "cancelled", counterAttempts: attempts } });
+          revalidatePath("/trades");
+          return { error: t("tradeAction.negotiationsBroken", { team }), negotiationOver: true };
+        }
+        await prisma.tradeOffer.update({ where: { id: counter.id }, data: { counterAttempts: attempts } });
+        return { error: `${t(key, { team })} ${t("tradeAction.counterAttemptsLeft", { n: NEGOTIATION_MAX_COUNTERS - attempts })}` };
+      }
       return { error: t(key, { team }) };
     }
 
     await prisma.$transaction([
+      // L'offre d'origine est remplacée par l'accord négocié.
+      ...(counter ? [prisma.tradeOffer.update({ where: { id: counter.id }, data: { status: "countered" } })] : []),
       ...myPlayerIds.map((playerId) =>
         prisma.contract.update({
           where: { careerId_playerId: { careerId: membership.careerId, playerId } },
@@ -198,6 +221,7 @@ export async function proposeTrade(
     revalidatePath(`/teams/${membership.teamId}`);
     revalidatePath(`/teams/${opponentTeamId}`);
     revalidatePath("/draft");
+    revalidatePath("/trades");
 
     const suffix = reactions
       ? " " +
@@ -226,6 +250,7 @@ export async function proposeTrade(
     },
   });
 
+  if (counter) await prisma.tradeOffer.update({ where: { id: counter.id }, data: { status: "countered" } });
   revalidatePath("/trades");
   return { success: t("tradeAction.sentAwaitingResponse", { email: opponentManager.email }) };
 }

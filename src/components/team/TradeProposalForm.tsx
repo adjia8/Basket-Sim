@@ -70,7 +70,12 @@ export function TradeProposalForm({
   opponentTeamId,
   locale,
   labels,
+  initialSelection,
+  counter,
 }: {
+  initialSelection?: { myPlayerIds: string[]; theirPlayerIds: string[]; myPickIds: string[]; theirPickIds: string[] };
+  // Négociation d'une offre reçue (contre-proposition).
+  counter?: { offerId: string; title: string; hint: string; button: string; backLabel: string };
   myRoster: RosterPlayer[];
   theirRoster: RosterPlayer[];
   myTeamId: string;
@@ -82,10 +87,10 @@ export function TradeProposalForm({
 }) {
   const [state, action, pending] = useActionState(proposeTrade, undefined);
   const [selected, setSelected] = useState<Record<string, Set<string>>>({
-    myPlayerIds: new Set(),
-    theirPlayerIds: new Set(),
-    myPickIds: new Set(),
-    theirPickIds: new Set(),
+    myPlayerIds: new Set(initialSelection?.myPlayerIds),
+    theirPlayerIds: new Set(initialSelection?.theirPlayerIds),
+    myPickIds: new Set(initialSelection?.myPickIds),
+    theirPickIds: new Set(initialSelection?.theirPickIds),
   });
   const [preview, setPreview] = useState<TradePreview | null>(null);
   const [loading, setLoading] = useState(false);
@@ -131,10 +136,16 @@ export function TradeProposalForm({
 
   return (
     <div className="mt-8 card p-4" data-testid="trade-center">
-      <h2 className="text-lg font-semibold">{labels.title}</h2>
+      <h2 className="text-lg font-semibold">{counter ? counter.title : labels.title}</h2>
+      {counter && (
+        <p className="mt-2 rounded border border-info/40 bg-info/5 px-3 py-2 text-sm text-soft" data-testid="counter-banner">
+          {counter.hint}
+        </p>
+      )}
 
       <form action={action} className="mt-4">
         <input type="hidden" name="opponentTeamId" value={opponentTeamId} />
+        {counter && !state?.negotiationOver && <input type="hidden" name="counterOfferId" value={counter.offerId} />}
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_18rem]">
           <div className="space-y-6">
@@ -238,13 +249,18 @@ export function TradeProposalForm({
 
         {state?.error && <p className="mt-4 text-sm text-bad">{state.error}</p>}
         {state?.success && <p className="mt-4 text-sm text-good">{state.success}</p>}
+        {counter && (state?.success || state?.negotiationOver) && (
+          <Link href="/trades" className="mt-2 inline-block text-sm text-accent-text hover:underline" data-testid="counter-back">
+            {counter.backLabel}
+          </Link>
+        )}
 
         <button
           type="submit"
           disabled={pending}
           className="mt-4 rounded-md bg-accent px-6 py-2 text-sm font-medium text-accent-fg transition hover:bg-accent-hover disabled:opacity-50"
         >
-          {pending ? labels.proposing : labels.proposeButton}
+          {pending ? labels.proposing : counter && !state?.negotiationOver ? counter.button : labels.proposeButton}
         </button>
       </form>
     </div>

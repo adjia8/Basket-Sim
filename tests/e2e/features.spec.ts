@@ -210,6 +210,26 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       await expect(offer.getByTestId("offer-review")).toBeVisible();
       await expect(offer.getByTestId("offer-verdict")).toBeVisible();
       if (process.env.OFFER_SHOT) await offer.screenshot({ path: process.env.OFFER_SHOT });
+
+      // Négociation : l'offre est pré-remplie ; une contre-proposition
+      // déséquilibrée (mon plus mauvais joueur à la place du leur) est refusée
+      // et entame la patience de Boston.
+      await offer.getByTestId("negotiate-offer").click();
+      await page.waitForURL(/\/teams\/bos\?tab=trade&counter=/);
+      const center = page.getByTestId("trade-center");
+      await expect(center.getByTestId("counter-banner")).toBeVisible();
+      await expect(center.locator(`input[name="myPlayerIds"][value="${fav.playerId}"]`)).toBeChecked();
+      await expect(center.locator(`input[name="theirPlayerIds"][value="${match.playerId}"]`)).toBeChecked();
+      // Trop gourmand : on réclame en plus leurs trois premiers tours de draft.
+      const bosFirsts = await prisma.draftPick.findMany({ where: { careerId, teamId: "bos", round: 1, status: "pending" } });
+      for (const pk of bosFirsts) await center.locator(`input[name="theirPickIds"][value="${pk.id}"]`).check();
+      await expect(center.getByTestId("trade-interest")).toBeVisible({ timeout: 30_000 });
+      if (process.env.COUNTER_SHOT) await center.screenshot({ path: process.env.COUNTER_SHOT });
+      await center.getByRole("button", { name: "Faire la contre-proposition" }).click();
+      await expect(center.getByText(/Encore 2 contre-proposition/)).toBeVisible({ timeout: 30_000 });
+      await expectPageOk(page, "/trades");
+      await expect(offer.getByText(/Contre-propositions refusées : 1\/3/)).toBeVisible();
+
       await offer.getByRole("button", { name: "Accepter" }).click();
       await expect(page.getByTestId("received-offer")).toHaveCount(0, { timeout: 30_000 });
       const reaction = await prisma.inboxMessage.findFirst({ where: { careerId, teamId: "lal", type: "trade_reaction" } });

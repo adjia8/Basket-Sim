@@ -52,6 +52,10 @@ export function draftPickTradeValue(
 // absurdes (ex: un joueur de banc contre une superstar).
 export const TRADE_ACCEPT_TOLERANCE = 0.9;
 
+// Négociation d'une offre reçue : contre-propositions refusées tolérées
+// avant que l'équipe qui a fait l'offre ne rompe les discussions.
+export const NEGOTIATION_MAX_COUNTERS = 3;
+
 // Date limite des échanges : pas de vraie horloge murale dans ce jeu (le temps
 // n'avance qu'au fil des matchs simulés), donc calée sur la progression de la
 // saison en cours plutôt que sur une date — comme la vraie date limite NBA,

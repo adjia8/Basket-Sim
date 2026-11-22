@@ -75,6 +75,15 @@ export const keys = [
   "tradeReaction.mood.neutral",
   "tradeReaction.mood.concerned",
   "tradeReaction.mood.angry",
+  "tradeOffers.negotiate",
+  "tradeOffers.negotiateHint",
+  "tradeOffers.counterAttempts",
+  "trade.counterTitle",
+  "trade.counterHint",
+  "trade.counterButton",
+  "trade.counterBack",
+  "tradeAction.negotiationsBroken",
+  "tradeAction.counterAttemptsLeft",
 ] as const;
 
 export type TradeReviewKey = (typeof keys)[number];
@@ -156,6 +165,15 @@ export const fr: Record<TradeReviewKey, string> = {
   "tradeReaction.mood.neutral": "neutre",
   "tradeReaction.mood.concerned": "inquiète",
   "tradeReaction.mood.angry": "mécontente",
+  "tradeOffers.negotiate": "Négocier",
+  "tradeOffers.negotiateHint": "Modifier l'offre et faire une contre-proposition",
+  "tradeOffers.counterAttempts": "Contre-propositions refusées : {n}/{max}",
+  "trade.counterTitle": "Contre-proposition à l'offre de {team}",
+  "trade.counterHint": "L'offre reçue est pré-remplie : retire ou ajoute des éléments, la jauge d'intérêt se met à jour. Attention, sa patience est limitée ({left} essai(s) restant(s)) : au-delà, l'offre est retirée.",
+  "trade.counterButton": "Faire la contre-proposition",
+  "trade.counterBack": "Revenir aux offres",
+  "tradeAction.negotiationsBroken": "{team} rompt les négociations et retire son offre.",
+  "tradeAction.counterAttemptsLeft": "Encore {n} contre-proposition(s) possible(s) avant qu'ils ne retirent leur offre.",
 };
 
 export const en: Record<TradeReviewKey, string> = {
@@ -235,4 +253,13 @@ export const en: Record<TradeReviewKey, string> = {
   "tradeReaction.mood.neutral": "neutral",
   "tradeReaction.mood.concerned": "concerned",
   "tradeReaction.mood.angry": "unhappy",
+  "tradeOffers.negotiate": "Negotiate",
+  "tradeOffers.negotiateHint": "Change the offer and make a counter-proposal",
+  "tradeOffers.counterAttempts": "Counter-proposals turned down: {n}/{max}",
+  "trade.counterTitle": "Counter-proposal to {team}'s offer",
+  "trade.counterHint": "The offer you received is pre-filled: remove or add items, the interest meter updates. Careful, their patience is limited ({left} attempt(s) left): beyond that, the offer is withdrawn.",
+  "trade.counterButton": "Send counter-proposal",
+  "trade.counterBack": "Back to offers",
+  "tradeAction.negotiationsBroken": "{team} break off negotiations and withdraw their offer.",
+  "tradeAction.counterAttemptsLeft": "{n} more counter-proposal(s) before they withdraw their offer.",
 };

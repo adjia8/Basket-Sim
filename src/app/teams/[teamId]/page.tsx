@@ -37,6 +37,7 @@ import { getMedicalReport } from "@/lib/data-access/medical";
 import { NBA_INITIAL_DEAD_CAP } from "@/lib/mock-data/nba-dead-cap";
 import { MAX_ROSTER_SIZE, MIN_ROSTER_SIZE } from "@/lib/careers/roster-rules";
 import { NBA_SECOND_APRON, NBA_TAX_LINE, payrollWarningLine } from "@/lib/careers/cap-rules";
+import { NEGOTIATION_MAX_COUNTERS } from "@/lib/careers/trade-rules";
 import { getPlayerDemandStates, type PlayerDemandState } from "@/lib/data-access/trade-requests";
 import { mergeRotationOrder, parseRotationOrder } from "@/lib/careers/rotation-rules";
 import { getTranslator, type Translator } from "@/lib/i18n/translate";
@@ -77,11 +78,11 @@ export default async function TeamRosterPage({
   searchParams,
 }: {
   params: Promise<{ teamId: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; counter?: string }>;
 }) {
   const membership = await getCurrentMembership();
   const { teamId } = await params;
-  const { tab: requestedTab } = await searchParams;
+  const { tab: requestedTab, counter: counterOfferId } = await searchParams;
   const team = await getTeamById(teamId);
   if (!team) notFound();
   const { t, locale } = await getTranslator();
@@ -234,6 +235,27 @@ export default async function TeamRosterPage({
   ];
   const activeTab = tabs.some((tab) => tab.id === requestedTab) ? requestedTab! : tabs[0].id;
   // Rapport d'équipe : points forts / faibles classés dans la ligue (voir team-report.ts).
+  // Négociation : offre reçue de cette équipe, pré-remplie dans le centre
+  // des transferts (mes éléments = côté « to », les leurs = côté « from »).
+  const counterRow =
+    activeTab === "trade" && counterOfferId && isOpponentInMyLeague
+      ? await prisma.tradeOffer.findFirst({
+          where: { id: counterOfferId, careerId: membership.careerId, fromTeamId: team.id, toTeamId: membership.teamId, status: "pending" },
+          include: { items: true },
+        })
+      : null;
+  const counterOffer = counterRow
+    ? {
+        id: counterRow.id,
+        attempts: counterRow.counterAttempts,
+        selection: {
+          myPlayerIds: counterRow.items.filter((i) => i.side === "to" && i.playerId).map((i) => i.playerId!),
+          theirPlayerIds: counterRow.items.filter((i) => i.side === "from" && i.playerId).map((i) => i.playerId!),
+          myPickIds: counterRow.items.filter((i) => i.side === "to" && i.draftPickId).map((i) => i.draftPickId!),
+          theirPickIds: counterRow.items.filter((i) => i.side === "from" && i.draftPickId).map((i) => i.draftPickId!),
+        },
+      }
+    : null;
   const teamReport = activeTab === "report" ? await getTeamReport(membership.careerId, team.leagueId, membership.season, team.id) : null;
   // Suggestion de l'entraîneur adjoint (voir rotation-advice-rules.ts) : le
   // meilleur adjoint de l'équipe, sa compétence pèse sur la qualité du conseil.
@@ -601,6 +623,19 @@ export default async function TeamRosterPage({
 
       {activeTab === "trade" && isOpponentInMyLeague && !tradeDeadlinePassed && (
         <TradeProposalForm
+          key={counterOffer?.id ?? "new"}
+          initialSelection={counterOffer?.selection}
+          counter={
+            counterOffer
+              ? {
+                  offerId: counterOffer.id,
+                  title: t("trade.counterTitle", { team: teamFullName(team) }),
+                  hint: t("trade.counterHint", { left: NEGOTIATION_MAX_COUNTERS - counterOffer.attempts }),
+                  button: t("trade.counterButton"),
+                  backLabel: t("trade.counterBack"),
+                }
+              : undefined
+          }
           myRoster={myRosterWithContracts}
           theirRoster={rosterWithContracts}
           myTeamId={membership.teamId}

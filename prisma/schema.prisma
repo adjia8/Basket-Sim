@@ -596,8 +596,9 @@ model TradeOffer {
   career     Career           @relation(fields: [careerId], references: [id], onDelete: Cascade)
   fromTeamId String
   toTeamId   String
-  status     String           @default("pending") // pending | accepted | rejected | cancelled
+  status     String           @default("pending") // pending | accepted | rejected | cancelled | countered
   createdAt  DateTime         @default(now())
+  counterAttempts Int         @default(0) // contre-propositions refusées (négociation) — voir proposeTrade
   items      TradeOfferItem[]
 
   @@index([careerId])
