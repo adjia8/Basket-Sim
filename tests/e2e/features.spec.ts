@@ -150,6 +150,17 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       });
     });
 
+    await test.step("rotation : suggestion de l'entraîneur adjoint", async () => {
+      await expectPageOk(page, "/teams/lal?tab=rotation");
+      const advice = page.getByTestId("rotation-advice");
+      await expect(advice).toBeVisible();
+      await advice.getByRole("button", { name: "Voir la suggestion" }).click();
+      await expect(advice.getByText("Titulaire · meneur")).toBeVisible();
+      await advice.getByTestId("apply-advice").click();
+      await expect(advice.getByText(/Appliquée/)).toBeVisible();
+      if (process.env.ADVICE_SHOT) await advice.screenshot({ path: process.env.ADVICE_SHOT });
+    });
+
     await test.step("centre des transferts : partenaires, analyse en direct, intérêt de l'IA", async () => {
       await expectPageOk(page, "/trades");
       await expect(page.getByTestId("trade-partners")).toBeVisible();

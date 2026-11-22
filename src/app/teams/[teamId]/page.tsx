@@ -2,6 +2,7 @@ import Link from "next/link";
 import { TrainingCalendarPanel, type CalendarPanelDay } from "@/components/team/TrainingCalendarPanel";
 import { CALENDAR_TEMPLATES, SESSION_TYPES, parseCalendar, planDays } from "@/lib/careers/training-calendar-rules";
 import { weeksCovering } from "@/lib/careers/month-grid";
+import { rotationAdvice } from "@/lib/careers/rotation-advice-rules";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { getTacticsReport } from "@/lib/data-access/tactics";
 import { TacticsPanel } from "@/components/team/TacticsPanel";
@@ -229,6 +230,40 @@ export default async function TeamRosterPage({
     ...(isOpponentInMyLeague ? [{ id: "trade", label: t("team.tab.trade") }] : []),
   ];
   const activeTab = tabs.some((tab) => tab.id === requestedTab) ? requestedTab! : tabs[0].id;
+  // Suggestion de l'entraîneur adjoint (voir rotation-advice-rules.ts) : le
+  // meilleur adjoint de l'équipe, sa compétence pèse sur la qualité du conseil.
+  const rotationAdviser =
+    isMyTeam && activeTab === "rotation"
+      ? await prisma.staffMember.findFirst({
+          where: { careerId: membership.careerId, teamId: team.id, role: "assistant_coach" },
+          orderBy: { rating: "desc" },
+          select: { firstName: true, lastName: true, rating: true },
+        })
+      : null;
+  const rotationSuggestion =
+    isMyTeam && activeTab === "rotation"
+      ? {
+          adviser: rotationAdviser ? `${rotationAdviser.firstName} ${rotationAdviser.lastName}` : null,
+          skill: rotationAdviser?.rating ?? 40,
+          ...rotationAdvice(
+            rosterWithContracts.map((p) => ({
+              id: p.id,
+              position: p.position,
+              overall: p.overallRating,
+              fatigue: p.fatigue,
+              wear: p.wear ?? 0,
+              injured: p.injured,
+              injurySeverity: p.injurySeverity,
+              playingThroughInjury: p.playingThroughInjury,
+              ppg: p.ppg,
+              rpg: p.rpg,
+              apg: p.apg,
+            })),
+            rotationAdviser?.rating ?? 40,
+            `${membership.careerId}:${team.id}`
+          ),
+        }
+      : null;
   const medical = activeTab === "medical" ? await getMedicalReport(membership.careerId, team.id, team.leagueId) : null;
   if (activeTab === "staff") await ensureCareerStaff(membership.careerId, team.leagueId, membership.season);
   const teamStaff = activeTab === "staff" ? await getTeamStaff(membership.careerId, team.id) : null;
@@ -455,7 +490,7 @@ export default async function TeamRosterPage({
 
       {activeTab === "rotation" && (
         <div className="mt-6">
-          <RotationOrderForm teamId={team.id} initialOrder={rotationOrder} />
+          <RotationOrderForm teamId={team.id} initialOrder={rotationOrder} suggestion={rotationSuggestion} />
         </div>
       )}
 

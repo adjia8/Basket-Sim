@@ -5,6 +5,7 @@ import { setRotationOrder, type RotationOrderFormState } from "@/app/actions/rot
 import { ROTATION_SIZE } from "@/lib/simulation/mockEngine";
 import type { RotationOrderPlayer } from "@/lib/careers/rotation-rules";
 import { injuryBadge, type InjuryBadgeKind, type InjuryBadgeTone } from "@/lib/careers/injury-report-rules";
+import type { AdviceNote } from "@/lib/careers/rotation-advice-rules";
 import Link from "next/link";
 import { playerHref } from "@/lib/utils";
 import { EnergyRing } from "./EnergyRing";
@@ -15,7 +16,38 @@ const BADGE_TONE: Record<InjuryBadgeTone, string> = {
   green: "bg-good/15 text-good",
 };
 
+// Suggestion de l'entraîneur adjoint (voir rotation-advice-rules.ts).
+export interface RotationSuggestionView {
+  adviser: string | null;
+  skill: number;
+  order: string[];
+  notes: Record<string, AdviceNote>;
+  confidence: "high" | "medium" | "low";
+}
+
+export interface AdviceLabels {
+  show: string;
+  hide: string;
+  by: string; // « {name}, entraîneur adjoint (compétence {skill}) »
+  noAdviser: string;
+  confidence: Record<"high" | "medium" | "low", string>;
+  note: {
+    starter: string; // « Titulaire · {pos} »
+    offPosition: string;
+    sixth: string;
+    bench: string;
+    rest: string; // « Repos conseillé · énergie {energy} % »
+    wear: string; // « Minutes limitées · usure {wear} »
+    injured: string;
+    reserve: string;
+  };
+  positions: Record<string, string>;
+  apply: string;
+  applied: string;
+}
+
 export interface RotationOrderLabels {
+  advice: AdviceLabels;
   injury: Record<InjuryBadgeKind, string>; // « {games} » remplacé par le nombre de matchs
   description: string;
   activeHeading: string;
@@ -39,13 +71,17 @@ function roleLabel(index: number, labels: RotationOrderLabels): string {
 export function RotationOrderFormClient({
   teamId,
   initialOrder,
+  suggestion,
   labels,
 }: {
   teamId: string;
   initialOrder: RotationOrderPlayer[];
+  suggestion?: RotationSuggestionView | null;
   labels: RotationOrderLabels;
 }) {
   const [order, setOrder] = useState(initialOrder);
+  const [showAdvice, setShowAdvice] = useState(false);
+  const [applied, setApplied] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const orderRef = useRef(order);
   const itemRefs = useRef(new Map<string, HTMLLIElement>());
@@ -229,9 +265,99 @@ export function RotationOrderFormClient({
   const activePlayers = order.slice(0, ROTATION_SIZE);
   const reservePlayers = order.slice(ROTATION_SIZE);
 
+  const byId = new Map(order.map((p) => [p.id, p]));
+  const applySuggestion = () => {
+    if (!suggestion) return;
+    const suggested = suggestion.order.map((id) => byId.get(id)).filter((p): p is RotationOrderPlayer => !!p);
+    const rest = order.filter((p) => !suggestion.order.includes(p.id));
+    setOrder([...suggested, ...rest]);
+    setApplied(true);
+  };
+  const noteText = (id: string): string => {
+    const n = suggestion?.notes[id];
+    const a = labels.advice.note;
+    if (!n) return "";
+    switch (n.kind) {
+      case "starter":
+        return a.starter.replace("{pos}", labels.advice.positions[n.pos] ?? n.pos) + (n.offPosition ? ` ${a.offPosition}` : "");
+      case "sixth":
+        return a.sixth;
+      case "bench":
+        return a.bench;
+      case "rest":
+        return a.rest.replace("{energy}", String(n.energy));
+      case "wear":
+        return a.wear.replace("{wear}", String(n.wear));
+      case "injured":
+        return a.injured;
+      default:
+        return a.reserve;
+    }
+  };
+
   return (
     <div className="card p-4">
       <p className="text-xs text-muted">{labels.description}</p>
+
+      {suggestion && (
+        <div className="mt-3 rounded-lg border border-info/40 bg-info/5 p-3" data-testid="rotation-advice">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm">
+              <span className="font-semibold">💡 </span>
+              {suggestion.adviser
+                ? labels.advice.by.replace("{name}", suggestion.adviser).replace("{skill}", String(suggestion.skill))
+                : labels.advice.noAdviser}
+              <span className="ml-2 text-xs text-muted">{labels.advice.confidence[suggestion.confidence]}</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowAdvice((v) => !v)}
+              className="rounded-md border border-line px-3 py-1 text-xs font-medium hover:bg-surface-2"
+            >
+              {showAdvice ? labels.advice.hide : labels.advice.show}
+            </button>
+          </div>
+          {showAdvice && (
+            <>
+              <ol className="mt-3 grid gap-1 text-sm sm:grid-cols-2">
+                {suggestion.order.map((id, i) => {
+                  const p = byId.get(id);
+                  if (!p) return null;
+                  const n = suggestion.notes[id];
+                  const tone =
+                    n?.kind === "injured" || n?.kind === "rest"
+                      ? "text-bad"
+                      : n?.kind === "wear"
+                        ? "text-warn"
+                        : i < 5
+                          ? "text-good"
+                          : "text-muted";
+                  return (
+                    <li key={id} className={`flex items-baseline gap-2 ${i === ROTATION_SIZE ? "sm:col-start-1" : ""}`}>
+                      <span className="w-5 shrink-0 text-right text-xs text-faint tabular">{i + 1}.</span>
+                      <span className="min-w-0 truncate">
+                        {p.firstName} {p.lastName}
+                      </span>
+                      <span className={`ml-auto shrink-0 text-[11px] ${tone}`}>{noteText(id)}</span>
+                    </li>
+                  );
+                })}
+              </ol>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={applySuggestion}
+                  className="rounded-md bg-info/80 px-3 py-1.5 text-xs font-semibold text-bg hover:bg-info"
+                  data-testid="apply-advice"
+                >
+                  {labels.advice.apply}
+                </button>
+                {applied && <span className="text-xs text-good">{labels.advice.applied}</span>}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted">
         {labels.activeHeading}
