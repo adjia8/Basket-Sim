@@ -79,7 +79,7 @@ export default async function InjuriesPage({ searchParams }: { searchParams: Pro
         <div className="card mt-4 overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm" data-testid="injuries-table">
             <thead>
-              <tr className="border-b border-line-soft text-left text-[11px] uppercase tracking-wide text-faint">
+              <tr className="border-b border-line-soft text-left text-2xs uppercase tracking-wide text-faint">
                 <th className="px-3 py-2 font-medium">{t("injuries.col.player")}</th>
                 <th className="px-3 py-2 font-medium">{t("injuries.col.team")}</th>
                 <th className="px-3 py-2 font-medium">{t("injuries.col.injury")}</th>
@@ -119,7 +119,7 @@ function InjuryRow({
           {p.name}
         </Link>
         <span className="ml-2 tabular text-xs text-faint">{p.overall}</span>
-        <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${TIER_TONE[p.tier]}`}>
+        <span className={`ml-2 rounded px-1.5 py-0.5 text-2xs font-semibold uppercase ${TIER_TONE[p.tier]}`}>
           {t(`injuries.tier.${p.tier}` as DictionaryKey)}
         </span>
       </td>
@@ -127,17 +127,17 @@ function InjuryRow({
         <Link href={`/teams/${p.teamId}`} className="hover:underline" title={p.teamName}>
           {p.teamAbbr}
         </Link>
-        {mine && <span className="ml-1.5 text-[10px] font-semibold text-accent-text">{t("injuries.mine")}</span>}
-        {opponent && <span className="ml-1.5 text-[10px] font-semibold text-warn">{t("injuries.nextOpponent")}</span>}
+        {mine && <span className="ml-1.5 text-2xs font-semibold text-accent-text">{t("injuries.mine")}</span>}
+        {opponent && <span className="ml-1.5 text-2xs font-semibold text-warn">{t("injuries.nextOpponent")}</span>}
       </td>
       <td className="px-3 py-2.5">
         {p.injuryType ? t(`domain.injuryType.${p.injuryType}` as DictionaryKey) : "—"}
         {p.severity && (
-          <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] ${SEVERITY_TONE[p.severity] ?? ""}`}>
+          <span className={`ml-2 rounded px-1.5 py-0.5 text-2xs ${SEVERITY_TONE[p.severity] ?? ""}`}>
             {t(`domain.injurySeverity.${p.severity}` as DictionaryKey)}
           </span>
         )}
-        {p.playingThrough && <span className="ml-2 text-[10px] text-warn">{t("injuries.playingThrough")}</span>}
+        {p.playingThrough && <span className="ml-2 text-2xs text-warn">{t("injuries.playingThrough")}</span>}
       </td>
       <td className="px-3 py-2.5 text-right tabular">{p.gamesRemaining}</td>
       <td className="px-3 py-2.5 text-soft">

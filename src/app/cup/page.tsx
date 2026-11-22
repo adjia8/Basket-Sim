@@ -155,7 +155,7 @@ export default async function CupPage() {
                                       {short(row.teamId)}
                                     </Link>
                                     {seed && (
-                                      <span className="ml-1 rounded bg-good/15 px-1 text-[10px] text-good">
+                                      <span className="ml-1 rounded bg-good/15 px-1 text-2xs text-good">
                                         {i === 0 ? t("cup.qualified") : t("cup.wildcard")}
                                       </span>
                                     )}

@@ -264,7 +264,7 @@ export default async function FranchisePage() {
               </div>
             ))}
           </dl>
-          <p className="mt-2 text-[11px] text-faint">{t("facility.budget.hint", { reserve: money(reserve) })}</p>
+          <p className="mt-2 text-2xs text-faint">{t("facility.budget.hint", { reserve: money(reserve) })}</p>
         </div>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2">

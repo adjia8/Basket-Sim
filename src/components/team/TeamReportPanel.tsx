@@ -88,7 +88,7 @@ export function TeamReportPanel({ report, t }: { report: TeamReport; t: Translat
               <p className="mt-1 text-xs text-muted">{t("report.depthBest", { best: d.best || "—" })}</p>
               <p className="text-xs text-muted">{t("report.depthCount", { count: d.count, quality: d.quality })}</p>
               {d.need && (
-                <p className={`mt-1 text-[11px] font-semibold ${d.need === "critical" ? "text-bad" : "text-warn"}`}>
+                <p className={`mt-1 text-2xs font-semibold ${d.need === "critical" ? "text-bad" : "text-warn"}`}>
                   {t(d.need === "critical" ? "report.needCritical" : "report.needThin")}
                 </p>
               )}

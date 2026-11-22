@@ -301,9 +301,9 @@ function SideSummary({
         </dd>
       </dl>
       {side.payrollAfter > tax ? (
-        <p className="mt-0.5 text-[11px] text-bad">{labels.overTax}</p>
+        <p className="mt-0.5 text-2xs text-bad">{labels.overTax}</p>
       ) : side.payrollAfter > cap ? (
-        <p className="mt-0.5 text-[11px] text-warn">{labels.overCap}</p>
+        <p className="mt-0.5 text-2xs text-warn">{labels.overCap}</p>
       ) : null}
     </div>
   );
@@ -357,7 +357,7 @@ function PlayerCheckboxList({
                   <span className="text-faint">
                     ({player.position}, {player.overallRating})
                   </span>
-                  <span className="block text-[11px] text-faint">
+                  <span className="block text-2xs text-faint">
                     {player.age} {labels.age} · {player.yearsRemaining} {labels.years}
                   </span>
                 </span>

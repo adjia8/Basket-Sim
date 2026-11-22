@@ -147,7 +147,7 @@ export function PreMatchComparison({
         {form.map((r, i) => (
           <span
             key={i}
-            className={`inline-flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold ${
+            className={`inline-flex h-5 w-5 items-center justify-center rounded text-2xs font-bold ${
               r === "W" ? "bg-good/20 text-good" : "bg-bad/20 text-bad"
             }`}
           >

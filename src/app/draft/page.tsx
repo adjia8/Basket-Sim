@@ -180,7 +180,7 @@ export default async function DraftPage() {
                           <span className="text-muted">{t(`interview.q.${a.question}`)} </span>
                           <span className="italic">{t(`interview.a.${a.question}.${a.band}`)}</span>{" "}
                           <span
-                            className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${
+                            className={`rounded px-1.5 py-0.5 text-2xs font-medium ${
                               a.band === "high" ? "bg-good/15 text-good" : a.band === "low" ? "bg-bad/15 text-bad" : "bg-surface-3 text-soft"
                             }`}
                           >

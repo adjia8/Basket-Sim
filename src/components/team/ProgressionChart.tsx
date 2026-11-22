@@ -32,7 +32,7 @@ export function ProgressionChart({
         {ticks.map((v) => (
           <g key={v}>
             <line x1={pad.l} x2={W - pad.r} y1={y(v)} y2={y(v)} className="stroke-line-soft" strokeWidth={1} />
-            <text x={pad.l - 6} y={y(v) + 4} textAnchor="end" className="fill-faint text-[11px]">
+            <text x={pad.l - 6} y={y(v) + 4} textAnchor="end" className="fill-faint text-2xs">
               {v}
             </text>
           </g>
@@ -48,7 +48,7 @@ export function ProgressionChart({
               strokeDasharray="4 4"
               strokeWidth={1.5}
             />
-            <text x={W - pad.r} y={y(potentialMid) - 5} textAnchor="end" className="fill-info text-[11px]">
+            <text x={W - pad.r} y={y(potentialMid) - 5} textAnchor="end" className="fill-info text-2xs">
               {labels.potential} ≈ {potentialMid}
             </text>
           </g>
@@ -61,7 +61,7 @@ export function ProgressionChart({
           {points[last].overall}
         </text>
         {seasonStarts.map((i) => (
-          <text key={i} x={x(i)} y={H - 8} textAnchor={i === 0 ? "start" : "middle"} className="fill-muted text-[11px]">
+          <text key={i} x={x(i)} y={H - 8} textAnchor={i === 0 ? "start" : "middle"} className="fill-muted text-2xs">
             {points[i].season}
           </text>
         ))}

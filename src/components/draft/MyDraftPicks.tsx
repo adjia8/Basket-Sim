@@ -52,7 +52,7 @@ export async function MyDraftPicks({
                       {p.pickNumber !== null && <span className="ml-1 text-xs text-muted">#{p.pickNumber}</span>}
                     </span>
                     {p.originalTeamId !== teamId && (
-                      <span className="rounded bg-good/10 px-1.5 py-0.5 text-[11px] font-semibold text-good">
+                      <span className="rounded bg-good/10 px-1.5 py-0.5 text-2xs font-semibold text-good">
                         {t("draft.myPicks.via", { team: p.originalTeam.abbreviation })}
                       </span>
                     )}
@@ -61,7 +61,7 @@ export async function MyDraftPicks({
                 {traded.map((p) => (
                   <li key={p.id} className="flex items-center justify-between gap-2 text-faint">
                     <span className="line-through">{t(p.round === 1 ? "draft.myPicks.round1" : "draft.myPicks.round2")}</span>
-                    <span className="text-[11px]">{t("draft.myPicks.tradedTo", { team: p.team.abbreviation })}</span>
+                    <span className="text-2xs">{t("draft.myPicks.tradedTo", { team: p.team.abbreviation })}</span>
                   </li>
                 ))}
               </ul>

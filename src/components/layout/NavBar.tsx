@@ -139,7 +139,7 @@ export async function NavBar() {
         aria-hidden
       />
       <span className="min-w-0">
-        <span className="block text-[11px] font-semibold uppercase tracking-wider text-muted">{team.city}</span>
+        <span className="block text-2xs font-semibold uppercase tracking-wider text-muted">{team.city}</span>
         <span className="block truncate text-sm font-semibold">{team.name}</span>
       </span>
     </Link>

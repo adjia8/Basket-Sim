@@ -60,7 +60,7 @@ export function FacilityProjectCard({
             ))}
           </span>
         ) : (
-          view.tierLabel && <span className="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 text-[11px] text-soft">{view.tierLabel}</span>
+          view.tierLabel && <span className="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 text-2xs text-soft">{view.tierLabel}</span>
         )}
       </div>
       {view.rating && (
@@ -68,7 +68,7 @@ export function FacilityProjectCard({
           <span data-stars={view.rating.stars}>
             <Stars value={view.rating.stars} />
           </span>
-          <span className="text-[11px] text-faint">{view.rating.line}</span>
+          <span className="text-2xs text-faint">{view.rating.line}</span>
         </div>
       )}
       <p className="mt-1 text-xs text-muted">{view.desc}</p>

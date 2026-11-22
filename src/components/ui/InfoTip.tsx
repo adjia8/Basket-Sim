@@ -21,7 +21,7 @@ export function InfoTip({ text, label = "?" }: { text: string; label?: string })
         aria-describedby={open ? id : undefined}
         onClick={() => setOpen((v) => !v)}
         onBlur={() => setOpen(false)}
-        className="flex h-4 w-4 items-center justify-center rounded-full border border-line-strong text-[10px] font-semibold leading-none text-muted transition hover:border-accent hover:text-accent-text focus-visible:border-accent"
+        className="flex h-4 w-4 items-center justify-center rounded-full border border-line-strong text-2xs font-semibold leading-none text-muted transition hover:border-accent hover:text-accent-text focus-visible:border-accent"
       >
         {label}
       </button>

@@ -13,93 +13,101 @@
    cartes blanc cassé ; texte un peu moins noir pour réduire le contraste
    tout en restant bien lisible. */
 :root {
-  --bg: #d9dfea;
-  --surface: #eef1f6;
-  --surface-2: #e4e8f0;
-  --surface-3: #d6dce8;
-  --line: #c3ccdc;
-  --line-soft: #d4dbe7;
-  --line-strong: #97a4bd;
-  --fg: #141c33;
-  --soft: #313c58;
-  --muted: #4f5b78;
-  --faint: #7d88a2;
+  --bg: #d5dbe7;
+  --surface: #f4f6fa;
+  --surface-2: #e7ebf2;
+  --surface-3: #d3dae7;
+  --line: #a6b2c9;
+  --line-soft: #c3cbda;
+  --line-strong: #6f7d9a;
+  --fg: #070d1f;
+  --text: #141c33;
+  --soft: #232d48;
+  --muted: #3b4662;
+  --faint: #59647f;
   --accent: #e8601c;
   --accent-hover: #d4530f;
   --accent-fg: #160800;
-  --accent-text: #b2470e;
-  --good: #0f7a55;
-  --bad: #d4283b;
-  --warn: #8f6200;
-  --info: #0a74a3;
+  --accent-text: #a33f0a;
+  --good: #0a6b49;
+  --bad: #c01c30;
+  --warn: #a15800;
+  --info: #075f87;
+  --card-shadow: 0 1px 3px rgb(15 23 42 / 0.12), 0 1px 1px rgb(15 23 42 / 0.06);
 }
 
 .dark {
-  --bg: #070b16;
-  --surface: #0e1528;
-  --surface-2: #152039;
-  --surface-3: #1d2a47;
-  --line: #22304f;
-  --line-soft: #172238;
-  --line-strong: #364a72;
-  --fg: #e8eefc;
-  --soft: #b9c4dc;
-  --muted: #8d9bbb;
-  --faint: #5f6d8e;
+  --bg: #05080f;
+  --surface: #111a30;
+  --surface-2: #19243f;
+  --surface-3: #24325a;
+  --line: #34476f;
+  --line-soft: #26365a;
+  --line-strong: #5168a0;
+  --fg: #ffffff;
+  --text: #e3e9f6;
+  --soft: #cdd6ea;
+  --muted: #a9b6d2;
+  --faint: #8492b2;
   --accent: #ff7a2f;
   --accent-hover: #ff8f4f;
   --accent-fg: #160800;
-  --accent-text: #ff9d63;
-  --good: #34d399;
-  --bad: #ff5d6c;
-  --warn: #fbbf24;
-  --info: #38d3ff;
+  --accent-text: #ffa772;
+  --good: #46e0a6;
+  --bad: #ff6b79;
+  --warn: #ffc93d;
+  --info: #5ddcff;
+  --card-shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 2px 6px rgb(0 0 0 / 0.45);
 }
 
 /* « Trophée » pendant les playoffs (attribut data-phase posé par
    layout.tsx) : noir profond et or, comme le trophée Larry O'Brien. */
 html[data-phase="playoffs"] {
-  --bg: #e2ded5;
-  --surface: #f2efe8;
-  --surface-2: #e9e5dc;
-  --surface-3: #ddd8cc;
-  --line: #cdc6b6;
-  --line-soft: #dcd7cb;
-  --line-strong: #a89f89;
-  --fg: #1f1b14;
-  --soft: #3f392d;
-  --muted: #5e574a;
-  --faint: #8c8371;
+  --bg: #ddd8cd;
+  --surface: #f5f2ec;
+  --surface-2: #ebe6dc;
+  --surface-3: #ddd7ca;
+  --line: #b9b09b;
+  --line-soft: #d0c9b9;
+  --line-strong: #8c8269;
+  --fg: #120f09;
+  --text: #1f1b14;
+  --soft: #342f24;
+  --muted: #4f4839;
+  --faint: #6f6754;
   --accent: #c99a27;
   --accent-hover: #b8891a;
   --accent-fg: #1a1200;
-  --accent-text: #7d5c0c;
-  --good: #1a7f4a;
-  --bad: #c0392b;
-  --warn: #b4590b;
-  --info: #2c62a0;
+  --accent-text: #6b4e08;
+  --good: #146b3d;
+  --bad: #b02f22;
+  --warn: #9a4c08;
+  --info: #22558f;
+  --card-shadow: 0 1px 3px rgb(40 30 10 / 0.14);
 }
 
 html.dark[data-phase="playoffs"] {
-  --bg: #0c0b09;
-  --surface: #15130f;
-  --surface-2: #1e1b15;
-  --surface-3: #29251d;
-  --line: #2e2a21;
-  --line-soft: #1f1c16;
-  --line-strong: #4a4435;
-  --fg: #f2ece0;
-  --soft: #cfc6b4;
-  --muted: #a39a88;
-  --faint: #6e6656;
-  --accent: #d9a62e;
-  --accent-hover: #e8b947;
+  --bg: #080705;
+  --surface: #18150f;
+  --surface-2: #221e17;
+  --surface-3: #2e2a20;
+  --line: #463f30;
+  --line-soft: #332e24;
+  --line-strong: #6b6249;
+  --fg: #ffffff;
+  --text: #f2ece0;
+  --soft: #ddd4c2;
+  --muted: #b8ae9a;
+  --faint: #918874;
+  --accent: #e2b03a;
+  --accent-hover: #efc154;
   --accent-fg: #1a1200;
-  --accent-text: #e8c063;
-  --good: #5cc28a;
-  --bad: #ef6b5e;
-  --warn: #f08a3a;
-  --info: #6fa8dc;
+  --accent-text: #f0c96c;
+  --good: #6fd49b;
+  --bad: #ff7b6e;
+  --warn: #ff9d4f;
+  --info: #86b8e6;
+  --card-shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 2px 6px rgb(0 0 0 / 0.5);
 }
 
 @theme inline {
@@ -113,6 +121,7 @@ html.dark[data-phase="playoffs"] {
   --color-line-soft: var(--line-soft);
   --color-line-strong: var(--line-strong);
   --color-fg: var(--fg);
+  --color-text: var(--text);
   --color-soft: var(--soft);
   --color-muted: var(--muted);
   --color-faint: var(--faint);
@@ -128,6 +137,24 @@ html.dark[data-phase="playoffs"] {
   --font-mono: var(--font-geist-mono);
 }
 
+/* Tailles de texte plus généreuses (lecture prolongée) : chaque palier
+   Tailwind est relevé d'environ 1 px, et « text-2xs » remplace les très
+   petites tailles fixes (9-11 px) d'avant. */
+@theme {
+  --text-2xs: 0.75rem;
+  --text-2xs--line-height: 1.1rem;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.2rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.45rem;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.6rem;
+  --text-lg: 1.25rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.625rem;
+}
+
 html {
   color-scheme: light;
 }
@@ -137,8 +164,35 @@ html.dark {
 
 body {
   background: var(--bg);
-  color: var(--fg);
+  /* Texte courant un cran sous les titres (blanc pur / noir réservés aux
+     titres), pour une hiérarchie nette sans fatiguer l'œil. */
+  color: var(--text);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  letter-spacing: 0.005em;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Titres : plus clairs/foncés que le texte, plus gras, resserrés. */
+h1,
+h2,
+h3,
+h4 {
+  color: var(--fg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+h1 {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+/* Titres de page : un trait d'accent dessous pour les détacher du contenu. */
+main h1 {
+  padding-bottom: 0.35rem;
+  border-bottom: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  display: inline-block;
 }
 
 /* Tous les chiffres alignés en colonnes (stats, salaires, bilans) : un jeu
@@ -172,16 +226,17 @@ table,
     border-radius: 0.75rem;
     border: 1px solid var(--line);
     background: var(--surface);
+    box-shadow: var(--card-shadow);
   }
 
   /* Petit libellé de section en capitales (en-têtes de tableaux, titres
      d'encarts, libellés de stats). */
   .eyebrow {
-    font-size: 0.6875rem;
-    font-weight: 600;
+    font-size: 0.75rem;
+    font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--muted);
+    color: var(--soft);
   }
 
   /* Tableaux de données : en-tête discret sur surface-2, lignes séparées
@@ -191,17 +246,18 @@ table,
     white-space: nowrap;
   }
   .data-table thead tr {
-    border-bottom: 1px solid var(--line);
+    border-bottom: 2px solid var(--line-strong);
+    background: var(--surface-2);
   }
   .data-table thead th {
-    font-size: 0.6875rem;
-    font-weight: 600;
+    font-size: 0.75rem;
+    font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--muted);
   }
   .data-table tbody tr {
-    border-bottom: 1px solid var(--line-soft);
+    border-bottom: 1px solid var(--line);
   }
   .data-table tbody tr:last-child {
     border-bottom: 0;
@@ -213,7 +269,7 @@ table,
   /* Champs de formulaire. */
   .field {
     border-radius: 0.5rem;
-    border: 1px solid var(--line);
+    border: 1px solid var(--line-strong);
     background: var(--surface-2);
     color: var(--fg);
   }

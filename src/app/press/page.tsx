@@ -79,7 +79,7 @@ function OutcomeChips({ outcome, t }: { outcome: PressOutcome; t: Translator }) 
         const positive = c.value !== undefined && c.value > 0;
         const tone = c.bad || (c.value !== undefined && c.value < 0) ? "bg-bad/15 text-bad" : positive ? "bg-good/15 text-good" : "bg-surface-3 text-soft";
         return (
-          <span key={c.label} className={`rounded px-1.5 py-0.5 text-[11px] font-medium tabular ${tone}`}>
+          <span key={c.label} className={`rounded px-1.5 py-0.5 text-2xs font-medium tabular ${tone}`}>
             {c.label}
             {c.value !== undefined ? ` ${c.value > 0 ? "+" : ""}${c.value}` : ""}
           </span>
@@ -114,7 +114,7 @@ function ConferenceResult({ conference, t, locale }: { conference: PressConferen
                 </p>
                 {chosen && (
                   <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${TONE_STYLE[chosen.tone] ?? ""}`}>
+                    <span className={`rounded px-1.5 py-0.5 text-2xs font-semibold ${TONE_STYLE[chosen.tone] ?? ""}`}>
                       {t(`pressPage.tone.${chosen.tone}` as DictionaryKey)}
                     </span>
                     <span className="font-medium">{chosen.label}</span>
@@ -151,7 +151,7 @@ function Reactions({ reactions, t }: { reactions: PressReactions; t: Translator 
             {reactions.players.map((r) => (
               <li key={r.playerId + r.kind}>
                 <span className="font-medium">{r.name}</span>
-                <span className="ml-1 text-[11px] text-faint">{t(`pressPage.reactions.kind.${r.kind}` as DictionaryKey)}</span>
+                <span className="ml-1 text-2xs text-faint">{t(`pressPage.reactions.kind.${r.kind}` as DictionaryKey)}</span>
                 <p className="text-soft italic">« {r.quote} »</p>
               </li>
             ))}
@@ -163,7 +163,7 @@ function Reactions({ reactions, t }: { reactions: PressReactions; t: Translator 
         <ul className="space-y-2">
           {reactions.media.map((m, i) => (
             <li key={i}>
-              <span className="text-[11px] text-faint">{m.outlet}</span>
+              <span className="text-2xs text-faint">{m.outlet}</span>
               <p className={`font-medium ${STANCE_STYLE[m.stance] ?? ""}`}>{m.headline}</p>
             </li>
           ))}
@@ -177,7 +177,7 @@ function Reactions({ reactions, t }: { reactions: PressReactions; t: Translator 
         <ul className="space-y-2">
           {reactions.fans.map((f, i) => (
             <li key={i}>
-              <span className="text-[11px] text-faint">{f.handle}</span>
+              <span className="text-2xs text-faint">{f.handle}</span>
               <p className="text-soft">{f.text}</p>
             </li>
           ))}
@@ -272,7 +272,7 @@ export default async function PressPage() {
                           {question.journalist ?? "—"}
                           {question.outlet && <span className="font-normal text-muted"> · {question.outlet}</span>}
                         </p>
-                        <p className="text-[11px] uppercase tracking-wide text-faint">
+                        <p className="text-2xs uppercase tracking-wide text-faint">
                           {topicLabel(t, question.topic, question.category)}
                         </p>
                       </div>
@@ -296,7 +296,7 @@ export default async function PressPage() {
                           />
                           <span className="flex-1">{option.label}</span>
                           <span
-                            className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold ${TONE_STYLE[option.tone] ?? "bg-surface-3 text-soft"}`}
+                            className={`shrink-0 rounded px-1.5 py-0.5 text-2xs font-semibold ${TONE_STYLE[option.tone] ?? "bg-surface-3 text-soft"}`}
                           >
                             {t(`pressPage.tone.${option.tone}` as DictionaryKey)}
                           </span>
@@ -377,7 +377,7 @@ export default async function PressPage() {
                     <div className="mt-1">
                       <Meter value={p.morale} />
                     </div>
-                    {alarm && p.wantsTrade && <p className="mt-0.5 text-[11px] text-bad">⚠ {t("pressPage.wantsTrade")}</p>}
+                    {alarm && p.wantsTrade && <p className="mt-0.5 text-2xs text-bad">⚠ {t("pressPage.wantsTrade")}</p>}
                   </li>
                 );
               })}

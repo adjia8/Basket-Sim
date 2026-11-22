@@ -81,7 +81,7 @@ export function SidebarNav({
                   >
                     <span className="flex-1 truncate">{item.label}</span>
                     {(item.badge ?? 0) > 0 && (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-semibold text-accent-fg tabular">
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-2xs font-semibold text-accent-fg tabular">
                         {(item.badge ?? 0) > 9 ? "9+" : item.badge}
                       </span>
                     )}

@@ -135,7 +135,7 @@ export function TradeOfferDetail({ detail, t, locale }: { detail: OfferDetail; t
               ))}
             </ul>
           )}
-          <p className="mt-2 text-[11px] text-faint">{t(`tradeReview.confidence.${r.confidence}` as DictionaryKey)}</p>
+          <p className="mt-2 text-2xs text-faint">{t(`tradeReview.confidence.${r.confidence}` as DictionaryKey)}</p>
         </section>
       )}
     </div>

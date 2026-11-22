@@ -153,7 +153,7 @@ export default async function TradesPage() {
                   <span className="block truncate font-medium">{teamFullName(p.team)}</span>
                   <span className="text-xs text-faint tabular">{p.record}</span>
                 </span>
-                <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold ${OUTLOOK_TONE[p.outlook]}`}>
+                <span className={`shrink-0 rounded px-1.5 py-0.5 text-2xs font-semibold ${OUTLOOK_TONE[p.outlook]}`}>
                   {t(`trade.outlook.${p.outlook}` as DictionaryKey)}
                 </span>
               </Link>

@@ -75,7 +75,7 @@ export default async function StatsPage({
           <div className="card mt-2 overflow-x-auto">
             <table className="w-full min-w-[520px] text-sm">
               <thead>
-                <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-muted">
+                <tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-muted">
                   <th className="px-4 py-2 font-medium">{t("league.stats.col.rank")}</th>
                   <th className="px-2 py-2 font-medium">{t("league.stats.col.player")}</th>
                   <th className="px-2 py-2 font-medium">{t("league.stats.col.team")}</th>

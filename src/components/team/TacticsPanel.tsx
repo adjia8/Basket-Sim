@@ -82,7 +82,7 @@ export function TacticsPanel({
         </span>
         <span className="text-xs leading-snug text-muted">{t(`tactics.${category}Desc.${option.value}` as DictionaryKey)}</span>
         {duel !== undefined && duel !== 0 && (
-          <span className={`text-[11px] font-medium ${duel > 0 ? "text-good" : "text-bad"}`}>
+          <span className={`text-2xs font-medium ${duel > 0 ? "text-good" : "text-bad"}`}>
             {duel > 0 ? t("tactics.duelGood") : t("tactics.duelBad")} ({signed(duel)})
           </span>
         )}

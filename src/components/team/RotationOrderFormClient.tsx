@@ -224,7 +224,7 @@ export function RotationOrderFormClient({
               const badge = injuryBadge(player);
               return badge ? (
                 <span
-                  className={`rounded-full px-1.5 py-px text-[10px] font-semibold ${BADGE_TONE[badge.tone]}`}
+                  className={`rounded-full px-1.5 py-px text-2xs font-semibold ${BADGE_TONE[badge.tone]}`}
                   data-testid="injury-badge"
                   data-tone={badge.tone}
                 >
@@ -236,7 +236,7 @@ export function RotationOrderFormClient({
         </span>
         <EnergyRing fatigue={player.fatigue} size={34} />
         {inRotation ? (
-          <span className="w-[4.5rem] shrink-0 rounded-full bg-surface-2 px-1 py-0.5 text-center text-[10px] font-medium leading-tight text-soft sm:w-28 sm:px-2 sm:text-xs">
+          <span className="w-[4.5rem] shrink-0 rounded-full bg-surface-2 px-1 py-0.5 text-center text-2xs font-medium leading-tight text-soft sm:w-28 sm:px-2 sm:text-xs">
             {roleLabel(index, labels)}
           </span>
         ) : (
@@ -338,7 +338,7 @@ export function RotationOrderFormClient({
                       <span className="min-w-0 truncate">
                         {p.firstName} {p.lastName}
                       </span>
-                      <span className={`ml-auto shrink-0 text-[11px] ${tone}`}>{noteText(id)}</span>
+                      <span className={`ml-auto shrink-0 text-2xs ${tone}`}>{noteText(id)}</span>
                     </li>
                   );
                 })}

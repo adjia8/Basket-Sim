@@ -56,7 +56,7 @@ export function MonthCalendar({
         )}
       </div>
 
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-faint sm:gap-1.5 sm:text-xs">
+      <div className="grid grid-cols-7 gap-1 text-center text-2xs font-semibold uppercase tracking-wide text-faint sm:gap-1.5 sm:text-xs">
         {weekdayLabels.map((d) => (
           <div key={d} className="pb-1">
             {d}
@@ -74,7 +74,7 @@ export function MonthCalendar({
             inMonth ? "" : "opacity-35"
           } ${isToday ? "ring-2 ring-accent" : ""}`;
           const dayNumber = (
-            <span className={`text-[10px] tabular sm:text-xs ${isToday ? "font-bold text-accent-text" : "text-muted"}`}>
+            <span className={`text-2xs tabular sm:text-xs ${isToday ? "font-bold text-accent-text" : "text-muted"}`}>
               {Number(day.slice(8))}
             </span>
           );
@@ -82,7 +82,7 @@ export function MonthCalendar({
             return (
               <div key={day} className={`${base} border-line-soft bg-surface/30`} title={isToday ? labels.today : undefined}>
                 {dayNumber}
-                {isBreak && <span className="mt-auto truncate text-[9px] text-warn sm:text-[11px]">⭐ {labels.allStar}</span>}
+                {isBreak && <span className="mt-auto truncate text-2xs text-warn sm:text-2xs">⭐ {labels.allStar}</span>}
               </div>
             );
           }
@@ -95,15 +95,15 @@ export function MonthCalendar({
             <Link key={day} href={`/game/${game.id}`} className={`${base} ${tone} transition hover:brightness-125`} data-testid="calendar-game">
               <span className="flex items-center justify-between gap-0.5">
                 {dayNumber}
-                {game.cup && <span className="text-[9px] sm:text-[11px]">🏆</span>}
+                {game.cup && <span className="text-2xs sm:text-2xs">🏆</span>}
               </span>
-              <span className="mt-auto truncate text-[10px] font-semibold leading-tight sm:text-sm">
+              <span className="mt-auto truncate text-2xs font-semibold leading-tight sm:text-sm">
                 {/* Sur mobile, seul « @ » (extérieur) est affiché : la place manque. */}
                 <span className="font-normal text-faint">{game.home ? <span className="hidden sm:inline">vs </span> : "@"}</span>
                 {game.opponent}
               </span>
               {game.played && game.score && (
-                <span className={`truncate text-[9px] font-semibold tabular leading-tight sm:text-xs ${game.won ? "text-good" : "text-bad"}`}>
+                <span className={`truncate text-2xs font-semibold tabular leading-tight sm:text-xs ${game.won ? "text-good" : "text-bad"}`}>
                   {game.won ? labels.win : labels.loss} <span className="hidden sm:inline">{game.score}</span>
                 </span>
               )}

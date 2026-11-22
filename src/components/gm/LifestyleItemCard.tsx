@@ -16,7 +16,7 @@ export function LifestyleItemCard({
     <div className={`card flex flex-col p-3 ${item.owned ? "border-good/50" : ""}`} data-testid={`lifestyle-${item.key}`}>
       <div className="flex items-start justify-between gap-2">
         <p className="font-medium">{item.name}</p>
-        {item.owned && <span className="shrink-0 rounded bg-good/15 px-1.5 py-0.5 text-[11px] font-semibold text-good">{labels.owned}</span>}
+        {item.owned && <span className="shrink-0 rounded bg-good/15 px-1.5 py-0.5 text-2xs font-semibold text-good">{labels.owned}</span>}
       </div>
       <p className="mt-1 text-sm font-semibold tabular">{item.price}</p>
       <p className="text-xs text-accent-text">

@@ -58,7 +58,7 @@ export function TrainingCalendarPanel({
           // Grille hebdomadaire (lundi → dimanche) : jours passés grisés, jours
           // de match en couleur, séance modifiable les autres jours.
           <div data-testid="training-grid">
-            <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-faint sm:gap-1.5 sm:text-xs">
+            <div className="grid grid-cols-7 gap-1 text-center text-2xs font-semibold uppercase tracking-wide text-faint sm:gap-1.5 sm:text-xs">
               {weekdayLabels.map((d) => (
                 <div key={d} className="pb-1">
                   {d}
@@ -72,15 +72,15 @@ export function TrainingCalendarPanel({
                 if (!d) {
                   return (
                     <div key={date} className="flex min-h-16 min-w-0 flex-col rounded-md border border-line-soft p-1 opacity-35" title={labels.past}>
-                      <span className="text-[10px] tabular text-muted sm:text-xs">{dayNumber}</span>
+                      <span className="text-2xs tabular text-muted sm:text-xs">{dayNumber}</span>
                     </div>
                   );
                 }
                 if (d.game) {
                   return (
                     <div key={date} className="flex min-h-16 min-w-0 flex-col rounded-md border border-accent/40 bg-accent/10 p-1" title={d.label}>
-                      <span className="text-[10px] tabular text-muted sm:text-xs">{dayNumber}</span>
-                      <span className="mt-auto truncate text-[10px] font-semibold text-accent-text sm:text-xs">
+                      <span className="text-2xs tabular text-muted sm:text-xs">{dayNumber}</span>
+                      <span className="mt-auto truncate text-2xs font-semibold text-accent-text sm:text-xs">
                         <span className="hidden sm:inline">🏀 </span>
                         {d.game.replace(/^vs /, "").replace(/^@ /, "@")}
                       </span>
@@ -95,12 +95,12 @@ export function TrainingCalendarPanel({
                     className={`flex min-h-16 min-w-0 flex-col gap-1 rounded-md border p-1 ${custom ? "border-info/50 bg-info/5" : "border-line"}`}
                     title={d.label}
                   >
-                    <span className="text-[10px] tabular text-muted sm:text-xs">{dayNumber}</span>
+                    <span className="text-2xs tabular text-muted sm:text-xs">{dayNumber}</span>
                     <select
                       name={changed[date] ? `day:${date}` : undefined}
                       value={value}
                       onChange={(e) => setChanged({ ...changed, [date]: e.target.value })}
-                      className="field mt-auto w-full min-w-0 appearance-none px-0.5 py-0.5 text-center text-[10px] sm:appearance-auto sm:px-1 sm:text-left sm:text-xs"
+                      className="field mt-auto w-full min-w-0 appearance-none px-0.5 py-0.5 text-center text-2xs sm:appearance-auto sm:px-1 sm:text-left sm:text-xs"
                       disabled={pending}
                       aria-label={d.label}
                     >
@@ -115,7 +115,7 @@ export function TrainingCalendarPanel({
                 );
               })}
             </div>
-            <p className="mt-2 text-[11px] text-faint">
+            <p className="mt-2 text-2xs text-faint">
               <span className="mr-3"><span className="inline-block h-2 w-2 rounded-sm border border-line align-middle" /> {labels.auto}</span>
               <span className="mr-3"><span className="inline-block h-2 w-2 rounded-sm border border-info/50 bg-info/20 align-middle" /> {labels.custom}</span>
               <span><span className="inline-block h-2 w-2 rounded-sm bg-accent/40 align-middle" /> {labels.game}</span>

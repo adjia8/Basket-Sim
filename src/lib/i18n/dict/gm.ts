@@ -105,7 +105,7 @@ export const fr: Record<GmKey, string> = {
   "gm.sexOther": "Autre",
   "franchisePage.title": "Franchise",
   "franchisePage.description":
-    "Recettes et dépenses tombent match après match : droits TV, sponsors, billetterie, loges, restauration et boutique d'un côté, salaires, staff et fonctionnement de l'autre. Investis en intersaison dans le centre d'entraînement et la salle — ils s'usent un peu chaque année sans entretien.",
+    "Recettes et dépenses tombent match après match : droits TV, sponsors, billetterie, loges, restauration et boutique d'un côté, salaires, staff et fonctionnement de l'autre. Investis à tout moment dans le centre d'entraînement et la salle (projets ci-dessous) — ils s'usent un peu chaque année sans entretien.",
   "franchisePage.offseasonOnly":
     "Les améliorations ne sont possibles qu'en intersaison — termine la saison régulière et les playoffs pour pouvoir investir.",
   "franchisePage.facilitiesLabel": "Infrastructures d'entraînement",
@@ -170,7 +170,7 @@ export const en: Record<GmKey, string> = {
   "gm.sexOther": "Other",
   "franchisePage.title": "Franchise",
   "franchisePage.description":
-    "Revenue and expenses land game by game: TV rights, sponsors, tickets, suites, concessions and merchandise on one side; salaries, staff and operations on the other. Invest in the training center and the arena during the offseason — they wear down a little every year without upkeep.",
+    "Revenue and expenses land game by game: TV rights, sponsors, tickets, suites, concessions and merchandise on one side; salaries, staff and operations on the other. Invest in the training center and the arena at any time (projects below) — they wear down a little every year without upkeep.",
   "franchisePage.offseasonOnly": "Upgrades are only possible in the offseason — finish the regular season and playoffs to invest.",
   "franchisePage.facilitiesLabel": "Training facilities",
   "franchisePage.facilitiesDescription": "Reduces injury risk and speeds up fatigue recovery between games.",

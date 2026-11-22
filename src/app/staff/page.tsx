@@ -264,7 +264,7 @@ function MarketTable({
     <div className="card overflow-x-auto">
       <table className="w-full min-w-[760px] text-sm">
         <thead>
-          <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-muted">
+          <tr className="border-b border-line text-left text-2xs uppercase tracking-wide text-muted">
             <th className="px-4 py-2 font-medium">{t("staff.col.name")}</th>
             <th className="px-2 py-2 font-medium">{t("staff.col.age")}</th>
             <th className="px-2 py-2 font-medium">{t("staff.col.specialty")}</th>

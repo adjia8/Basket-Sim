@@ -190,7 +190,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         >
         <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${PRIORITY_DOT[m.priority]}`} title={t(`inbox.priority.${m.priority}` as DictionaryKey)} />
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2 text-[11px] text-faint">
+          <span className="flex items-center gap-2 text-2xs text-faint">
             <span className="uppercase tracking-wide">{typeLabel(m.type, t)}</span>
             <span>{m.gameDate ? formatGameDate(m.gameDate, locale) : t("inbox.offseason")}</span>
             {actionRequired(m) && <span className="rounded bg-accent/15 px-1.5 font-semibold text-accent-text">{t("inbox.actionRequired")}</span>}
@@ -261,7 +261,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
               className={`shrink-0 border-b-2 px-3 py-2 ${active ? "border-accent font-semibold" : "border-transparent text-muted hover:text-fg"}`}
             >
               {tab.label}
-              {count > 0 && <span className="ml-1.5 rounded-full bg-accent px-1.5 text-[10px] font-bold text-accent-fg">{count}</span>}
+              {count > 0 && <span className="ml-1.5 rounded-full bg-accent px-1.5 text-2xs font-bold text-accent-fg">{count}</span>}
             </Link>
           );
         })}
@@ -274,7 +274,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
           ) : (
             inbox.leagueNews.map((n) => (
               <div key={n.id} className="card p-4">
-                <p className="text-[11px] text-faint">{formatGameDate(n.date, locale)}</p>
+                <p className="text-2xs text-faint">{formatGameDate(n.date, locale)}</p>
                 <p className="mt-1 font-semibold">{n.title}</p>
                 <p className="mt-1 whitespace-pre-line text-sm text-soft">{n.body}</p>
               </div>
