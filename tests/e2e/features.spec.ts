@@ -200,12 +200,28 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       await expect(talk.getByText(/chantier à lancer d'ici 90 jours/)).toBeVisible({ timeout: 30_000 });
       expect((await prisma.playerState.findUniqueOrThrow({ where: { id: star.id } })).facilityPromiseBy).not.toBeNull();
 
+      // Un autre joueur veut partir, on lui a promis d'investir dans les
+      // installations : la promesse est soldée dès le lancement du chantier.
+      const unhappy = await prisma.playerState.findFirstOrThrow({
+        where: { careerId, id: { not: star.id }, player: { contracts: { some: { careerId, teamId: "lal" } } } },
+      });
+      const season = (await prisma.career.findUniqueOrThrow({ where: { id: careerId } })).season;
+      await prisma.playerState.update({
+        where: { id: unhappy.id },
+        data: { wantsTrade: true, activePromiseType: "facilities", activePromiseSeason: season, promiseOriginTeamId: "lal", morale: 40 },
+      });
+
       await expectPageOk(page, "/franchise");
       await expect(card.getByTestId("project-request")).toContainText("Promis à");
       await card.getByLabel(/Comptant/).check();
       await card.getByRole("button", { name: "Lancer le chantier" }).click();
       await expect(card.getByText(/Chantier lancé/)).toBeVisible({ timeout: 30_000 });
       await expect(page.getByTestId("facility-progress").getByText(/Centre de récupération/)).toBeVisible();
+      const kept = await prisma.playerState.findUniqueOrThrow({ where: { id: unhappy.id } });
+      expect(kept.activePromiseType).toBeNull();
+      expect(kept.wantsTrade).toBe(false);
+      expect(kept.morale).toBeGreaterThan(40);
+      expect(await prisma.inboxMessage.count({ where: { careerId, teamId: "lal", title: { startsWith: "Promesse tenue" } } })).toBe(1);
       // Choix exclusif : les loges existent déjà, la tribune populaire est impossible.
       await expect(page.getByTestId("project-fan_stand").getByText(/Incompatible avec/)).toBeVisible();
       await expect(page.getByTestId("project-premium_suites").getByText("Palier maximum atteint")).toBeVisible();

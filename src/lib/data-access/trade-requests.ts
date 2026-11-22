@@ -1,6 +1,7 @@
 import "server-only";
 import { parsePlan, projectDef } from "@/lib/careers/facility-projects-rules";
-import { ambitiousWantsOut, personalityFor, tradeRequestChanceMultiplier } from "@/lib/careers/personality-rules";
+import { ambitiousWantsOut, personalityFor, scaleMoraleDelta, tradeRequestChanceMultiplier } from "@/lib/careers/personality-rules";
+import { clampMorale } from "@/lib/careers/morale-rules";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getStandings } from "@/lib/data-access/standings";
@@ -161,6 +162,134 @@ export async function getPlayerDemandStates(
   return new Map(states.map((state) => [state.playerId, toDemandState(state)]));
 }
 
+// Promesse déjà tenue ? Prolongation signée, échange réalisé, ou chantier
+// du centre d'entraînement lancé dans la saison (ou niveau suffisant). La
+// compétitivité, elle, ne se juge qu'au bilan final.
+async function promiseHonoredNow(
+  careerId: string,
+  state: { playerId: string; activePromiseType: string | null; promiseOriginTeamId: string | null },
+  season: string,
+  contract: { teamId: string; lastExtendedSeason: string | null },
+  ts: Pick<TeamState, "facilitiesLevel" | "trainingStaffLevel" | "facilityProjectsJson"> | undefined
+): Promise<boolean> {
+  switch (state.activePromiseType as PromiseType) {
+    case "renewal":
+      return contract.lastExtendedSeason === season;
+    case "trade":
+      return Boolean(
+        await prisma.playerTeamStint.findFirst({
+          where: {
+            careerId,
+            playerId: state.playerId,
+            season,
+            reason: "traded",
+            teamId: { not: state.promiseOriginTeamId ?? undefined },
+          },
+        })
+      );
+    case "facilities": {
+      const from = new Date(`${season.slice(0, 4)}-07-01T00:00:00Z`).getTime();
+      const to = new Date(`${season.slice(5, 9)}-07-01T00:00:00Z`).getTime();
+      const invested = parsePlan(ts?.facilityProjectsJson).projects.some((p) => {
+        const at = new Date(p.startedOn).getTime();
+        return projectDef(p.key)?.domain === "training" && at >= from && at < to;
+      });
+      return (
+        invested ||
+        ((ts?.facilitiesLevel ?? 0) >= ATTRACTIVE_FACILITIES_THRESHOLD &&
+          (ts?.trainingStaffLevel ?? 0) >= ATTRACTIVE_TRAINING_STAFF_THRESHOLD)
+      );
+    }
+    default:
+      return false;
+  }
+}
+
+export const PROMISE_HONORED_MORALE = 6;
+
+// Date du jeu (dernier match joué), pour dater les messages hors simulation.
+export async function currentGameDate(careerId: string): Promise<Date> {
+  const last = await prisma.game.findFirst({ where: { careerId, status: "final" }, orderBy: { gameDate: "desc" }, select: { gameDate: true } });
+  return last?.gameDate ?? new Date();
+}
+
+// En cours de saison (après chaque match d'une équipe humaine) : une
+// promesse tenue est soldée tout de suite — le joueur est satisfait, son
+// moral remonte et sa demande d'échange retombe — sans attendre le bilan.
+export async function resolveHonoredPromises(
+  careerId: string,
+  teamId: string,
+  seasonLabel: string,
+  gameDate: Date,
+  locale: Locale
+): Promise<number> {
+  const season = seasonLabel.slice(0, 9);
+  const pending = await prisma.playerState.findMany({
+    where: {
+      careerId,
+      activePromiseType: { in: ["renewal", "trade", "facilities"] },
+      activePromiseSeason: season,
+      promiseOriginTeamId: teamId,
+    },
+    include: { player: { select: { firstName: true, lastName: true } } },
+  });
+  if (pending.length === 0) return 0;
+  const ts = await prisma.teamState.findFirst({ where: { careerId, teamId } });
+  const fr = locale === "fr";
+  let resolved = 0;
+  for (const state of pending) {
+    const contract = await prisma.contract.findUnique({ where: { careerId_playerId: { careerId, playerId: state.playerId } } });
+    if (!contract || state.retired) continue;
+    if (!(await promiseHonoredNow(careerId, state, season, contract, ts ?? undefined))) continue;
+    const type = state.activePromiseType as PromiseType;
+    const stays = type !== "trade";
+    const p = personalityFor(state.playerId, state.age);
+    const updated = await prisma.playerState.updateMany({
+      where: { id: state.id, activePromiseType: state.activePromiseType },
+      data: {
+        activePromiseType: null,
+        activePromiseSeason: null,
+        promiseOriginTeamId: null,
+        wantsTrade: false,
+        tradeRequestReasonsJson: null,
+        tradeRequestSinceSeason: null,
+        lastTradeRequestCheckDate: gameDate,
+        ...(stays ? { morale: clampMorale(state.morale + scaleMoraleDelta(PROMISE_HONORED_MORALE, p)) } : {}),
+      },
+    });
+    if (updated.count === 0) continue;
+    resolved++;
+    const name = `${state.player.firstName} ${state.player.lastName}`;
+    const text: Record<string, [string, string, string, string]> = {
+      renewal: [
+        `Promesse tenue : ${name} prolongé`,
+        `Comme promis, ${name} a été prolongé. Il est satisfait, ne demande plus à partir et son moral remonte.`,
+        `Promise kept: ${name} extended`,
+        `As promised, ${name} has been extended. He's satisfied, no longer wants out and his morale rises.`,
+      ],
+      facilities: [
+        `Promesse tenue : ${name} voit le club investir`,
+        `Le club investit dans son centre d'entraînement comme promis. ${name} est rassuré, ne demande plus à partir et son moral remonte.`,
+        `Promise kept: ${name} sees the club invest`,
+        `The club is investing in its training center as promised. ${name} is reassured, no longer wants out and his morale rises.`,
+      ],
+      trade: [
+        `Promesse tenue : ${name} échangé`,
+        `Comme promis, ${name} a été échangé. Il quitte le club en bons termes.`,
+        `Promise kept: ${name} traded`,
+        `As promised, ${name} has been traded. He leaves on good terms.`,
+      ],
+    };
+    const [tfr, bfr, ten, ben] = text[type];
+    await createInboxMessage(careerId, teamId, season, "player_reaction", fr ? tfr : ten, fr ? bfr : ben, `/teams/${contract.teamId}/players/${state.playerId}`, {
+      gameDate,
+      playerId: state.playerId,
+      priority: "important",
+    });
+  }
+  return resolved;
+}
+
 // Résolution des promesses en attente pour la saison qui vient de se
 // terminer — appelée depuis advanceSeason AVANT l'écrasement de
 // career.season, avec finishedStandings/teamStates déjà capturés pour cette
@@ -193,38 +322,10 @@ export async function evaluatePendingPromises(
     if (contract && !state.retired) {
       switch (state.activePromiseType as PromiseType) {
         case "renewal":
-          isHonored = contract.lastExtendedSeason === finishedSeason;
-          break;
         case "trade":
-          isHonored = Boolean(
-            await prisma.playerTeamStint.findFirst({
-              where: {
-                careerId,
-                playerId: state.playerId,
-                season: finishedSeason,
-                reason: "traded",
-                teamId: { not: state.promiseOriginTeamId ?? undefined },
-              },
-            })
-          );
+        case "facilities":
+          isHonored = await promiseHonoredNow(careerId, state, finishedSeason, contract, teamStates.find((x) => x.teamId === teamId));
           break;
-        case "facilities": {
-          const ts = teamStates.find((s) => s.teamId === teamId);
-          // Promesse tenue si le centre d'entraînement est au niveau… ou si
-          // un chantier du centre d'entraînement a été lancé cette saison
-          // (voir facility-projects-rules.ts).
-          const from = new Date(`${finishedSeason.slice(0, 4)}-07-01T00:00:00Z`).getTime();
-          const to = new Date(`${finishedSeason.slice(5, 9)}-07-01T00:00:00Z`).getTime();
-          const invested = parsePlan(ts?.facilityProjectsJson).projects.some((p) => {
-            const at = new Date(p.startedOn).getTime();
-            return projectDef(p.key)?.domain === "training" && at >= from && at < to;
-          });
-          isHonored =
-            invested ||
-            ((ts?.facilitiesLevel ?? 0) >= ATTRACTIVE_FACILITIES_THRESHOLD &&
-              (ts?.trainingStaffLevel ?? 0) >= ATTRACTIVE_TRAINING_STAFF_THRESHOLD);
-          break;
-        }
         case "competitiveness": {
           const row = finishedStandings.find((s) => s.teamId === teamId);
           isHonored =

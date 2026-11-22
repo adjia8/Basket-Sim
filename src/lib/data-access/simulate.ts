@@ -78,7 +78,7 @@ async function ensureStaffOnce(careerId: string, leagueId: string, season: strin
 }
 import { gmBonusFromProfile } from "@/lib/data-access/gm";
 import { maybeCreatePressConference } from "@/lib/data-access/press";
-import { maybeFlagTradeRequest } from "@/lib/data-access/trade-requests";
+import { maybeFlagTradeRequest, resolveHonoredPromises } from "@/lib/data-access/trade-requests";
 import { getFreeAgents } from "@/lib/data-access/contracts";
 import { createInboxMessage } from "@/lib/data-access/inbox";
 import { winPctForStandings, minAcceptableSalary } from "@/lib/careers/player-demands";
@@ -998,6 +998,12 @@ export async function simulateAndResolveGame(
   await Promise.all([
     homeManager ? evaluatePlayingTimePromises(careerId, game.homeTeamId, game.season, locale, gameDate) : Promise.resolve(),
     awayManager ? evaluatePlayingTimePromises(careerId, game.awayTeamId, game.season, locale, gameDate) : Promise.resolve(),
+  ]);
+  // Promesses déjà tenues (prolongation, échange, infrastructures) : soldées
+  // sans attendre la fin de saison (voir resolveHonoredPromises).
+  await Promise.all([
+    homeManager ? resolveHonoredPromises(careerId, game.homeTeamId, game.season, gameDate, locale) : Promise.resolve(0),
+    awayManager ? resolveHonoredPromises(careerId, game.awayTeamId, game.season, gameDate, locale) : Promise.resolve(0),
   ]);
   // Les joueurs viennent parfois voir le GM (voir player-requests.ts) —
   // saison régulière seulement.

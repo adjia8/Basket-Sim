@@ -26,6 +26,7 @@ import type { Locale } from "@/lib/i18n/locale";
 import { analyzeTrade, type TradeSelection, type TradeSide } from "@/lib/data-access/trade-analysis";
 import { formatSalary } from "@/lib/utils";
 import { applyTradeReactions } from "@/lib/data-access/trade-review";
+import { currentGameDate, resolveHonoredPromises } from "@/lib/data-access/trade-requests";
 import type { DictionaryKey } from "@/lib/i18n/dictionary";
 
 export interface TradeFormState {
@@ -203,6 +204,8 @@ export async function proposeTrade(
       myPlayerIds,
       locale
     );
+    // Promesse d'échange faite à un joueur cédé : tenue tout de suite.
+    await resolveHonoredPromises(membership.careerId, membership.teamId, membership.career.season, await currentGameDate(membership.careerId), locale);
     // Réactions des fans et de la direction (opinion, confiance, message).
     const reactions = await applyTradeReactions({
       careerId: membership.careerId,
@@ -422,6 +425,9 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
     toPlayerIds,
     await getLocale()
   );
+  for (const id of [offer.toTeamId, offer.fromTeamId]) {
+    await resolveHonoredPromises(membership.careerId, id, membership.career.season, await currentGameDate(membership.careerId), await getLocale());
+  }
   // Réactions des fans et de la direction, pour chaque équipe humaine.
   const { t } = await getTranslator();
   const base = { careerId: membership.careerId, season: membership.career.season, leagueId: membership.career.leagueId, t };

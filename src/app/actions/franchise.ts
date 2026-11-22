@@ -6,6 +6,7 @@ import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getGameClock } from "@/lib/data-access/game-clock";
 import { startFacilityProject } from "@/lib/data-access/facility-projects";
+import { resolveHonoredPromises } from "@/lib/data-access/trade-requests";
 import { projectDef, type Financing, type ProjectKey } from "@/lib/careers/facility-projects-rules";
 import { getTranslator } from "@/lib/i18n/translate";
 import { formatLongDate, formatSalary } from "@/lib/utils";
@@ -45,6 +46,8 @@ export async function startProject(_prev: FacilityFormState | undefined, formDat
   });
   revalidatePath("/franchise");
   if (!res.ok) return { error: t(`facility.error.${res.error}`) };
+  // Promesse « infrastructures » faite à un joueur : tenue dès le lancement.
+  await resolveHonoredPromises(membership.careerId, membership.teamId, membership.career.season, today, locale);
   const date = formatLongDate(new Date(res.completesOn), locale);
   return {
     success: res.ownersPaid > 0 ? t("facility.okOwners", { amount: formatSalary(res.ownersPaid, locale), date }) : t("facility.ok", { date }),

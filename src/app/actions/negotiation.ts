@@ -26,6 +26,7 @@ import {
   type Offer,
 } from "@/lib/careers/contract-negotiation-rules";
 import { getTranslator } from "@/lib/i18n/translate";
+import { currentGameDate, resolveHonoredPromises } from "@/lib/data-access/trade-requests";
 import { formatSalary } from "@/lib/utils";
 
 export interface NegotiationFormState {
@@ -157,6 +158,8 @@ export async function negotiateContract(
         optionDeclined: false,
       },
     });
+    // Promesse de prolongation : tenue tout de suite.
+    await resolveHonoredPromises(careerId, teamId, season, await currentGameDate(careerId), locale);
   } else {
     try {
       await prisma.contract.create({
