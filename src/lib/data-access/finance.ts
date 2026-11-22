@@ -3,7 +3,7 @@ import { starPower } from "@/lib/careers/attendance-rules";
 import { prisma } from "@/lib/prisma";
 import { getPayrollForTeam } from "@/lib/data-access/contracts";
 import { NBA_TAX_LINE } from "@/lib/careers/cap-rules";
-import { chargeLoans, facilityBonuses, parsePlan } from "@/lib/careers/facility-projects-rules";
+import { baselineTiers, chargeLoans, facilityBonuses, parsePlan } from "@/lib/careers/facility-projects-rules";
 import {
   ANNUAL_DEGRADATION,
   OWNER_PROFIT_SHARE,
@@ -108,7 +108,7 @@ export async function computeGameFinances(p: {
   const cur = ledger.current;
   let delta = 0;
   // Projets d'infrastructure livrés : recettes en plus, entretien.
-  const fx = facilityBonuses(parsePlan(p.state.facilityProjectsJson), p.leagueId);
+  const fx = facilityBonuses(parsePlan(p.state.facilityProjectsJson), p.leagueId, baselineTiers(p.teamId, p.marketAppeal));
 
   if (regular) {
     const [payroll, staff] = await Promise.all([

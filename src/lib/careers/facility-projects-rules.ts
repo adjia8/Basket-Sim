@@ -215,6 +215,46 @@ export function builtTier(plan: FacilityPlan, key: ProjectKey): number {
 }
 export const isBuilding = (plan: FacilityPlan, key: ProjectKey) => plan.projects.some((p) => p.key === key && p.status === "building");
 
+// Installations existantes au départ : chaque franchise a déjà un centre
+// médical, une salle vidéo… plus ou moins modernes selon son marché (avec
+// une part de hasard stable par équipe). Jamais au palier maximum : il reste
+// toujours une amélioration possible.
+export type Baseline = Partial<Record<ProjectKey, number>>;
+function hash01(seed: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 1000) / 999;
+}
+export function baselineTiers(teamId: string, marketAppeal: number): Baseline {
+  const out: Baseline = {};
+  for (const def of PROJECTS) {
+    if (def.repeatable) continue;
+    const q = (Math.max(0, Math.min(99, marketAppeal)) / 99) * 0.55 + hash01(`${teamId}:${def.key}`) * 0.45;
+    out[def.key] = Math.max(0, Math.min(def.tiers.length - 1, Math.floor(q * def.tiers.length)));
+  }
+  // Loges premium et tribune populaire s'excluent : une seule des deux existe.
+  if ((out.premium_suites ?? 0) > 0 && (out.fan_stand ?? 0) > 0) {
+    if (hash01(`${teamId}:seating`) < 0.5) out.fan_stand = 0;
+    else out.premium_suites = 0;
+  }
+  return out;
+}
+
+// Palier effectif : existant au départ ou construit depuis.
+export function effectiveTier(plan: FacilityPlan, key: ProjectKey, baseline: Baseline = {}): number {
+  return Math.max(builtTier(plan, key), baseline[key] ?? 0);
+}
+
+// Note sur 5 (demi-étoiles) d'une installation : 1 étoile sans rien,
+// 5 au palier maximum. Rénovations : d'après le niveau global (0-99).
+export function projectStars(def: ProjectDef, tier: number, domainLevel: number): number {
+  const raw = def.repeatable ? Math.max(0.5, domainLevel / 20) : 1 + (4 * tier) / def.tiers.length;
+  return Math.max(0.5, Math.min(5, Math.round(raw * 2) / 2));
+}
+
 export interface ProjectOption {
   def: ProjectDef;
   built: number;
@@ -228,12 +268,13 @@ export interface ProjectOption {
 export function projectOptions(
   plan: FacilityPlan,
   leagueId: string,
-  renovationCost: { training: number; arena: number }
+  renovationCost: { training: number; arena: number },
+  baseline: Baseline = {}
 ): ProjectOption[] {
   const scale = leagueScale(leagueId);
   const buildingCount = plan.projects.filter((p) => p.status === "building").length;
   return PROJECTS.map((def) => {
-    const built = def.repeatable ? 0 : builtTier(plan, def.key);
+    const built = def.repeatable ? 0 : effectiveTier(plan, def.key, baseline);
     const building = plan.projects.find((p) => p.key === def.key && p.status === "building") ?? null;
     const tierIdx = def.repeatable ? 0 : built;
     const tier = def.tiers[tierIdx];
@@ -247,7 +288,7 @@ export function projectOptions(
       : null;
     let blockedBy: ProjectOption["blockedBy"] = null;
     if (!next) blockedBy = "maxed";
-    else if (def.exclusiveWith && (builtTier(plan, def.exclusiveWith) > 0 || isBuilding(plan, def.exclusiveWith))) blockedBy = "exclusive";
+    else if (def.exclusiveWith && (effectiveTier(plan, def.exclusiveWith, baseline) > 0 || isBuilding(plan, def.exclusiveWith))) blockedBy = "exclusive";
     else if (!building && buildingCount >= MAX_CONCURRENT_PROJECTS) blockedBy = "concurrent";
     return { def, built, next, building, blockedBy };
   });
@@ -293,7 +334,7 @@ export interface FacilityBonuses extends Required<ProjectEffects> {
 }
 
 // Effets cumulés des projets livrés (le meilleur palier de chaque projet).
-export function facilityBonuses(plan: FacilityPlan, leagueId: string): FacilityBonuses {
+export function facilityBonuses(plan: FacilityPlan, leagueId: string, baseline: Baseline = {}): FacilityBonuses {
   const out: FacilityBonuses = {
     recovery: 0,
     medical: 0,
@@ -311,12 +352,13 @@ export function facilityBonuses(plan: FacilityPlan, leagueId: string): FacilityB
   const scale = leagueScale(leagueId);
   for (const def of PROJECTS) {
     if (def.repeatable) continue;
-    const t = builtTier(plan, def.key);
+    const t = effectiveTier(plan, def.key, baseline);
     if (t === 0) continue;
     const tier = def.tiers[t - 1];
     for (const [k, v] of Object.entries(tier.effects) as [keyof ProjectEffects, number][]) out[k] += v;
-    // Entretien : celui du palier atteint (il remplace les précédents).
-    out.upkeep += Math.round(tier.upkeep * scale);
+    // Entretien : celui du palier atteint (il remplace les précédents), dû
+    // seulement pour ce qui a été construit au-delà de l'existant.
+    if (builtTier(plan, def.key) > (baseline[def.key] ?? 0)) out.upkeep += Math.round(tier.upkeep * scale);
   }
   return out;
 }

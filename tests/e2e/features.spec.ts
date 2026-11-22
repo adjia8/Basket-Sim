@@ -169,32 +169,61 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       if (process.env.ADVICE_SHOT) await advice.screenshot({ path: process.env.ADVICE_SHOT });
     });
 
-    await test.step("infrastructures : lancer un chantier, livraison, effets", async () => {
+    await test.step("infrastructures : étoiles, comparaison, demande d'un joueur, chantier, livraison", async () => {
+      // Les Lakers (grand marché) partent avec des installations existantes :
+      // récupération palier 2/3, loges premium palier 1/2.
+      const star = await prisma.playerState.findFirstOrThrow({
+        where: { careerId, player: { contracts: { some: { careerId, teamId: "lal" } } } },
+        orderBy: { renown: "desc" },
+        include: { player: true },
+      });
+      await prisma.playerState.update({
+        where: { id: star.id },
+        data: { pendingRequest: "facilities", requestAt: new Date("2026-10-01"), facilityRequestKey: "recovery_center", facilityRequestTier: 3 },
+      });
       await expectPageOk(page, "/franchise");
       await expect(page.getByTestId("facilities")).toBeVisible();
+      await expect(page.getByTestId("facility-training-compare")).toContainText(/Ligue : \d+(er|e)( ex æquo)? sur 30/);
+      expect(await page.getByTestId("project-rating").count()).toBeGreaterThanOrEqual(10);
       const card = page.getByTestId("project-recovery_center");
+      await expect(card.getByTestId("project-request")).toContainText(star.player.lastName);
+      await expect(card.getByText("Palier 3 :")).toBeVisible();
+      // Le joueur le réclame : on le lui promet depuis sa fiche.
+      await expectPageOk(page, `/teams/lal/players/${star.playerId}`);
+      const talk = page.getByTestId("player-conversation");
+      await expect(talk.getByText(/Centre de récupération/)).toBeVisible();
+      await talk.locator('select[name="topic"]').selectOption("promise_facility");
+      await talk.locator('button[type="submit"]').click();
+      await expect(talk.getByText(/chantier à lancer d'ici 90 jours/)).toBeVisible({ timeout: 30_000 });
+      expect((await prisma.playerState.findUniqueOrThrow({ where: { id: star.id } })).facilityPromiseBy).not.toBeNull();
+
+      await expectPageOk(page, "/franchise");
+      await expect(card.getByTestId("project-request")).toContainText("Promis à");
       await card.getByLabel(/Comptant/).check();
       await card.getByRole("button", { name: "Lancer le chantier" }).click();
       await expect(card.getByText(/Chantier lancé/)).toBeVisible({ timeout: 30_000 });
       await expect(page.getByTestId("facility-progress").getByText(/Centre de récupération/)).toBeVisible();
-      // Le choix exclusif : des loges rendent la tribune populaire impossible.
+      // Choix exclusif : les loges existent déjà, la tribune populaire est impossible.
+      await expect(page.getByTestId("project-fan_stand").getByText(/Incompatible avec/)).toBeVisible();
       const suites = page.getByTestId("project-premium_suites");
       await suites.getByLabel(/Emprunt/).check();
       await suites.getByRole("button", { name: "Lancer le chantier" }).click();
       await expect(suites.getByText(/Chantier lancé/)).toBeVisible({ timeout: 30_000 });
-      await page.reload();
-      await expect(page.getByTestId("project-fan_stand").getByText(/Incompatible avec/)).toBeVisible();
-      if (process.env.FACILITY_SHOT) await page.getByTestId("facilities").screenshot({ path: process.env.FACILITY_SHOT });
-      // Livraison : on avance la date de fin du chantier.
+      if (process.env.FACILITY_SHOT) {
+        await page.reload();
+        await page.getByTestId("facilities").screenshot({ path: process.env.FACILITY_SHOT });
+      }
+      // Livraison : on avance la date de fin des chantiers.
       const state = await prisma.teamState.findFirstOrThrow({ where: { careerId, teamId: "lal" } });
       const plan = JSON.parse(state.facilityProjectsJson!);
       for (const p of plan.projects) p.completesOn = "2000-01-01T00:00:00.000Z";
       await prisma.teamState.update({ where: { id: state.id }, data: { facilityProjectsJson: JSON.stringify(plan) } });
       await expectPageOk(page, "/franchise");
-      await expect(page.getByTestId("facilities").getByText(/Récupération \+4 %/).first()).toBeVisible();
-      await expect(page.getByTestId("facilities").getByText(/Recettes loges et premium \+15 %/).first()).toBeVisible();
+      await expect(page.getByTestId("facilities").getByText(/Récupération \+12 %/).first()).toBeVisible();
+      await expect(page.getByTestId("facilities").getByText(/Recettes loges et premium \+30 %/).first()).toBeVisible();
+      await expect(card.getByText("Palier maximum atteint")).toBeVisible();
       const after = await prisma.teamState.findFirstOrThrow({ where: { careerId, teamId: "lal" } });
-      expect(after.facilitiesLevel).toBe(state.facilitiesLevel + 3);
+      expect(after.facilitiesLevel).toBe(state.facilitiesLevel + 4);
       expect(after.publicOpinion).toBe(state.publicOpinion - 2);
       expect(await prisma.inboxMessage.count({ where: { careerId, teamId: "lal", type: "facility" } })).toBe(2);
       await expect(page.getByTestId("facility-progress").getByText(/Emprunts en cours/)).toBeVisible();

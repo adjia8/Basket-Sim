@@ -78,6 +78,11 @@ export const keys = [
   "facility.project.food_court.desc",
   "facility.project.fan_zone.name",
   "facility.project.fan_zone.desc",
+  "facility.compare",
+  "facility.requested",
+  "facility.requestPromised",
+  "facility.existing",
+  "facility.tied",
 ] as const;
 
 export type FacilityKey = (typeof keys)[number];
@@ -162,6 +167,11 @@ export const fr: Record<FacilityKey, string> = {
   "facility.project.food_court.desc": "Food court, bars, mégastore : les spectateurs dépensent davantage.",
   "facility.project.fan_zone.name": "Fan zone et parvis",
   "facility.project.fan_zone.desc": "Animations avant-match, écrans extérieurs : la ville vit au rythme du club.",
+  "facility.compare": "Ligue : {rank} sur {of} · moyenne {avg} ★ · meilleure autre équipe : {best}",
+  "facility.requested": "Réclamé par {names}",
+  "facility.requestPromised": "Promis à {names} : lance le chantier avant l'échéance",
+  "facility.existing": "Existant",
+  "facility.tied": "ex æquo",
 };
 
 export const en: Record<FacilityKey, string> = {
@@ -244,4 +254,9 @@ export const en: Record<FacilityKey, string> = {
   "facility.project.food_court.desc": "Food court, bars, megastore: fans spend more.",
   "facility.project.fan_zone.name": "Fan zone and plaza",
   "facility.project.fan_zone.desc": "Pre-game entertainment, outdoor screens: the city lives to the club's rhythm.",
+  "facility.compare": "League: {rank} of {of} · average {avg} ★ · best other team: {best}",
+  "facility.requested": "Requested by {names}",
+  "facility.requestPromised": "Promised to {names}: start the build before the deadline",
+  "facility.existing": "Existing",
+  "facility.tied": "(tied)",
 };

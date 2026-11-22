@@ -93,7 +93,6 @@ import {
   withFacilityBonuses,
   type FacilityPlan,
 } from "../../src/lib/careers/facility-projects-rules";
-import { homeGameRevenue } from "../../src/lib/careers/finance-rules";
 
 test("projets d'infrastructure : paliers, exclusivité, chantiers simultanés", () => {
   const reno = { training: 20_000_000, arena: 30_000_000 };
@@ -155,4 +154,46 @@ test("financement, effets et recettes des projets", () => {
   assert.ok(boosted.concessions > plain.concessions);
   const works = homeGameRevenue({ ...base, boost: { fill: 0, premium: 0, concessions: 0, merch: 0, works: true } });
   assert.ok(works.attendees < plain.attendees);
+});
+
+import { baselineTiers, effectiveTier, projectDef as defOf, projectStars, PROJECTS } from "../../src/lib/careers/facility-projects-rules";
+import { desiredFacility, facilityRequestOutcome } from "../../src/lib/careers/facility-request-rules";
+
+test("installations existantes : jamais au maximum, une seule tribune, étoiles", () => {
+  for (const id of ["lal", "nyk", "uta", "okc", "mem"]) {
+    for (const market of [10, 50, 95]) {
+      const b = baselineTiers(id, market);
+      for (const def of PROJECTS) if (!def.repeatable) assert.ok((b[def.key] ?? 0) < def.tiers.length);
+      assert.ok(!((b.premium_suites ?? 0) > 0 && (b.fan_stand ?? 0) > 0));
+    }
+  }
+  // Un grand marché est mieux équipé en moyenne.
+  const sum = (m: number) =>
+    ["a", "b", "c", "d", "e", "f"].reduce((s, id) => s + Object.values(baselineTiers(id, m)).reduce((x, y) => x + (y ?? 0), 0), 0);
+  assert.ok(sum(95) > sum(10));
+  // Construit > existant.
+  const plan = { projects: [{ key: "medical_center" as const, tier: 3, status: "done" as const, startedOn: "", completesOn: "", cost: 0, financing: "cash" as const }], loans: [], ownersRequestSeason: null };
+  assert.equal(effectiveTier(plan, "medical_center", { medical_center: 1 }), 3);
+  assert.equal(effectiveTier(plan, "recovery_center", { recovery_center: 2 }), 2);
+  const med = defOf("medical_center")!;
+  assert.equal(projectStars(med, 0, 50), 1);
+  assert.equal(projectStars(med, 3, 50), 5);
+  assert.equal(projectStars(defOf("arena_renovation")!, 0, 70), 3.5);
+});
+
+test("demandes d'installations : besoin selon le profil, issue", () => {
+  const tierOf = () => 0;
+  const maxOf = () => 3;
+  const star = { age: 27, renown: 80, overall: 85, potential: 86, wear: 20, injuriesThisSeason: 0 };
+  assert.equal(desiredFacility(star, tierOf, maxOf), null); // rien de particulier
+  assert.equal(desiredFacility({ ...star, injuriesThisSeason: 2 }, tierOf, maxOf)?.key, "medical_center");
+  assert.equal(desiredFacility({ ...star, age: 33 }, tierOf, maxOf)?.key, "recovery_center");
+  assert.equal(desiredFacility({ ...star, age: 22, overall: 78, potential: 88 }, tierOf, maxOf)?.key, "performance_lab");
+  assert.equal(desiredFacility({ ...star, age: 33, renown: 40 }, tierOf, maxOf), null); // pas assez renommé
+  assert.equal(desiredFacility({ ...star, age: 33 }, () => 2, maxOf), null); // déjà bien équipé
+  const today = new Date("2027-01-10");
+  assert.equal(facilityRequestOutcome({ currentTier: 2, wantedTier: 2, building: false, promiseBy: null, today }), "delivered");
+  assert.equal(facilityRequestOutcome({ currentTier: 1, wantedTier: 2, building: true, promiseBy: null, today }), "started");
+  assert.equal(facilityRequestOutcome({ currentTier: 1, wantedTier: 2, building: false, promiseBy: new Date("2027-01-01"), today }), "broken");
+  assert.equal(facilityRequestOutcome({ currentTier: 1, wantedTier: 2, building: false, promiseBy: new Date("2027-02-01"), today }), "waiting");
 });

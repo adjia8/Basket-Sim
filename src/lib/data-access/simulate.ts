@@ -18,7 +18,7 @@ import { translatorFor } from "@/lib/i18n/translate";
 import { advancePlayerRenown } from "@/lib/data-access/renown";
 import { advanceRosterFatigue, getRestDays } from "@/lib/data-access/fatigue";
 import { fatigueAtTipOff } from "@/lib/careers/fatigue-rules";
-import { facilityBonuses, parsePlan, withFacilityBonuses } from "@/lib/careers/facility-projects-rules";
+import { baselineTiers, facilityBonuses, parsePlan, withFacilityBonuses } from "@/lib/careers/facility-projects-rules";
 import { settleFacilityProjects } from "@/lib/data-access/facility-projects";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { advanceRosterDevelopment, advanceRosterTraining } from "@/lib/data-access/training";
@@ -458,12 +458,12 @@ export async function simulateAndResolveGame(
   // progression, vidéo, ambiance à domicile — voir facility-projects-rules.ts).
   const homeStaff = withFacilityBonuses(
     staffEffects(homeProfile),
-    facilityBonuses(parsePlan(homeTeamState.facilityProjectsJson), game.leagueId),
+    facilityBonuses(parsePlan(homeTeamState.facilityProjectsJson), game.leagueId, baselineTiers(game.homeTeamId, homeTeam.marketAppeal)),
     true
   );
   const awayStaff = withFacilityBonuses(
     staffEffects(awayProfile),
-    facilityBonuses(parsePlan(awayTeamState.facilityProjectsJson), game.leagueId),
+    facilityBonuses(parsePlan(awayTeamState.facilityProjectsJson), game.leagueId, baselineTiers(game.awayTeamId, awayTeam.marketAppeal)),
     false
   );
   // Énergie au coup d'envoi : la fatigue enregistrée date de la fin du

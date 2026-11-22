@@ -28,6 +28,8 @@ export interface ConversationSetup {
   nextStatus: PlayerStatus | null; // rôle promis par « plus de minutes »
   request: PlayerRequest | null; // demande du joueur en attente
   suggestedTopic: ConversationTopic | null; // sujet qui y répond
+  facilityKey: string | null; // installation réclamée (demande « facilities »)
+  facilityName?: string; // libellé, ajouté par la page
 }
 
 // Tout ce qu'il faut pour discuter avec un joueur de MON effectif : sa
@@ -86,6 +88,7 @@ export async function getConversationSetup(
     recentIncident,
     recentGoodForm: recent.length >= 3 && recentPpg >= ppg + 3,
     answeringRequest: !!state.pendingRequest,
+    facilityRequest: !!state.facilityRequestKey && !state.facilityPromiseBy,
   };
   const today = lastGame?.gameDate ?? null;
   const since = state.lastConversationAt && today ? Math.floor((today.getTime() - state.lastConversationAt.getTime()) / DAY_MS) : null;
@@ -94,5 +97,5 @@ export async function getConversationSetup(
   const request = (state.pendingRequest as PlayerRequest | null) ?? null;
   const topics = availableTopics(context);
   const suggestedTopic = request ? (TOPICS_FOR_REQUEST[request].find((t) => topics.includes(t as ConversationTopic)) as ConversationTopic | undefined) ?? null : null;
-  return { context, topics, cooldownDays, today, nextStatus, request, suggestedTopic };
+  return { context, topics, cooldownDays, today, nextStatus, request, suggestedTopic, facilityKey: state.facilityRequestKey };
 }

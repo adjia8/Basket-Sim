@@ -7,6 +7,7 @@ import {
 } from "@/lib/data-access/franchise-history";
 import { PRICE_LEVELS, healthyFinancesThreshold, upgradeCost } from "@/lib/careers/finance-rules";
 import {
+  baselineTiers,
   facilityBonuses,
   financingPlan,
   MAX_CONCURRENT_PROJECTS,
@@ -16,7 +17,8 @@ import {
   type FacilityDomain,
 } from "@/lib/careers/facility-projects-rules";
 import { tierEffectLines } from "@/lib/careers/facility-effects-text";
-import { settleFacilityProjects } from "@/lib/data-access/facility-projects";
+import { getFacilityComparison, settleFacilityProjects, type FeatureComparison } from "@/lib/data-access/facility-projects";
+import { Stars } from "@/components/ui/Stars";
 import { getGameClock } from "@/lib/data-access/game-clock";
 import { prisma } from "@/lib/prisma";
 import { FacilityProjectCard, type ProjectCardView } from "@/components/franchise/FacilityProjectCard";
@@ -37,19 +39,47 @@ export default async function FranchisePage() {
   const clock = await getGameClock(membership.careerId, membership.teamId);
   const today = clock.today ?? new Date();
   await settleFacilityProjects(membership.careerId, membership.teamId, membership.season, today, locale);
-  const [teamState, gm] = await Promise.all([
+  const [teamState, gm, myTeam, comparison, requesters] = await Promise.all([
     getOrCreateTeamState(membership.careerId, membership.teamId, membership.leagueId),
     prisma.gmProfile.findFirst({ where: { membership: { careerId: membership.careerId, teamId: membership.teamId } }, select: { frontOfficeApproval: true } }),
+    prisma.team.findUnique({ where: { id: membership.teamId }, select: { marketAppeal: true } }),
+    getFacilityComparison(membership.careerId, membership.leagueId, membership.teamId),
+    // Joueurs de mon effectif qui réclament une installation.
+    prisma.playerState.findMany({
+      where: {
+        careerId: membership.careerId,
+        facilityRequestKey: { not: null },
+        player: { contracts: { some: { careerId: membership.careerId, teamId: membership.teamId } } },
+      },
+      select: { facilityRequestKey: true, facilityPromiseBy: true, player: { select: { firstName: true, lastName: true } } },
+    }),
   ]);
+  const baseline = baselineTiers(membership.teamId, myTeam?.marketAppeal ?? 50);
+  const ratingLine = (c: FeatureComparison | undefined) =>
+    c
+      ? t("facility.compare", {
+          rank:
+            (locale === "fr" ? (c.rank === 1 ? "1er" : `${c.rank}e`) : `#${c.rank}`) +
+            (c.tied ? ` ${t("facility.tied")}` : ""),
+          of: c.of,
+          avg: c.average.toLocaleString(locale, { maximumFractionDigits: 1 }),
+          best: c.best ? `${c.best.teamName} (${c.best.stars.toLocaleString(locale)} ★)` : "—",
+        })
+      : "";
   const ledger = parseLedger(teamState.financeLedgerJson, membership.season);
 
   // Projets d'infrastructure (voir facility-projects-rules.ts).
   const plan = parsePlan(teamState.facilityProjectsJson);
-  const bonuses = facilityBonuses(plan, membership.leagueId);
-  const options = projectOptions(plan, membership.leagueId, {
-    training: upgradeCost(teamState.facilitiesLevel, membership.leagueId, "training"),
-    arena: upgradeCost(teamState.arenaLevel, membership.leagueId, "arena"),
-  });
+  const bonuses = facilityBonuses(plan, membership.leagueId, baseline);
+  const options = projectOptions(
+    plan,
+    membership.leagueId,
+    {
+      training: upgradeCost(teamState.facilitiesLevel, membership.leagueId, "training"),
+      arena: upgradeCost(teamState.arenaLevel, membership.leagueId, "arena"),
+    },
+    baseline
+  );
   const money = (v: number) => formatSalary(v, locale);
   const projectName = (key: string) => t(`facility.project.${key}.name` as DictionaryKey);
   const ownersAsked = plan.ownersRequestSeason === membership.season;
@@ -112,6 +142,15 @@ export default async function FranchisePage() {
             : [],
           canStart: !!next && !o.building && !o.blockedBy,
           warning: domain === "arena" ? t("facility.worksWarning") : null,
+          rating: comparison.get(o.def.key)
+            ? { stars: comparison.get(o.def.key)!.stars, line: ratingLine(comparison.get(o.def.key)) }
+            : null,
+          request: (() => {
+            const who = requesters.filter((r) => r.facilityRequestKey === o.def.key);
+            if (who.length === 0) return null;
+            const names = who.map((r) => `${r.player.firstName} ${r.player.lastName}`).join(", ");
+            return who.some((r) => r.facilityPromiseBy) ? t("facility.requestPromised", { names }) : t("facility.requested", { names });
+          })(),
         };
       });
   const activeEffects = tierEffectLines(
@@ -233,9 +272,17 @@ export default async function FranchisePage() {
           return (
             <div key={domain} className="mt-6" data-testid={`facility-${domain}`}>
               <div className="flex items-baseline justify-between gap-3">
-                <h3 className="font-semibold">{t(`facility.domain.${domain}`)}</h3>
+                <h3 className="flex flex-wrap items-center gap-2 font-semibold">
+                  {t(`facility.domain.${domain}`)}
+                  {comparison.get(`domain:${domain}`) && <Stars value={comparison.get(`domain:${domain}`)!.stars} />}
+                </h3>
                 <span className={`text-sm font-semibold ${toneClass(ratingTone(level))}`}>{t("facility.level", { level })}</span>
               </div>
+              {comparison.get(`domain:${domain}`) && (
+                <p className="mt-0.5 text-xs text-faint" data-testid={`facility-${domain}-compare`}>
+                  {ratingLine(comparison.get(`domain:${domain}`))}
+                </p>
+              )}
               <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-3">
                 <div className="h-full rounded-full bg-accent" style={{ width: `${level}%` }} />
               </div>

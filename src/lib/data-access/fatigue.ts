@@ -4,7 +4,7 @@ import type { PlayerStatePatches } from "./player-state-patches";
 import type { BoxScoreEntry, Player } from "@/lib/types";
 import { fatigueAtTipOff, fatigueGainForGame } from "@/lib/careers/fatigue-rules";
 import { staffEffects, staffProfile } from "@/lib/careers/staff-rules";
-import { facilityBonuses, parsePlan } from "@/lib/careers/facility-projects-rules";
+import { baselineTiers, facilityBonuses, parsePlan } from "@/lib/careers/facility-projects-rules";
 import { clampWear, wearGainForGame, wearRecovery } from "@/lib/careers/wear-rules";
 import type { TrainingIntensity } from "@/lib/careers/training-rules";
 
@@ -102,17 +102,18 @@ export async function withTipOffFatigue<P extends Player>(careerId: string, team
     select: { gameDate: true, season: true, leagueId: true },
   });
   if (!next) return players;
-  const [restDays, state, staff] = await Promise.all([
+  const [restDays, state, staff, team] = await Promise.all([
     getRestDays(careerId, teamId, next.season, next.gameDate),
     prisma.teamState.findFirst({ where: { careerId, teamId }, select: { facilitiesLevel: true, facilityProjectsJson: true } }),
     prisma.staffMember.findMany({
       where: { careerId, teamId },
       select: { teamId: true, role: true, specialty: true, rating: true, motivation: true },
     }),
+    prisma.team.findUnique({ where: { id: teamId }, select: { marketAppeal: true } }),
   ]);
   const recoveryFactor =
     (staff.length > 0 ? staffEffects(staffProfile(staff, next.leagueId)).fatigueRecoveryFactor : 1) *
-    (1 + facilityBonuses(parsePlan(state?.facilityProjectsJson), next.leagueId).recovery);
+    (1 + facilityBonuses(parsePlan(state?.facilityProjectsJson), next.leagueId, baselineTiers(teamId, team?.marketAppeal ?? 50)).recovery);
   const facilities = state?.facilitiesLevel ?? 50;
   return players.map((p) => ({
     ...p,

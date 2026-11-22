@@ -17,6 +17,7 @@ export type ConversationTopic =
   | "patience" // « Patiente, ton tour viendra »
   | "convince_stay" // il veut partir : le convaincre de rester
   | "promise_trade" // il veut partir : lui promettre un échange
+  | "promise_facility" // il réclame une installation : la lui promettre
   | "discipline" // le recadrer (comportement, fautes techniques…)
   | "praise"; // le féliciter
 
@@ -26,6 +27,7 @@ export const CONVERSATION_TOPICS: ConversationTopic[] = [
   "patience",
   "convince_stay",
   "promise_trade",
+  "promise_facility",
   "discipline",
   "praise",
 ];
@@ -35,7 +37,7 @@ export const CONVERSATION_TONES: ConversationTone[] = ["calm", "firm", "encourag
 
 export type Reaction = "delighted" | "positive" | "neutral" | "annoyed" | "angry";
 
-export type ConversationEffect = "promise_minutes" | "clear_trade_request" | "trade_request" | "promise_trade" | null;
+export type ConversationEffect = "promise_minutes" | "clear_trade_request" | "trade_request" | "promise_trade" | "promise_facility" | null;
 
 // Jours de jeu minimum entre deux discussions avec le même joueur.
 export const CONVERSATION_COOLDOWN_DAYS = 7;
@@ -52,6 +54,7 @@ export interface ConversationContext {
   recentIncident: boolean; // faute technique ou expulsion lors des derniers matchs
   recentGoodForm: boolean; // meilleurs matchs récents que sa moyenne
   answeringRequest?: boolean; // le joueur avait demandé à parler au GM
+  facilityRequest?: boolean; // il réclame une installation, sans promesse en cours
 }
 
 // Sujets qui ont du sens pour ce joueur maintenant.
@@ -62,6 +65,7 @@ export function availableTopics(c: ConversationContext): ConversationTopic[] {
   if (c.underExpectedMinutes || c.status === "bench" || c.status === "prospect") topics.push("patience");
   if (c.wantsTrade) topics.push("convince_stay");
   if (c.wantsTrade && !c.hasActivePromise) topics.push("promise_trade");
+  if (c.facilityRequest) topics.push("promise_facility");
   topics.push("discipline", "praise");
   return topics;
 }
@@ -87,6 +91,8 @@ function topicScore(topic: ConversationTopic, tone: ConversationTone, c: Convers
       return (p.loyalty - 10) / 3 + (c.morale - 50) / 20;
     case "promise_trade":
       return 2;
+    case "promise_facility":
+      return 2.5;
     case "discipline":
       if (!c.recentIncident) return -2 + (p.professionalism >= 15 ? 1 : 0);
       // Recadrer à raison : un professionnel l'accepte ; un sanguin le prend
@@ -132,6 +138,7 @@ export function conversationOutcome(
   let effect: ConversationEffect = null;
   if (topic === "more_minutes") effect = "promise_minutes";
   if (topic === "promise_trade") effect = "promise_trade";
+  if (topic === "promise_facility") effect = "promise_facility";
   if (topic === "convince_stay" && (reaction === "delighted" || reaction === "positive")) effect = "clear_trade_request";
   // Un ambitieux qu'on rétrograde ou qu'on retient de force finit par
   // réclamer son départ.

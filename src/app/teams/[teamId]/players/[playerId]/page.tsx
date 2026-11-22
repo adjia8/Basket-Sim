@@ -18,6 +18,7 @@ import { getPromiseProgress } from "@/lib/data-access/playing-time-promises";
 import { promisePlayingTime } from "@/app/actions/promise";
 import { PlayerConversation } from "@/components/team/PlayerConversation";
 import { getConversationSetup } from "@/lib/data-access/player-conversations";
+import type { DictionaryKey } from "@/lib/i18n/dictionary";
 import { CONVERSATION_TONES } from "@/lib/careers/player-conversation-rules";
 import {
   PERSONALITY_TRAITS,
@@ -231,10 +232,13 @@ export default async function PlayerDetailPage({
       : null;
   const promisable = currentStatus ? promisableStatuses(currentStatus) : [];
   // Discussion avec le joueur (mes joueurs seulement).
-  const conversation =
+  const conversationRaw =
     isMyTeam && contract
       ? await getConversationSetup(membership.careerId, membership.season, contract.teamId, playerId)
       : null;
+  const conversation = conversationRaw?.facilityKey
+    ? { ...conversationRaw, facilityName: t(`facility.project.${conversationRaw.facilityKey}.name` as DictionaryKey) }
+    : conversationRaw;
   const loadPlan = parseLoadPlan(player.loadPlanJson);
   // Courbe de progression : relevés mensuels + la note d'aujourd'hui.
   const [ratingHistory, careerLines] = await Promise.all([
@@ -482,7 +486,7 @@ export default async function PlayerDetailPage({
             you: t("talk.you"),
             cooldown: conversation.cooldownDays > 0 ? t("talk.cooldown", { days: conversation.cooldownDays }) : null,
             request: conversation.request
-              ? t(`talk.request.${conversation.request}`, { name: player.firstName })
+              ? t(`talk.request.${conversation.request}`, { name: player.firstName, facility: conversation.facilityName ?? "" })
               : null,
           }}
           defaultTopic={conversation.suggestedTopic}

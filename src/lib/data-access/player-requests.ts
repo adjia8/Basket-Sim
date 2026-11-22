@@ -15,6 +15,17 @@ import {
   type PlayerRequest,
 } from "@/lib/careers/player-request-rules";
 import type { Locale } from "@/lib/i18n/locale";
+import { translatorFor } from "@/lib/i18n/translate";
+import type { DictionaryKey } from "@/lib/i18n/dictionary";
+import { baselineTiers, effectiveTier, parsePlan, projectDef, type ProjectKey } from "@/lib/careers/facility-projects-rules";
+import {
+  desiredFacility,
+  facilityRequestOutcome,
+  FACILITY_BROKEN_MORALE,
+  FACILITY_DELIVERED_MORALE,
+  FACILITY_REQUEST_CHANCE,
+  FACILITY_STARTED_MORALE,
+} from "@/lib/careers/facility-request-rules";
 
 const DAY_MS = 86_400_000;
 const days = (from: Date, to: Date) => Math.floor((to.getTime() - from.getTime()) / DAY_MS);
@@ -31,6 +42,10 @@ const REQUEST_TEXT: Record<PlayerRequest, { fr: [string, string]; en: [string, s
   support: {
     fr: ["{name} demande à te parler", "{name} traverse une période difficile et a besoin de se sentir soutenu."],
     en: ["{name} asks to talk to you", "{name} is going through a rough patch and needs to feel supported."],
+  },
+  facilities: {
+    fr: ["{name} réclame un {facility} plus moderne", "{name} estime que le club doit investir dans son {facility} pour rester au niveau. Lance le chantier depuis la page Franchise, ou parle-lui."],
+    en: ["{name} wants a more modern {facility}", "{name} believes the club must invest in its {facility} to keep up. Start the build from the Franchise page, or talk to him."],
   },
 };
 
@@ -50,14 +65,16 @@ export async function maybePlayerRequests(
     select: { playerId: true, yearsRemaining: true, isRookieScale: true },
   });
   const ids = contracts.map((c) => c.playerId);
-  const [states, stats, teamState] = await Promise.all([
+  const [states, stats, teamState, injuries] = await Promise.all([
     prisma.playerState.findMany({
       where: { careerId, playerId: { in: ids } },
       include: { player: { select: { firstName: true, lastName: true } } },
     }),
     prisma.playerSeasonStat.findMany({ where: { careerId, season, playerId: { in: ids } } }),
     prisma.teamState.findFirst({ where: { careerId, teamId } }),
+    prisma.injuryRecord.groupBy({ by: ["playerId"], where: { careerId, season, playerId: { in: ids } }, _count: { _all: true } }),
   ]);
+  const injuriesById = new Map(injuries.map((r) => [r.playerId, r._count._all]));
   const name = (s: (typeof states)[number]) => `${s.player.firstName} ${s.player.lastName}`;
 
   // 1. Demandes ignorées.
@@ -70,6 +87,7 @@ export async function maybePlayerRequests(
       data: {
         pendingRequest: null,
         requestAt: null,
+        ...(s.pendingRequest === "facilities" ? { facilityRequestKey: null, facilityRequestTier: null } : {}),
         morale: clampMorale(s.morale + scaleMoraleDelta(REQUEST_IGNORED_MORALE, p)),
         ...(toTrade ? { wantsTrade: true, tradeRequestReasonsJson: JSON.stringify(["morale"]), tradeRequestSinceSeason: season } : {}),
       },
@@ -87,6 +105,59 @@ export async function maybePlayerRequests(
       `/teams/${teamId}/players/${s.playerId}`,
       { gameDate, playerId: s.playerId, priority: toTrade ? "urgent" : "important" }
     );
+  }
+
+  // 1 bis. Demandes d'installations : livrée, chantier lancé, promesse rompue.
+  const team = await prisma.team.findUnique({ where: { id: teamId }, select: { marketAppeal: true } });
+  const plan = parsePlan(teamState?.facilityProjectsJson);
+  const baseline = baselineTiers(teamId, team?.marketAppeal ?? 50);
+  const tf = translatorFor(locale);
+  for (const s of states) {
+    if (!s.facilityRequestKey || !s.facilityRequestTier) continue;
+    const key = s.facilityRequestKey as ProjectKey;
+    const building = plan.projects.find((p) => p.key === key && p.status === "building");
+    const outcome = facilityRequestOutcome({
+      currentTier: effectiveTier(plan, key, baseline),
+      wantedTier: s.facilityRequestTier,
+      building: !!building,
+      promiseBy: s.facilityPromiseBy,
+      today: gameDate,
+    });
+    if (outcome === "waiting") continue;
+    // Chantier lancé : il le salue une fois, puis attend la livraison.
+    if (outcome === "started" && s.facilityPromiseBy && building && s.facilityPromiseBy.getTime() > new Date(building.completesOn).getTime()) continue;
+    const p = personalityFor(s.playerId, s.age);
+    const facility = tf(`facility.project.${key}.name` as DictionaryKey);
+    const delta =
+      outcome === "delivered" ? FACILITY_DELIVERED_MORALE : outcome === "started" ? FACILITY_STARTED_MORALE : FACILITY_BROKEN_MORALE;
+    const toTrade = outcome === "broken" && ignoredLeadsToTradeRequest(p) && !s.wantsTrade;
+    await prisma.playerState.update({
+      where: { id: s.id },
+      data: {
+        morale: clampMorale(s.morale + scaleMoraleDelta(delta, p)),
+        ...(outcome === "started"
+          ? // Attend la livraison (avec une marge) ; la demande est entendue.
+            { facilityPromiseBy: new Date(new Date(building!.completesOn).getTime() + 14 * DAY_MS), ...(s.pendingRequest === "facilities" ? { pendingRequest: null, requestAt: null } : {}) }
+          : { facilityRequestKey: null, facilityRequestTier: null, facilityPromiseBy: null, ...(s.pendingRequest === "facilities" ? { pendingRequest: null, requestAt: null } : {}) }),
+        ...(toTrade ? { wantsTrade: true, tradeRequestReasonsJson: JSON.stringify(["facilities"]), tradeRequestSinceSeason: season } : {}),
+      },
+    });
+    const text = {
+      delivered: fr
+        ? [`${name(s)} savoure le nouveau ${facility}`, `Sa demande est satisfaite : ${name(s)} apprécie l'investissement du club. Son moral grimpe.`]
+        : [`${name(s)} loves the new ${facility}`, `His request has been met: ${name(s)} appreciates the club's investment. His morale rises.`],
+      started: fr
+        ? [`${name(s)} salue le lancement du chantier`, `Les travaux du ${facility} ont commencé : ${name(s)} se sent écouté et attend la livraison.`]
+        : [`${name(s)} welcomes the start of construction`, `Work on the ${facility} has begun: ${name(s)} feels heard and awaits delivery.`],
+      broken: fr
+        ? [`${name(s)} se sent trahi`, `Le ${facility} promis n'a jamais vu le jour. ${name(s)} le prend très mal${toTrade ? " et demande désormais à être échangé" : ""}.`]
+        : [`${name(s)} feels let down`, `The promised ${facility} never happened. ${name(s)} takes it very badly${toTrade ? " and now wants to be traded" : ""}.`],
+    }[outcome];
+    await createInboxMessage(careerId, teamId, season, "player_reaction", text[0], text[1], `/teams/${teamId}/players/${s.playerId}`, {
+      gameDate,
+      playerId: s.playerId,
+      priority: outcome === "broken" ? (toTrade ? "urgent" : "important") : "info",
+    });
   }
 
   // 2. Nouvelle demande éventuelle.
@@ -120,21 +191,46 @@ export async function maybePlayerRequests(
       extensionEligible: contract.yearsRemaining <= EXTENSION_MAX_YEARS_REMAINING,
       rookieScale: contract.isRookieScale,
     });
-    if (!request) continue;
+    // Sinon, une star peut réclamer une installation (voir facility-request-rules.ts).
+    const wanted =
+      !request && !s.facilityRequestKey && Math.random() < FACILITY_REQUEST_CHANCE
+        ? desiredFacility(
+            {
+              age: s.age,
+              renown: s.renown,
+              overall: s.overallRating,
+              potential: s.potential || s.overallRating,
+              wear: s.wear,
+              injuriesThisSeason: injuriesById.get(s.playerId) ?? 0,
+            },
+            (key) => effectiveTier(plan, key, baseline),
+            (key) => projectDef(key)?.tiers.length ?? 0
+          )
+        : null;
+    // Pas pendant qu'on construit déjà ce qu'il demande.
+    const facilityAsk = wanted && !plan.projects.some((p) => p.key === wanted.key && p.status === "building") ? wanted : null;
+    const finalRequest: PlayerRequest | null = request ?? (facilityAsk ? "facilities" : null);
+    if (!finalRequest) continue;
     const claimed = await prisma.playerState.updateMany({
       where: { id: s.id, pendingRequest: null },
-      data: { pendingRequest: request, requestAt: gameDate, lastRequestAt: gameDate },
+      data: {
+        pendingRequest: finalRequest,
+        requestAt: gameDate,
+        lastRequestAt: gameDate,
+        ...(facilityAsk && !request ? { facilityRequestKey: facilityAsk.key, facilityRequestTier: facilityAsk.tier, facilityPromiseBy: null } : {}),
+      },
     });
     if (claimed.count === 0) continue;
     if (teamState) await prisma.teamState.update({ where: { id: teamState.id }, data: { lastPlayerRequestAt: gameDate } });
-    const [title, body] = REQUEST_TEXT[request][fr ? "fr" : "en"];
+    const [title, body] = REQUEST_TEXT[finalRequest][fr ? "fr" : "en"];
+    const facilityName = facilityAsk ? tf(`facility.project.${facilityAsk.key}.name` as DictionaryKey) : "";
     await createInboxMessage(
       careerId,
       teamId,
       season,
       "player_request",
-      title.replace("{name}", name(s)),
-      body.replace("{name}", name(s)) +
+      title.replace("{name}", name(s)).replace("{facility}", facilityName),
+      body.replace("{name}", name(s)).replace("{facility}", facilityName) +
         (fr ? " Réponds-lui depuis sa fiche dans la semaine." : " Answer him from his player page within a week."),
       `/teams/${teamId}/players/${s.playerId}`,
       { gameDate, playerId: s.playerId }

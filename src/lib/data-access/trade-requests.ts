@@ -1,4 +1,5 @@
 import "server-only";
+import { parsePlan, projectDef } from "@/lib/careers/facility-projects-rules";
 import { ambitiousWantsOut, personalityFor, tradeRequestChanceMultiplier } from "@/lib/careers/personality-rules";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
@@ -209,9 +210,19 @@ export async function evaluatePendingPromises(
           break;
         case "facilities": {
           const ts = teamStates.find((s) => s.teamId === teamId);
+          // Promesse tenue si le centre d'entraînement est au niveau… ou si
+          // un chantier du centre d'entraînement a été lancé cette saison
+          // (voir facility-projects-rules.ts).
+          const from = new Date(`${finishedSeason.slice(0, 4)}-07-01T00:00:00Z`).getTime();
+          const to = new Date(`${finishedSeason.slice(5, 9)}-07-01T00:00:00Z`).getTime();
+          const invested = parsePlan(ts?.facilityProjectsJson).projects.some((p) => {
+            const at = new Date(p.startedOn).getTime();
+            return projectDef(p.key)?.domain === "training" && at >= from && at < to;
+          });
           isHonored =
-            (ts?.facilitiesLevel ?? 0) >= ATTRACTIVE_FACILITIES_THRESHOLD &&
-            (ts?.trainingStaffLevel ?? 0) >= ATTRACTIVE_TRAINING_STAFF_THRESHOLD;
+            invested ||
+            ((ts?.facilitiesLevel ?? 0) >= ATTRACTIVE_FACILITIES_THRESHOLD &&
+              (ts?.trainingStaffLevel ?? 0) >= ATTRACTIVE_TRAINING_STAFF_THRESHOLD);
           break;
         }
         case "competitiveness": {

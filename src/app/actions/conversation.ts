@@ -14,6 +14,7 @@ import {
 import { clampMorale } from "@/lib/careers/morale-rules";
 import { personalityFor, scaleMoraleDelta } from "@/lib/careers/personality-rules";
 import { getTranslator } from "@/lib/i18n/translate";
+import { FACILITY_PROMISE_DAYS } from "@/lib/careers/facility-request-rules";
 import type { DictionaryKey } from "@/lib/i18n/dictionary";
 
 export interface ConversationFormState {
@@ -70,6 +71,13 @@ export async function talkToPlayer(
       ...(outcome.effect === "promise_minutes" && setup.nextStatus
         ? { promisedStatus: setup.nextStatus, promiseSince: when }
         : {}),
+      // Promesse d'installation : chantier à lancer avant l'échéance ; sans
+      // promesse, répondre à la demande la referme.
+      ...(outcome.effect === "promise_facility"
+        ? { facilityPromiseBy: new Date(when.getTime() + FACILITY_PROMISE_DAYS * 86_400_000) }
+        : state.pendingRequest === "facilities"
+          ? { facilityRequestKey: null, facilityRequestTier: null }
+          : {}),
       ...(outcome.effect === "promise_trade"
         ? { activePromiseType: "trade", activePromiseSeason: season, promiseOriginTeamId: membership.teamId }
         : {}),

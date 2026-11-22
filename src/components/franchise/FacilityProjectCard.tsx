@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { startProject } from "@/app/actions/franchise";
+import { Stars } from "@/components/ui/Stars";
 
 // Carte d'un projet d'infrastructure : palier suivant (coût, durée,
 // entretien, effets), état du chantier, choix du financement.
@@ -24,6 +25,8 @@ export interface ProjectCardView {
   financing: FinancingOption[];
   canStart: boolean;
   warning: string | null;
+  rating: { stars: number; line: string } | null; // note /5 et comparaison à la ligue
+  request: string | null; // un joueur réclame cette installation
 }
 
 export function FacilityProjectCard({
@@ -53,7 +56,20 @@ export function FacilityProjectCard({
           view.tierLabel && <span className="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 text-[11px] text-soft">{view.tierLabel}</span>
         )}
       </div>
+      {view.rating && (
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5" data-testid="project-rating">
+          <span data-stars={view.rating.stars}>
+            <Stars value={view.rating.stars} />
+          </span>
+          <span className="text-[11px] text-faint">{view.rating.line}</span>
+        </div>
+      )}
       <p className="mt-1 text-xs text-muted">{view.desc}</p>
+      {view.request && (
+        <p className="mt-2 rounded bg-accent/10 px-2 py-1 text-xs text-accent-text" data-testid="project-request">
+          {view.request}
+        </p>
+      )}
 
       {view.status && (
         <p className={`mt-3 text-xs font-medium ${view.status.tone === "info" ? "text-info" : view.status.tone === "warn" ? "text-warn" : "text-muted"}`}>

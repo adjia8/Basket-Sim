@@ -9,7 +9,7 @@
 
 import type { Personality } from "./personality-rules";
 
-export type PlayerRequest = "minutes" | "contract" | "support";
+export type PlayerRequest = "minutes" | "contract" | "support" | "facilities";
 
 export const REQUEST_IGNORED_AFTER_DAYS = 7; // jours de jeu sans réponse
 export const REQUEST_PLAYER_COOLDOWN_DAYS = 21; // entre deux demandes d'un même joueur
@@ -49,6 +49,7 @@ export const TOPICS_FOR_REQUEST: Record<PlayerRequest, string[]> = {
   minutes: ["more_minutes", "patience", "less_minutes"],
   contract: ["praise", "convince_stay", "promise_trade"],
   support: ["praise", "patience", "more_minutes", "convince_stay"],
+  facilities: ["promise_facility", "patience", "praise"],
 };
 
 // Un ambitieux ignoré finit par demander à partir.
