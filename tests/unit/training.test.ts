@@ -88,3 +88,34 @@ test("plan de charge : repos sur back-to-back et au-delà d'une usure, plafond l
   assert.equal(parseLoadPlan(JSON.stringify({ minutesLimit: 7 })), null);
   assert.equal(planRests(null, { restDays: 0, wear: 99 }), false);
 });
+
+import { fatigueAtTipOff, fatigueGainForGame } from "../../src/lib/careers/fatigue-rules";
+import { clampWear as clampWearT, wearGainForGame as wearGainT, wearRecovery as wearRecoveryT } from "../../src/lib/careers/wear-rules";
+
+test("énergie au coup d'envoi : le repos compte avant le match", () => {
+  // Fin de match à 40 de fatigue, 2 jours de repos : bien récupéré avant le suivant.
+  assert.ok(fatigueAtTipOff(40, 2, 80) <= 10);
+  // Back-to-back : récupère moins, jamais négatif.
+  assert.ok(fatigueAtTipOff(40, 1, 80) > fatigueAtTipOff(40, 2, 80));
+  assert.equal(fatigueAtTipOff(5, 3, 80), 0);
+  // Usure élevée : récupération ralentie.
+  assert.ok(fatigueAtTipOff(40, 1, 80, 50, 90) > fatigueAtTipOff(40, 1, 80, 50, 0));
+});
+
+test("usure d'une star sur une saison : reste sous le seuil de repos", () => {
+  // 82 matchs, un back-to-back tous les ~6 matchs, 38 min, rythme rapide.
+  let wear = 0;
+  let fatigue = 0;
+  let maxWear = 0;
+  let minEnergy = 100;
+  for (let g = 0; g < 82; g++) {
+    const rest = g % 6 === 5 ? 1 : 2;
+    const tip = fatigueAtTipOff(fatigue, rest, 85, 50, wear);
+    minEnergy = Math.min(minEnergy, 100 - tip);
+    wear = clampWearT(wear - wearRecoveryT(rest, false, 50, wear) + wearGainT(38, rest, 85, "medium") * 1.12);
+    fatigue = Math.min(99, tip + fatigueGainForGame(85) * 1.12 + 3);
+    maxWear = Math.max(maxWear, wear);
+  }
+  assert.ok(maxWear <= 60, `usure max ${maxWear}`);
+  assert.ok(minEnergy >= 85, `énergie min ${minEnergy}`);
+});

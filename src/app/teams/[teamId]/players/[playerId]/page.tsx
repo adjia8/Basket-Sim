@@ -36,6 +36,7 @@ import Link from "next/link";
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getContractForPlayer } from "@/lib/data-access/contracts";
 import { getPlayerWithState } from "@/lib/data-access/players";
+import { withTipOffFatigue } from "@/lib/data-access/fatigue";
 import { getSeasonStatsForPlayers } from "@/lib/data-access/season-stats";
 import { getStintsForPlayer } from "@/lib/data-access/player-history";
 import { getTeamById } from "@/lib/data-access/teams";
@@ -95,11 +96,13 @@ export default async function PlayerDetailPage({
   const { playerId } = await params;
   const { t, locale } = await getTranslator();
 
-  const [player, contract] = await Promise.all([
+  const [rawPlayer, contract] = await Promise.all([
     getPlayerWithState(membership.careerId, playerId),
     getContractForPlayer(membership.careerId, playerId),
   ]);
-  if (!player) notFound();
+  if (!rawPlayer) notFound();
+  // Énergie attendue au prochain match de son équipe (voir withTipOffFatigue).
+  const player = contract ? (await withTipOffFatigue(membership.careerId, contract.teamId, [rawPlayer]))[0] : rawPlayer;
 
   // L'équipe actuelle du contrat fait foi, pas le teamId de l'URL — un lien
   // vers cette page (box score, historique, ancien coéquipier...) peut avoir

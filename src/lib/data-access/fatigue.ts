@@ -2,7 +2,8 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { PlayerStatePatches } from "./player-state-patches";
 import type { BoxScoreEntry, Player } from "@/lib/types";
-import { fatigueGainForGame, fatigueRecoveryForRestDays } from "@/lib/careers/fatigue-rules";
+import { fatigueAtTipOff, fatigueGainForGame } from "@/lib/careers/fatigue-rules";
+import { staffEffects, staffProfile } from "@/lib/careers/staff-rules";
 import { clampWear, wearGainForGame, wearRecovery } from "@/lib/careers/wear-rules";
 import type { TrainingIntensity } from "@/lib/careers/training-rules";
 
@@ -67,9 +68,14 @@ export async function advanceRosterFatigue(
         wearRecovery(restDays, minutes === 0, facilitiesLevel, wear) +
         wearGainForGame(minutes, restDays, player.ratings.stamina, intensity) * fitness.wearFactor * (fitness.gainFactor ?? 1)
     );
-    const recovered =
-      fatigueRecoveryForRestDays(restDays, player.ratings.stamina, facilitiesLevel, wear) * fitness.fatigueRecoveryFactor;
-    let newFatigue = Math.max(0, player.fatigue - recovered);
+    let newFatigue = fatigueAtTipOff(
+      player.fatigue,
+      restDays,
+      player.ratings.stamina,
+      facilitiesLevel,
+      wear,
+      fitness.fatigueRecoveryFactor
+    );
     if (playedIds.has(player.id)) {
       newFatigue += fatigueGainForGame(player.ratings.stamina) * (fitness.gainFactor ?? 1);
     }
@@ -80,4 +86,33 @@ export async function advanceRosterFatigue(
 
     patches.set(player.id, { fatigue: newFatigue, wear: newWear });
   }
+}
+
+// Énergie annoncée pour le prochain match de l'équipe : la fatigue
+// enregistrée (fin du dernier match) moins la récupération des jours de
+// repos jusqu'à ce prochain match — c'est l'état dans lequel les joueurs
+// l'aborderont (même calcul que la simulation). Sans match à venir, la
+// fatigue enregistrée est conservée.
+export async function withTipOffFatigue<P extends Player>(careerId: string, teamId: string, players: P[]): Promise<P[]> {
+  if (players.length === 0) return players;
+  const next = await prisma.game.findFirst({
+    where: { careerId, status: { not: "final" }, OR: [{ homeTeamId: teamId }, { awayTeamId: teamId }] },
+    orderBy: { gameDate: "asc" },
+    select: { gameDate: true, season: true, leagueId: true },
+  });
+  if (!next) return players;
+  const [restDays, state, staff] = await Promise.all([
+    getRestDays(careerId, teamId, next.season, next.gameDate),
+    prisma.teamState.findFirst({ where: { careerId, teamId }, select: { facilitiesLevel: true } }),
+    prisma.staffMember.findMany({
+      where: { careerId, teamId },
+      select: { teamId: true, role: true, specialty: true, rating: true, motivation: true },
+    }),
+  ]);
+  const recoveryFactor = staff.length > 0 ? staffEffects(staffProfile(staff, next.leagueId)).fatigueRecoveryFactor : 1;
+  const facilities = state?.facilitiesLevel ?? 50;
+  return players.map((p) => ({
+    ...p,
+    fatigue: fatigueAtTipOff(p.fatigue, restDays, p.ratings.stamina, facilities, p.wear ?? 0, recoveryFactor),
+  }));
 }

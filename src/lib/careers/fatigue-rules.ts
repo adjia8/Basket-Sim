@@ -28,3 +28,18 @@ export function fatigueRecoveryForRestDays(
   const facilitiesFactor = 1 + ((Math.max(0, Math.min(100, facilitiesLevel)) - 50) / 50) * 0.2;
   return Math.round(Math.max(0, restDays) * perDay * facilitiesFactor * energyRecoveryFactor(wear));
 }
+
+// Fatigue au coup d'envoi du prochain match : la fatigue enregistrée est
+// celle de la fin du dernier match ; la récupération des jours de repos est
+// appliquée ici, avant le match (moteur) et à l'affichage (énergie annoncée
+// pour le prochain match), et non plus seulement une fois le match joué.
+export function fatigueAtTipOff(
+  fatigue: number,
+  restDays: number,
+  stamina: number,
+  facilitiesLevel = 50,
+  wear = 0,
+  recoveryFactor = 1
+): number {
+  return Math.max(0, Math.round(fatigue - fatigueRecoveryForRestDays(restDays, stamina, facilitiesLevel, wear) * recoveryFactor));
+}

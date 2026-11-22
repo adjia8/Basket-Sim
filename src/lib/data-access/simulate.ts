@@ -17,6 +17,7 @@ import { advanceRosterInjuries, estimatedReturnDate, type NewInjury } from "@/li
 import { translatorFor } from "@/lib/i18n/translate";
 import { advancePlayerRenown } from "@/lib/data-access/renown";
 import { advanceRosterFatigue, getRestDays } from "@/lib/data-access/fatigue";
+import { fatigueAtTipOff } from "@/lib/careers/fatigue-rules";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { advanceRosterDevelopment, advanceRosterTraining } from "@/lib/data-access/training";
 import { AI_MAX_RESTED_PER_GAME, WEAR_AI_AUTO_REST } from "@/lib/careers/wear-rules";
@@ -453,6 +454,17 @@ export async function simulateAndResolveGame(
   const awayProfile = staffProfiles.get(game.awayTeamId) ?? NEUTRAL_STAFF_PROFILE;
   const homeStaff = staffEffects(homeProfile);
   const awayStaff = staffEffects(awayProfile);
+  // Énergie au coup d'envoi : la fatigue enregistrée date de la fin du
+  // match précédent ; les jours de repos depuis la font redescendre AVANT
+  // ce match (moteur, risque de blessure). advanceRosterFatigue repart des
+  // valeurs brutes et applique la même récupération.
+  const tipOff = (roster: typeof homeRoster, restDays: number, facilities: number, recovery: number) =>
+    roster.map((p) => ({
+      ...p,
+      fatigue: fatigueAtTipOff(p.fatigue, restDays, p.ratings.stamina, facilities, p.wear ?? 0, recovery),
+    }));
+  const homeRosterAtTipOff = tipOff(homeRoster, homeRestDays, homeTeamState.facilitiesLevel, homeStaff.fatigueRecoveryFactor);
+  const awayRosterAtTipOff = tipOff(awayRoster, awayRestDays, awayTeamState.facilitiesLevel, awayStaff.fatigueRecoveryFactor);
 
   // Les joueurs actuellement blessés ne jouent pas : exclus du roster transmis
   // au moteur (ni minutes, ni stats de box score). Exception : une blessure
@@ -481,8 +493,8 @@ export async function simulateAndResolveGame(
       }
       return true;
     };
-  const homeEligibleRoster = homeRoster.filter(makeCanPlay(homeContractByPlayerId));
-  const awayEligibleRoster = awayRoster.filter(makeCanPlay(awayContractByPlayerId));
+  const homeEligibleRoster = homeRosterAtTipOff.filter(makeCanPlay(homeContractByPlayerId));
+  const awayEligibleRoster = awayRosterAtTipOff.filter(makeCanPlay(awayContractByPlayerId));
   // Tactiques : celles du GM humain ; l'IA prend la mieux adaptée à son
   // effectif du jour (voir bestTactics).
   const homeTactics = homeManager
@@ -618,12 +630,12 @@ export async function simulateAndResolveGame(
   const homeLoad = homeFocus && homeFocus !== "rest" ? homeIntensity : null;
   const awayLoad = awayFocus && awayFocus !== "rest" ? awayIntensity : null;
   const [homeNewInjuries, awayNewInjuries] = await Promise.all([
-    advanceRosterInjuries(patches, homeRoster, result.boxScore, homeTeamState.facilitiesLevel, {
+    advanceRosterInjuries(patches, homeRosterAtTipOff, result.boxScore, homeTeamState.facilitiesLevel, {
       medicalLevel: homeStaff.medicalLevel,
       intensity: homeLoad,
       recoveryChance: homeStaff.injuryRecoveryChance,
     }),
-    advanceRosterInjuries(patches, awayRoster, result.boxScore, awayTeamState.facilitiesLevel, {
+    advanceRosterInjuries(patches, awayRosterAtTipOff, result.boxScore, awayTeamState.facilitiesLevel, {
       medicalLevel: awayStaff.medicalLevel,
       intensity: awayLoad,
       recoveryChance: awayStaff.injuryRecoveryChance,

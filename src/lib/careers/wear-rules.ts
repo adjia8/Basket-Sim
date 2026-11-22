@@ -31,14 +31,15 @@ export function wearGainForGame(
 }
 
 // Usure résorbée avant le match, par jour de repos : d'autant plus que le
-// joueur est usé (0,8 + 2,5 % de l'usure), +5 pour un match passé sur le
+// joueur est usé (1,2 + 3,5 % de l'usure), +5 pour un match passé sur le
 // banc ou au repos (gestion de la charge), ±20 % selon les infrastructures.
-// Équilibre sur un calendrier NBA (~2 jours entre deux matchs) : ~15 pour
-// un remplaçant à 18 min, ~45-50 pour un titulaire à 34 min, ~60+ pour une
-// star à 38 min avec des back-to-backs — d'où la gestion de la charge.
+// Sur un calendrier NBA (~2 jours entre deux matchs) : ~20 pour un
+// remplaçant, ~35-40 pour un titulaire à 34 min, ~40 pour une star à 38 min,
+// et jusqu'à ~60 (seuil « besoin de repos ») avec rythme rapide, préparateurs
+// faibles et back-to-backs — d'où la gestion de la charge.
 export function wearRecovery(restDays: number, sat: boolean, facilitiesLevel = 50, wear = 0): number {
   const facilitiesFactor = 1 + ((Math.max(0, Math.min(100, facilitiesLevel)) - 50) / 50) * 0.2;
-  const perDay = 0.8 + Math.max(0, Math.min(99, wear)) * 0.025;
+  const perDay = 1.2 + Math.max(0, Math.min(99, wear)) * 0.035;
   return (Math.max(0, restDays) * perDay + (sat ? 5 : 0)) * facilitiesFactor;
 }
 

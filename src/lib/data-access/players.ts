@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { Player } from "@/lib/types";
 import type { Contract } from "@/lib/types";
 import { toDomainContract, toDomainPlayer, toDomainPlayerWithState } from "./mappers";
+import { withTipOffFatigue } from "./fatigue";
 
 export async function getAllPlayers(): Promise<Player[]> {
   const rows = await prisma.player.findMany();
@@ -13,6 +14,9 @@ export async function getAllPlayers(): Promise<Player[]> {
 // affichés viennent du PlayerState de cette Career (pas les valeurs figées du
 // catalogue) — c'est ce qui permet aux agents libres/signatures/vieillissement
 // de fonctionner indépendamment d'une Career à l'autre.
+// L'énergie affichée est celle attendue au prochain match (voir
+// withTipOffFatigue) ; la simulation lit la valeur brute via
+// getRosterAndContracts.
 export async function getRosterForTeam(
   careerId: string,
   teamId: string
@@ -23,8 +27,10 @@ export async function getRosterForTeam(
       player: { include: { playerStates: { where: { careerId } } } },
     },
   });
-  return contracts.map((c) =>
-    toDomainPlayerWithState(c.player, c.player.playerStates[0])
+  return withTipOffFatigue(
+    careerId,
+    teamId,
+    contracts.map((c) => toDomainPlayerWithState(c.player, c.player.playerStates[0]))
   );
 }
 
