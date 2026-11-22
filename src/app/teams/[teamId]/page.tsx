@@ -3,6 +3,8 @@ import { TrainingCalendarPanel, type CalendarPanelDay } from "@/components/team/
 import { CALENDAR_TEMPLATES, SESSION_TYPES, parseCalendar, planDays } from "@/lib/careers/training-calendar-rules";
 import { weeksCovering } from "@/lib/careers/month-grid";
 import { rotationAdvice } from "@/lib/careers/rotation-advice-rules";
+import { getTeamReport } from "@/lib/data-access/team-report";
+import { TeamReportPanel } from "@/components/team/TeamReportPanel";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { getTacticsReport } from "@/lib/data-access/tactics";
 import { TacticsPanel } from "@/components/team/TacticsPanel";
@@ -224,12 +226,15 @@ export default async function TeamRosterPage({
           { id: "training", label: t("team.tab.training") },
         ]
       : []),
+    ...(isMyTeam || isOpponentInMyLeague ? [{ id: "report", label: t("team.tab.report") }] : []),
     { id: "medical", label: t("team.tab.medical") },
     { id: "staff", label: t("team.tab.staff") },
     { id: "contracts", label: t("team.tab.contracts") },
     ...(isOpponentInMyLeague ? [{ id: "trade", label: t("team.tab.trade") }] : []),
   ];
   const activeTab = tabs.some((tab) => tab.id === requestedTab) ? requestedTab! : tabs[0].id;
+  // Rapport d'équipe : points forts / faibles classés dans la ligue (voir team-report.ts).
+  const teamReport = activeTab === "report" ? await getTeamReport(membership.careerId, team.leagueId, membership.season, team.id) : null;
   // Suggestion de l'entraîneur adjoint (voir rotation-advice-rules.ts) : le
   // meilleur adjoint de l'équipe, sa compétence pèse sur la qualité du conseil.
   const rotationAdviser =
@@ -487,6 +492,8 @@ export default async function TeamRosterPage({
           locale={locale}
         />
       )}
+
+      {activeTab === "report" && teamReport && <TeamReportPanel report={teamReport} t={t} />}
 
       {activeTab === "rotation" && (
         <div className="mt-6">

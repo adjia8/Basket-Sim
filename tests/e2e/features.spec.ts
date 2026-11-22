@@ -150,6 +150,14 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       });
     });
 
+    await test.step("rapport d'équipe : points forts / faibles, profondeur par poste", async () => {
+      await expectPageOk(page, "/teams/lal?tab=report");
+      await expect(page.getByTestId("team-report")).toBeVisible();
+      await expect(page.getByTestId("report-depth")).toBeVisible();
+      await expectPageOk(page, "/teams/bos?tab=report"); // aussi pour un adversaire
+      await expect(page.getByTestId("team-report")).toBeVisible();
+    });
+
     await test.step("rotation : suggestion de l'entraîneur adjoint", async () => {
       await expectPageOk(page, "/teams/lal?tab=rotation");
       const advice = page.getByTestId("rotation-advice");

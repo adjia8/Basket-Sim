@@ -150,3 +150,31 @@ test("suggestion de l'adjoint : chacun à son poste quand c'est possible (combin
   assert.equal((advice.notes.c as { pos: string }).pos, "C");
   assert.equal((advice.notes.pf as { pos: string }).pos, "PF");
 });
+
+test("rapport d'équipe : rangs, points forts / faibles, postes en manque, pistes", async () => {
+  const { rankMetrics, strengthsAndWeaknesses, positionDepth, reportAdvice } = await import("../../src/lib/careers/team-report-rules");
+  const league = new Map<string, Record<string, number>>();
+  for (let i = 0; i < 30; i++) league.set(`t${i}`, { ppg: 100 + i, oppPpg: 100 + i, scoringOutside: 60 + i, defenseInside: 60 + i, bench: 60 + i });
+  // Mon équipe : meilleure attaque et meilleur tir extérieur, pire défense (points encaissés et intérieure).
+  league.set("me", { ppg: 140, oppPpg: 140, scoringOutside: 95, defenseInside: 50, bench: 50 });
+  const ranked = rankMetrics("me", league);
+  const by = Object.fromEntries(ranked.map((m) => [m.key, m]));
+  assert.equal(by.ppg.rank, 1);
+  assert.equal(by.oppPpg.rank, 31); // moins bien = plus de points encaissés
+  const { strengths, weaknesses } = strengthsAndWeaknesses(ranked);
+  assert.ok(strengths.some((m) => m.key === "ppg") && strengths.some((m) => m.key === "scoringOutside"));
+  assert.ok(weaknesses.some((m) => m.key === "oppPpg") && weaknesses.some((m) => m.key === "defenseInside"));
+  const depth = positionDepth([
+    { position: "PG", overall: 90 }, { position: "PG", overall: 75 }, { position: "SG", overall: 80 }, { position: "SG", overall: 74 },
+    { position: "SF", overall: 78 }, { position: "SF", overall: 70 }, { position: "PF", overall: 77 },
+    { position: "C", overall: 70 }, { position: "C", overall: 68, injured: true },
+  ]);
+  const at = Object.fromEntries(depth.map((d) => [d.position, d]));
+  assert.equal(at.C.need, "critical"); // meilleur pivot à 70
+  assert.equal(at.PF.need, "thin"); // un seul ailier fort
+  assert.equal(at.PG.need, null);
+  const advice = reportAdvice(ranked, depth);
+  assert.deepEqual(advice[0], { kind: "recruit", position: "C", critical: true });
+  assert.ok(advice.some((a) => a.kind === "tactic" && a.tactic === "perimeter"));
+  assert.ok(advice.length <= 4);
+});
