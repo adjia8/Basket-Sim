@@ -83,6 +83,14 @@ export const keys = [
   "lifestyle.item.foundation",
   "lifestyle.item.yacht",
   "lifestyle.item.jet_share",
+  "aiLife.news.facilityTitle",
+  "aiLife.news.facilityBody",
+  "aiLife.news.facilityForPlayer",
+  "aiLife.news.requestTitle",
+  "aiLife.news.response.facilities",
+  "aiLife.news.response.convinced",
+  "aiLife.news.response.trade",
+  "aiLife.news.response.none",
 ] as const;
 
 export type GmCareerKey = (typeof keys)[number];
@@ -172,6 +180,14 @@ export const fr: Record<GmCareerKey, string> = {
   "lifestyle.item.foundation": "Fondation caritative locale",
   "lifestyle.item.yacht": "Yacht",
   "lifestyle.item.jet_share": "Part de jet privé",
+  "aiLife.news.facilityTitle": "{team} : chantier lancé ({project})",
+  "aiLife.news.facilityBody": "{team} investit {cost} dans son {project}. Livraison prévue le {date}.",
+  "aiLife.news.facilityForPlayer": "Une réponse aux attentes de {player}.",
+  "aiLife.news.requestTitle": "{player} veut quitter {team}",
+  "aiLife.news.response.facilities": "{player} réclamait de meilleures installations : {team} lance aussitôt un chantier pour le retenir.",
+  "aiLife.news.response.convinced": "Après une longue discussion, {team} convainc {player} de rester.",
+  "aiLife.news.response.trade": "{team} promet à {player} de lui trouver une nouvelle équipe d'ici la fin de la saison.",
+  "aiLife.news.response.none": "{team} fait la sourde oreille : {player} reste, mais l'ambiance est tendue.",
 };
 
 export const en: Record<GmCareerKey, string> = {
@@ -259,4 +275,12 @@ export const en: Record<GmCareerKey, string> = {
   "lifestyle.item.foundation": "Local charity foundation",
   "lifestyle.item.yacht": "Yacht",
   "lifestyle.item.jet_share": "Private jet share",
+  "aiLife.news.facilityTitle": "{team}: construction started ({project})",
+  "aiLife.news.facilityBody": "{team} invests {cost} in its {project}. Delivery expected {date}.",
+  "aiLife.news.facilityForPlayer": "A response to {player}'s expectations.",
+  "aiLife.news.requestTitle": "{player} wants out of {team}",
+  "aiLife.news.response.facilities": "{player} wanted better facilities: {team} immediately starts construction to keep him.",
+  "aiLife.news.response.convinced": "After a long talk, {team} convinces {player} to stay.",
+  "aiLife.news.response.trade": "{team} promises {player} to find him a new team by the end of the season.",
+  "aiLife.news.response.none": "{team} turns a deaf ear: {player} stays, but the mood is tense.",
 };

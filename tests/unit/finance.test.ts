@@ -203,3 +203,21 @@ test("demandes d'installations : besoin selon le profil, issue", () => {
   assert.equal(facilityRequestOutcome({ currentTier: 1, wantedTier: 2, building: false, promiseBy: new Date("2027-01-01"), today }), "broken");
   assert.equal(facilityRequestOutcome({ currentTier: 1, wantedTier: 2, building: false, promiseBy: new Date("2027-02-01"), today }), "waiting");
 });
+
+import { aiProjectChoice, projectOptions as optionsFor } from "../../src/lib/careers/facility-projects-rules";
+
+test("IA : choix d'un chantier selon les finances, les besoins et les stars", () => {
+  const plan = { projects: [], loans: [], ownersRequestSeason: null };
+  const opts = optionsFor(plan, "nba", { training: 20_000_000, arena: 30_000_000 }, baselineTiers("mia", 70));
+  const ctx = { finances: 150_000_000, reserve: 50_000_000, levels: { training: 41, arena: 69 }, demanded: [] as never[] };
+  const pick = aiProjectChoice(opts, ctx);
+  assert.ok(pick);
+  // Le Heat (centre d'entraînement faible) investit d'abord à l'entraînement.
+  assert.equal(optionsFor(plan, "nba", { training: 1, arena: 1 }).find((o) => o.def.key === pick!.key)?.def.domain, "training");
+  assert.equal(pick!.financing, "cash");
+  // Une star réclame un centre médical : priorité.
+  assert.equal(aiProjectChoice(opts, { ...ctx, demanded: ["medical_center"] })?.key, "medical_center");
+  // Trésorerie juste : emprunt ; sous la réserve : rien.
+  assert.equal(aiProjectChoice(opts, { ...ctx, finances: 56_000_000 })?.financing, "loan");
+  assert.equal(aiProjectChoice(opts, { ...ctx, finances: 40_000_000 }), null);
+});

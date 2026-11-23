@@ -43,6 +43,8 @@ export const keys = [
   "league.news.type.all_star",
   "league.news.type.trade",
   "league.news.type.cup",
+  "league.news.type.locker",
+  "league.news.type.facility",
   "league.news.dashboardHeading",
   "league.news.seeAll",
 ] as const;
@@ -95,6 +97,8 @@ export const fr: Record<LeagueKey, string> = {
   "league.news.type.all_star": "All-Star",
   "league.news.type.trade": "Échange",
   "league.news.type.cup": "NBA Cup",
+  "league.news.type.locker": "Vestiaire",
+  "league.news.type.facility": "Infrastructures",
   "league.news.dashboardHeading": "Actualité de la ligue",
   "league.news.seeAll": "Toute l'actualité",
 };
@@ -145,6 +149,8 @@ export const en: Record<LeagueKey, string> = {
   "league.news.type.all_star": "All-Star",
   "league.news.type.trade": "Trade",
   "league.news.type.cup": "NBA Cup",
+  "league.news.type.locker": "Locker room",
+  "league.news.type.facility": "Facilities",
   "league.news.dashboardHeading": "League news",
   "league.news.seeAll": "All news",
 };

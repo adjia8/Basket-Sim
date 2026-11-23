@@ -12,6 +12,7 @@ import { calendarDay } from "@/lib/careers/schedule-rules";
 import { maybeLeagueMilestones } from "@/lib/data-access/awards";
 import { advanceNbaCup, cupBarrier, maybePlayAllStarGame } from "@/lib/data-access/nba-cup";
 import { maybeAiTradeOffers } from "@/lib/data-access/ai-trades";
+import { maybeAiFacilityProjects } from "@/lib/data-access/ai-facilities";
 import { getTranslator } from "@/lib/i18n/translate";
 import { endOfGameDay } from "@/lib/data-access/game-clock";
 import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
@@ -98,6 +99,11 @@ async function runLeagueMilestones(
   await maybeBoardObjectives(careerId, career.leagueId, career.season, locale);
   // Offres d'échange à l'initiative de l'IA (voir ai-trades.ts).
   await maybeAiTradeOffers(careerId, career.leagueId, career.season, locale);
+  // Chantiers d'infrastructure des équipes IA (voir ai-facilities.ts).
+  const last = await prisma.game.findFirst({ where: { careerId, status: "final" }, orderBy: { gameDate: "desc" }, select: { gameDate: true } });
+  if (last && /^\d{4}-\d{4}$/.test(career.season)) {
+    await maybeAiFacilityProjects(careerId, career.leagueId, career.season, last.gameDate, locale);
+  }
 }
 
 // Simule, dans l'ordre chronologique, les matchs IA-vs-IA non joués datés

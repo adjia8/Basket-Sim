@@ -29,6 +29,7 @@ import { evaluatePendingPromises } from "@/lib/data-access/trade-requests";
 import { createInboxMessage } from "@/lib/data-access/inbox";
 import { poachOfferMessageText } from "@/lib/careers/inbox-rules";
 import { getTranslator, translatorFor } from "@/lib/i18n/translate";
+import { maybeAiFacilityProjects } from "@/lib/data-access/ai-facilities";
 import { ensureGmContract, pointsOf, seasonStyle, standingParts } from "@/lib/data-access/gm-career";
 import {
   attributeEvolution,
@@ -233,6 +234,10 @@ export async function advanceSeason(): Promise<void> {
   for (const team of teams) {
     await applySeasonFinancials(career.id, team.id, career.leagueId, career.season);
   }
+  // Intersaison : les équipes IA en profitent pour lancer des chantiers
+  // (comptés sur la saison qui démarre — voir ai-facilities.ts).
+  const lastGame = await prisma.game.findFirst({ where: { careerId: career.id, status: "final" }, orderBy: { gameDate: "desc" }, select: { gameDate: true } });
+  await maybeAiFacilityProjects(career.id, career.leagueId, newSeason, lastGame?.gameDate ?? new Date(), locale, 0.6);
 
   // 2ter. Évaluation des GM humains : compare l'objectif de pré-saison au
   // résultat réel des playoffs (+ pénalité si finances négatives en fin de

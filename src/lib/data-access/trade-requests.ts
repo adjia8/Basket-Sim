@@ -2,6 +2,9 @@ import "server-only";
 import { parsePlan, projectDef } from "@/lib/careers/facility-projects-rules";
 import { ambitiousWantsOut, personalityFor, scaleMoraleDelta, tradeRequestChanceMultiplier } from "@/lib/careers/personality-rules";
 import { clampMorale } from "@/lib/careers/morale-rules";
+import { aiStartProject } from "@/lib/data-access/ai-facilities";
+import { translatorFor } from "@/lib/i18n/translate";
+import type { DictionaryKey } from "@/lib/i18n/dictionary";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateTeamState } from "@/lib/data-access/team-state";
 import { getStandings } from "@/lib/data-access/standings";
@@ -36,7 +39,8 @@ export async function maybeFlagTradeRequest(
   leagueId: string,
   season: string,
   gameDate: Date,
-  locale: Locale
+  locale: Locale,
+  ai = false // équipe gérée par l'IA : pas de message, l'IA répond elle-même
 ): Promise<void> {
   const teamState = await getOrCreateTeamState(careerId, teamId, leagueId);
 
@@ -101,6 +105,10 @@ export async function maybeFlagTradeRequest(
     ]);
 
     const playerName = `${state.player.firstName} ${state.player.lastName}`;
+    if (ai) {
+      await aiRespondToTradeRequest({ careerId, teamId, leagueId, season, gameDate, locale, state, reasons, playerName, teamName: `${team.city} ${team.name}` });
+      break;
+    }
     const { title, body } = tradeRequestMessageText(locale, playerName);
     await createInboxMessage(
       careerId,
@@ -113,6 +121,67 @@ export async function maybeFlagTradeRequest(
       { gameDate, playerId: state.playerId }
     );
     break; // une seule nouvelle demande par appel — garantit l'anti-cluster même si plusieurs joueuses sont éligibles le même match
+  }
+}
+
+// Équipe IA : réponse immédiate à une demande d'échange.
+// - installations en cause : chantier au centre d'entraînement + promesse ;
+// - moral seul : une discussion le convainc une fois sur deux ;
+// - sinon (compétitivité, marché) : promesse d'échange (réalisé ensuite par
+//   l'IA, voir ai-trades.ts), ou rien.
+// Les stars font l'actualité de la ligue.
+async function aiRespondToTradeRequest(p: {
+  careerId: string;
+  teamId: string;
+  leagueId: string;
+  season: string;
+  gameDate: Date;
+  locale: Locale;
+  state: { id: string; playerId: string; renown: number; morale: number; age: number };
+  reasons: string[];
+  playerName: string;
+  teamName: string;
+}): Promise<void> {
+  const base = p.season.slice(0, 9);
+  let response: "facilities" | "convinced" | "trade" | "none" = "none";
+  if (p.reasons.includes("facilities")) {
+    const key = await aiStartProject(p.careerId, p.teamId, p.leagueId, base, p.gameDate, p.locale, {
+      preferDomain: "training",
+      forPlayer: p.playerName,
+    });
+    if (key) response = "facilities";
+  }
+  if (response === "none" && p.reasons.length === 1 && p.reasons[0] === "morale" && Math.random() < 0.5) response = "convinced";
+  if (response === "none" && Math.random() < 0.7) response = "trade";
+
+  if (response === "facilities" || response === "trade") {
+    await prisma.playerState.update({
+      where: { id: p.state.id },
+      data: { activePromiseType: response, activePromiseSeason: base, promiseOriginTeamId: p.teamId },
+    });
+  } else if (response === "convinced") {
+    await prisma.playerState.update({
+      where: { id: p.state.id },
+      data: {
+        wantsTrade: false,
+        tradeRequestReasonsJson: null,
+        tradeRequestSinceSeason: null,
+        morale: clampMorale(p.state.morale + scaleMoraleDelta(4, personalityFor(p.state.playerId, p.state.age))),
+      },
+    });
+  }
+  if (p.state.renown >= 75) {
+    const t = translatorFor(p.locale);
+    await prisma.leagueNews.create({
+      data: {
+        careerId: p.careerId,
+        season: base,
+        type: "locker",
+        teamId: p.teamId,
+        title: t("aiLife.news.requestTitle", { player: p.playerName, team: p.teamName }),
+        body: t(`aiLife.news.response.${response}` as DictionaryKey, { player: p.playerName, team: p.teamName }),
+      },
+    });
   }
 }
 
@@ -234,7 +303,11 @@ export async function resolveHonoredPromises(
     include: { player: { select: { firstName: true, lastName: true } } },
   });
   if (pending.length === 0) return 0;
-  const ts = await prisma.teamState.findFirst({ where: { careerId, teamId } });
+  const [ts, membership] = await Promise.all([
+    prisma.teamState.findFirst({ where: { careerId, teamId } }),
+    prisma.membership.findUnique({ where: { careerId_teamId: { careerId, teamId } }, select: { id: true } }),
+  ]);
+  const human = !!membership;
   const fr = locale === "fr";
   let resolved = 0;
   for (const state of pending) {
@@ -281,6 +354,15 @@ export async function resolveHonoredPromises(
       ],
     };
     const [tfr, bfr, ten, ben] = text[type];
+    if (!human) {
+      // Équipe IA : l'actualité de la ligue en parle pour les stars.
+      if (state.renown >= 75) {
+        await prisma.leagueNews.create({
+          data: { careerId, season, type: "locker", teamId, title: fr ? tfr : ten, body: fr ? bfr : ben },
+        });
+      }
+      continue;
+    }
     await createInboxMessage(careerId, teamId, season, "player_reaction", fr ? tfr : ten, fr ? bfr : ben, `/teams/${contract.teamId}/players/${state.playerId}`, {
       gameDate,
       playerId: state.playerId,

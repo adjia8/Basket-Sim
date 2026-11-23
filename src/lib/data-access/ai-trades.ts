@@ -289,6 +289,45 @@ async function maybeAiAiTrade(
   return false;
 }
 
+// Promesse d'échange faite par une équipe IA à un joueur mécontent (voir
+// aiRespondToTradeRequest) : elle cherche un preneur parmi les autres
+// équipes IA, à valeur un peu en dessous du marché (le joueur veut partir).
+async function maybePromisedTrade(
+  careerId: string,
+  market: Market,
+  season: string,
+  humanTeamIds: Set<string>,
+  locale: Locale
+): Promise<boolean> {
+  const promised = await prisma.playerState.findMany({
+    where: { careerId, activePromiseType: "trade", activePromiseSeason: season, promiseOriginTeamId: { notIn: [...humanTeamIds] } },
+    select: { playerId: true, promiseOriginTeamId: true },
+  });
+  for (const p of shuffle(promised).slice(0, 3)) {
+    const sellerId = p.promiseOriginTeamId!;
+    const target = (market.byTeam.get(sellerId) ?? []).find((a) => a.id === p.playerId);
+    if (!target || target.injured) continue;
+    const buyers = shuffle(market.standings.filter((r) => r.teamId !== sellerId && !humanTeamIds.has(r.teamId)));
+    for (const buyer of buyers.slice(0, 8)) {
+      const assets = await packageFor(careerId, market, buyer.teamId, target, { allowPicks: true, minRatio: 0.8 });
+      if (!assets) continue;
+      await executeTrade(careerId, season, sellerId, buyer.teamId, target, assets);
+      await recordTradeNews(
+        careerId,
+        season,
+        buyer.teamId,
+        sellerId,
+        [target.id],
+        assets.filter((a) => a.kind === "player").map((a) => a.id),
+        locale,
+        assets.filter((a) => a.kind === "pick").map((a) => a.label)
+      );
+      return true;
+    }
+  }
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 
 // Appelée après les lots de matchs : offres de l'IA aux GM humains (offre en
@@ -309,6 +348,11 @@ export async function maybeAiTradeOffers(careerId: string, leagueId: string, sea
   const humanTeamIds = new Set(memberships.map((m) => m.teamId));
   let market: Market | null = null;
   const getMarket = async () => (market ??= await loadMarket(careerId, leagueId, season, locale));
+
+  // Échanges promis par l'IA à ses joueurs mécontents (une fois sur deux).
+  if (Math.random() < 0.5 && (await maybePromisedTrade(careerId, await getMarket(), season, humanTeamIds, locale))) {
+    market = null;
+  }
 
   // Échanges entre équipes IA.
   if (daysSince(career?.lastAiAiTradeAt) >= AI_AI_COOLDOWN_DAYS) {

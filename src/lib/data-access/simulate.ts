@@ -79,6 +79,9 @@ async function ensureStaffOnce(careerId: string, leagueId: string, season: strin
 import { gmBonusFromProfile } from "@/lib/data-access/gm";
 import { maybeCreatePressConference } from "@/lib/data-access/press";
 import { maybeFlagTradeRequest, resolveHonoredPromises } from "@/lib/data-access/trade-requests";
+
+// Part des matchs où l'on vérifie le vestiaire d'une équipe IA.
+const AI_TRADE_REQUEST_CHECK = 0.15;
 import { getFreeAgents } from "@/lib/data-access/contracts";
 import { createInboxMessage } from "@/lib/data-access/inbox";
 import { winPctForStandings, minAcceptableSalary } from "@/lib/careers/player-demands";
@@ -1001,9 +1004,10 @@ export async function simulateAndResolveGame(
   ]);
   // Promesses déjà tenues (prolongation, échange, infrastructures) : soldées
   // sans attendre la fin de saison (voir resolveHonoredPromises).
+  // Toutes les équipes, IA comprises.
   await Promise.all([
-    homeManager ? resolveHonoredPromises(careerId, game.homeTeamId, game.season, gameDate, locale) : Promise.resolve(0),
-    awayManager ? resolveHonoredPromises(careerId, game.awayTeamId, game.season, gameDate, locale) : Promise.resolve(0),
+    resolveHonoredPromises(careerId, game.homeTeamId, game.season, gameDate, locale),
+    resolveHonoredPromises(careerId, game.awayTeamId, game.season, gameDate, locale),
   ]);
   // Les joueurs viennent parfois voir le GM (voir player-requests.ts) —
   // saison régulière seulement.
@@ -1015,14 +1019,20 @@ export async function simulateAndResolveGame(
   }
 
   // Nouvelle demande de trade éventuelle (cooldown + tirage, voir
-  // maybeFlagTradeRequest) — même restriction aux équipes humaines.
+  // maybeFlagTradeRequest). Équipes IA aussi (l'IA y répond elle-même),
+  // vérifiées un match sur six environ pour limiter les requêtes.
+  const regular = /^\d{4}-\d{4}$/.test(game.season);
   await Promise.all([
     homeManager
       ? maybeFlagTradeRequest(careerId, game.homeTeamId, game.leagueId, game.season, gameDate, locale)
-      : Promise.resolve(),
+      : regular && Math.random() < AI_TRADE_REQUEST_CHECK
+        ? maybeFlagTradeRequest(careerId, game.homeTeamId, game.leagueId, game.season, gameDate, locale, true)
+        : Promise.resolve(),
     awayManager
       ? maybeFlagTradeRequest(careerId, game.awayTeamId, game.leagueId, game.season, gameDate, locale)
-      : Promise.resolve(),
+      : regular && Math.random() < AI_TRADE_REQUEST_CHECK
+        ? maybeFlagTradeRequest(careerId, game.awayTeamId, game.leagueId, game.season, gameDate, locale, true)
+        : Promise.resolve(),
   ]);
 
   // Boîte de réception : blessures nouvelles, mouvement de classement, agent

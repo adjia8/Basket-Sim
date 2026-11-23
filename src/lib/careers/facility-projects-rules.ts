@@ -419,3 +419,44 @@ export function chargeLoans(json: string | null): { json: string | null; paid: n
   plan.loans = plan.loans.filter((l) => l.seasonsLeft > 0);
   return { json: JSON.stringify(plan), paid };
 }
+
+// ---------------------------------------------------------------------------
+// Équipes IA : quel chantier lancer (et comment le financer) ?
+
+export interface AiProjectContext {
+  finances: number;
+  reserve: number; // trésorerie à préserver
+  levels: { training: number; arena: number };
+  demanded: ProjectKey[]; // installations réclamées par ses stars
+  preferDomain?: FacilityDomain; // ex. un joueur veut partir faute d'installations
+}
+
+// Le projet le plus utile pour son coût, finançable sans fragiliser le club
+// (comptant si large marge, sinon emprunt). null = pas d'investissement.
+export function aiProjectChoice(options: ProjectOption[], c: AiProjectContext): { key: ProjectKey; financing: Financing; cost: number } | null {
+  const investable = c.finances - c.reserve;
+  if (investable <= 0) return null;
+  const scored = options
+    .filter((o) => o.next && !o.building && !o.blockedBy)
+    .map((o) => {
+      const level = c.levels[o.def.domain];
+      const gap = o.def.repeatable ? Math.max(0, (70 - level) / 70) : 1 - o.built / o.def.tiers.length;
+      const score =
+        gap +
+        (c.demanded.includes(o.def.key) ? 1.5 : 0) +
+        (c.preferDomain === o.def.domain ? 0.8 : 0) +
+        (level < 55 ? 0.3 : 0) -
+        (o.next!.cost / Math.max(1, investable)) * 0.5;
+      return { o, score };
+    })
+    .sort((a, b) => b.score - a.score);
+  for (const { o, score } of scored) {
+    if (score <= 0) continue;
+    const cost = o.next!.cost;
+    if (investable >= cost * 1.5) return { key: o.def.key, financing: "cash", cost };
+    if (investable >= cost * LOAN_DOWN_PAYMENT && c.finances - cost * LOAN_DOWN_PAYMENT >= c.reserve) {
+      return { key: o.def.key, financing: "loan", cost };
+    }
+  }
+  return null;
+}
