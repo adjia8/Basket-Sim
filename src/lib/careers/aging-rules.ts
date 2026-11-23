@@ -59,3 +59,27 @@ export function ageOneSeason(state: AgeableRatings & { potential?: number }, tra
     stamina: clampRating(state.stamina + delta),
   };
 }
+
+// Fin de carrière annoncée à l'issue de la saison (avant le vieillissement).
+// Au-delà de 40 ans, toujours ; avant, selon l'âge et le niveau restant :
+// un vétéran encore performant prolonge plus volontiers qu'un joueur en
+// net déclin. Tirage stable (même graine = même décision) pour que
+// l'annonce de fin de saison et l'intersaison concordent.
+function unit(seed: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 10_000) / 10_000;
+}
+
+export function retirementPlanned(p: { age: number; overallRating: number }, seed: string): boolean {
+  const nextAge = p.age + 1;
+  if (nextAge >= RETIREMENT_AGE) return true;
+  const roll = unit(seed);
+  if (nextAge >= 37) return p.overallRating < 70 || roll < 0.3;
+  if (nextAge >= 35) return p.overallRating < 60 || (p.overallRating < 68 && roll < 0.35);
+  if (nextAge >= 33) return p.overallRating < 52 && roll < 0.6;
+  return false;
+}

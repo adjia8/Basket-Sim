@@ -601,6 +601,7 @@ model Prospect {
   scoutingNote   String? // ex. "Duke (NCAA)", "Real Madrid (Espagne)" — null pour un prospect généré
   potential      Int     @default(0) // potentiel caché — voir potential-rules.ts
   nationality    String  @default("États-Unis")
+  draftSeason    String? // saison de la draft visée (classe révélée dès la fin de saison précédente)
 
   @@index([careerId])
 }

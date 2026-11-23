@@ -19,6 +19,17 @@ import {
   type SeasonReview,
 } from "@/lib/careers/offseason-rules";
 import type { Locale } from "@/lib/i18n/locale";
+import { generateProspectClass } from "@/lib/careers/generate-prospects";
+import { nextSeasonLabel } from "@/lib/careers/season-format";
+import { retirementPlanned } from "@/lib/careers/aging-rules";
+import { isHallOfFameWorthy } from "@/lib/careers/hall-of-fame-rules";
+import { tradeRequestReasons, winPctForStandings, type TradeRequestReason } from "@/lib/careers/player-demands";
+import { ambitiousWantsOut, personalityFor, tradeRequestChanceMultiplier } from "@/lib/careers/personality-rules";
+import { tradeRequestMessageText } from "@/lib/careers/inbox-rules";
+import { estimateRating, type Estimate } from "@/lib/careers/potential-rules";
+import { NEUTRAL_STAFF_PROFILE } from "@/lib/careers/staff-rules";
+import { aiRespondToTradeRequest } from "@/lib/data-access/trade-requests";
+import { getStaffProfiles } from "@/lib/data-access/staff";
 import { teamFullName } from "@/lib/utils";
 
 // Fin de saison : proclamation du champion (MVP des Finales, actualité,
@@ -77,6 +88,10 @@ export async function maybeChampionCeremony(careerId: string, leagueId: string, 
     applyAwardEffects(careerId, drafts),
     prisma.leagueNews.create({ data: { careerId, season, type: "champion", title: news.title, body: news.body, teamId: champion, playerId: mvp?.playerId ?? null } }),
   ]);
+  // Intersaison qui s'annonce : la classe de draft est révélée, et les
+  // joueurs mécontents font savoir qu'ils veulent partir.
+  await ensureDraftClass(careerId, leagueId, nextSeasonLabel(season), teams.length * 2);
+  await offseasonTradeRequests(careerId, leagueId, season, locale, new Set(humans.map((h) => h.teamId)));
   for (const h of humans) {
     await createInboxMessage(careerId, h.teamId, season, "season_end", news.title, `${news.body}\n\n${locale === "fr" ? "La cérémonie de fin de saison t'attend : trophées, bilan et réunion avec la direction." : "The end-of-season ceremony awaits: trophies, review and a meeting with ownership."}`, "/offseason");
   }
@@ -225,5 +240,176 @@ export async function computeSeasonReview(
     objectivesMet: judged.filter((o) => o.status === "met").length,
     objectivesTotal: judged.length,
     plan: null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Intersaison qui s'annonce.
+
+// Classe de draft de la saison suivante, générée une seule fois (révélée dès
+// la fin de saison ; advanceSeason la reprend telle quelle).
+export async function ensureDraftClass(careerId: string, leagueId: string, draftSeason: string, size: number): Promise<void> {
+  if ((await prisma.prospect.count({ where: { careerId, draftSeason } })) > 0) return;
+  await prisma.prospect.deleteMany({ where: { careerId } });
+  await generateProspectClass(careerId, leagueId, size, draftSeason);
+  await prisma.prospect.updateMany({ where: { careerId, draftSeason: null }, data: { draftSeason } });
+}
+
+// Chance qu'un joueur insatisfait réclame son départ à l'été (plus élevée
+// qu'en cours de saison : c'est le moment des bilans), au plus une par équipe.
+export const OFFSEASON_REQUEST_CHANCE = 0.1;
+const MAX_REQUESTS_PER_TEAM = 1;
+
+async function offseasonTradeRequests(careerId: string, leagueId: string, season: string, locale: Locale, humans: Set<string>): Promise<void> {
+  const [standings, teams, contracts, lastGame] = await Promise.all([
+    getStandings(careerId, leagueId, season),
+    getTeamsByLeague(leagueId),
+    prisma.contract.findMany({ where: { careerId }, select: { playerId: true, teamId: true } }),
+    prisma.game.findFirst({ where: { careerId, status: "final" }, orderBy: { gameDate: "desc" }, select: { gameDate: true } }),
+  ]);
+  const gameDate = lastGame?.gameDate ?? new Date();
+  const teamOf = new Map(contracts.map((c) => [c.playerId, c.teamId]));
+  const states = await prisma.playerState.findMany({
+    where: { careerId, retired: false, wantsTrade: false, activePromiseType: null, playerId: { in: [...teamOf.keys()] } },
+    include: { player: { select: { firstName: true, lastName: true } } },
+  });
+  const facilities = new Map(
+    (await prisma.teamState.findMany({ where: { careerId }, select: { teamId: true, facilitiesLevel: true } })).map((t) => [t.teamId, t.facilitiesLevel])
+  );
+  const perTeam = new Map<string, number>();
+  for (const st of states) {
+    const teamId = teamOf.get(st.playerId)!;
+    if ((perTeam.get(teamId) ?? 0) >= MAX_REQUESTS_PER_TEAM) continue;
+    if (retirementPlanned(st, `${careerId}:${st.playerId}:${season}:retire`)) continue;
+    const team = teams.find((t) => t.id === teamId);
+    const row = standings.find((r) => r.teamId === teamId);
+    if (!team) continue;
+    const winPct = winPctForStandings(row?.wins ?? 0, row?.losses ?? 0);
+    const reasons: TradeRequestReason[] = tradeRequestReasons({
+      renown: st.renown,
+      age: st.age,
+      teamWinPct: winPct,
+      teamMarketAppeal: team.marketAppeal,
+      teamFacilitiesLevel: facilities.get(teamId) ?? 50,
+      morale: st.morale,
+    });
+    const personality = personalityFor(st.playerId, st.age);
+    if (ambitiousWantsOut(personality, winPct) && !reasons.includes("competitiveness")) reasons.push("competitiveness");
+    if (reasons.length === 0 || Math.random() >= OFFSEASON_REQUEST_CHANCE * tradeRequestChanceMultiplier(personality)) continue;
+
+    await prisma.playerState.update({
+      where: { id: st.id },
+      data: { wantsTrade: true, tradeRequestReasonsJson: JSON.stringify(reasons), tradeRequestSinceSeason: season, lastTradeRequestCheckDate: gameDate },
+    });
+    perTeam.set(teamId, (perTeam.get(teamId) ?? 0) + 1);
+    const playerName = `${st.player.firstName} ${st.player.lastName}`;
+    if (humans.has(teamId)) {
+      const { title, body } = tradeRequestMessageText(locale, playerName);
+      await createInboxMessage(careerId, teamId, season, "trade_request", title, body, `/teams/${teamId}/players/${st.playerId}`, {
+        gameDate,
+        playerId: st.playerId,
+      });
+    } else {
+      // L'IA répond comme en saison, mais pour la saison qui vient.
+      await aiRespondToTradeRequest({
+        careerId,
+        teamId,
+        leagueId,
+        season: nextSeasonLabel(season),
+        gameDate,
+        locale,
+        state: st,
+        reasons,
+        playerName,
+        teamName: teamFullName(team),
+      });
+    }
+  }
+}
+
+export interface OutlookPlayer {
+  playerId: string;
+  name: string;
+  teamId: string | null;
+  position: string;
+  age: number;
+  overall: number;
+}
+
+export interface OffseasonOutlook {
+  retirees: (OutlookPlayer & { peak: number; hallOfFame: boolean })[];
+  myExpiring: (OutlookPlayer & { salary: number; option: string | null })[];
+  leagueExpiring: (OutlookPlayer & { salary: number })[];
+  expiringCount: number;
+  draftClass: { id: string; name: string; position: string; age: number; origin: string | null; nationality: string; current: Estimate; potential: Estimate }[];
+  draftSeason: string;
+  myRequests: (OutlookPlayer & { reasons: TradeRequestReason[]; promised: boolean })[];
+  otherRequests: (OutlookPlayer & { reasons: TradeRequestReason[]; promised: boolean })[];
+}
+
+export async function getOffseasonOutlook(careerId: string, leagueId: string, season: string, teamId: string): Promise<OffseasonOutlook> {
+  const draftSeason = nextSeasonLabel(season);
+  const [players, contracts, prospects, profiles] = await Promise.all([
+    prisma.player.findMany({
+      where: { leagueId, OR: [{ careerId: null }, { careerId }] },
+      select: { id: true, firstName: true, lastName: true, position: true, playerStates: { where: { careerId } } },
+    }),
+    prisma.contract.findMany({ where: { careerId }, select: { playerId: true, teamId: true, salary: true, yearsRemaining: true, optionType: true, contractType: true } }),
+    prisma.prospect.findMany({ where: { careerId, draftSeason } }),
+    getStaffProfiles(careerId, [teamId], leagueId),
+  ]);
+  const contractOf = new Map(contracts.map((c) => [c.playerId, c]));
+  const retirees: OffseasonOutlook["retirees"] = [];
+  const expiring: (OutlookPlayer & { salary: number; option: string | null })[] = [];
+  const requests: (OutlookPlayer & { reasons: TradeRequestReason[]; promised: boolean })[] = [];
+  for (const p of players) {
+    const st = p.playerStates[0];
+    if (!st || st.retired) continue;
+    const c = contractOf.get(p.id);
+    const base: OutlookPlayer = { playerId: p.id, name: `${p.firstName} ${p.lastName}`, teamId: c?.teamId ?? null, position: p.position, age: st.age, overall: st.overallRating };
+    const retiring = retirementPlanned(st, `${careerId}:${p.id}:${season}:retire`);
+    if (retiring) {
+      // Joueurs sans club ni passage en NBA récent : seulement les noms qui comptent.
+      if (c || st.overallRating >= 65 || st.peakOverallRating >= 80) {
+        const peak = Math.max(st.peakOverallRating, st.overallRating);
+        retirees.push({ ...base, peak, hallOfFame: isHallOfFameWorthy(peak, Math.max(st.peakRenown, st.renown)) });
+      }
+      continue;
+    }
+    if (c && c.yearsRemaining <= 1) expiring.push({ ...base, salary: c.salary, option: null });
+    else if (c && c.yearsRemaining === 2 && c.optionType && c.teamId === teamId) expiring.push({ ...base, salary: c.salary, option: c.optionType });
+    if (c && st.wantsTrade) {
+      requests.push({
+        ...base,
+        reasons: st.tradeRequestReasonsJson ? (JSON.parse(st.tradeRequestReasonsJson) as TradeRequestReason[]) : [],
+        promised: !!st.activePromiseType,
+      });
+    }
+  }
+  const byOverall = <T extends { overall: number }>(a: T, b: T) => b.overall - a.overall;
+  const scouting = (profiles.get(teamId) ?? NEUTRAL_STAFF_PROFILE).scouting;
+  const draftClass = prospects
+    .map((p) => ({
+      id: p.id,
+      name: `${p.firstName} ${p.lastName}`,
+      position: p.position,
+      age: p.age,
+      origin: p.scoutingNote,
+      nationality: p.nationality,
+      // Mêmes graines que la page Draft : mêmes estimations.
+      current: estimateRating(p.overallRating, scouting, `${careerId}:${teamId}:${p.id}:cur`, 0.6),
+      potential: estimateRating(p.potential || p.overallRating, scouting, `${careerId}:${teamId}:${p.id}:pot`),
+    }))
+    .sort((a, b) => b.current.mid * 0.6 + b.potential.mid * 0.4 - (a.current.mid * 0.6 + a.potential.mid * 0.4));
+  const leagueExpiring = expiring.filter((e) => e.teamId !== teamId && !e.option);
+  return {
+    retirees: retirees.sort((a, b) => b.peak - a.peak),
+    myExpiring: expiring.filter((e) => e.teamId === teamId).sort(byOverall),
+    leagueExpiring: leagueExpiring.sort(byOverall).slice(0, 20),
+    expiringCount: leagueExpiring.length,
+    draftClass: draftClass.slice(0, 20),
+    draftSeason,
+    myRequests: requests.filter((r) => r.teamId === teamId).sort(byOverall),
+    otherRequests: requests.filter((r) => r.teamId !== teamId).sort(byOverall),
   };
 }

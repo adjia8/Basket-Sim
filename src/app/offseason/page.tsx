@@ -6,7 +6,7 @@ import type { DictionaryKey } from "@/lib/i18n/dictionary";
 import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
 import { getAwards } from "@/lib/data-access/awards";
-import { getOffseasonView, maybeChampionCeremony, type SeriesSummary } from "@/lib/data-access/offseason";
+import { getOffseasonOutlook, getOffseasonView, maybeChampionCeremony, type SeriesSummary } from "@/lib/data-access/offseason";
 import { ensureGmContract, standingParts } from "@/lib/data-access/gm-career";
 import { advanceSeason } from "@/app/actions/season";
 import { chooseSeasonPlan, holdBoardMeeting } from "@/app/actions/offseason";
@@ -55,8 +55,9 @@ export default async function OffseasonPage() {
   }
   await maybeChampionCeremony(m.careerId, m.leagueId, m.season, locale);
 
-  const [view, teams, awards, membership] = await Promise.all([
+  const [view, outlook, teams, awards, membership] = await Promise.all([
     getOffseasonView(m.careerId, m.leagueId, m.season, m.teamId),
+    getOffseasonOutlook(m.careerId, m.leagueId, m.season, m.teamId),
     getTeamsByLeague(m.leagueId),
     getAwards(m.careerId),
     prisma.membership.findUnique({ where: { id: m.id }, include: { gmProfile: true } }),
@@ -263,7 +264,162 @@ export default async function OffseasonPage() {
         </div>
       </section>
 
-      {/* 6. Réunion avec la direction */}
+      {/* 6. L'intersaison qui s'annonce */}
+      <section className="space-y-4" data-testid="offseason-outlook">
+        <div>
+          <h2 className="text-xl font-semibold">{t("offseason.outlook.title")}</h2>
+          <p className="mt-1 text-sm text-soft">{t("offseason.outlook.intro")}</p>
+        </div>
+
+        {/* Retraites */}
+        <div className="card p-4" data-testid="outlook-retirees">
+          <h3 className="text-lg font-semibold">{t("offseason.outlook.retireTitle")}</h3>
+          {outlook.retirees.length === 0 ? (
+            <p className="mt-1 text-sm text-muted">{t("offseason.outlook.retireNone")}</p>
+          ) : (
+            <ul className="mt-2 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+              {outlook.retirees.map((r) => (
+                <li key={r.playerId} className={r.teamId === m.teamId ? "font-semibold text-accent" : ""}>
+                  <Link href={playerHref(r.playerId, r.teamId)} className="hover:underline">
+                    {r.name}
+                  </Link>{" "}
+                  <span className="text-xs text-muted">
+                    {r.teamId ? abbr(r.teamId) : t("offseason.outlook.noTeam")} · {t("offseason.outlook.ageShort", { age: r.age })} · {t("offseason.outlook.peak", { peak: r.peak })}
+                  </span>
+                  {r.hallOfFame && (
+                    <span className="ml-2 rounded-full bg-warn/10 px-2 py-0.5 text-xs font-medium text-warn">{t("offseason.outlook.hof")}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Agents libres */}
+        <div className="card p-4" data-testid="outlook-free-agents">
+          <h3 className="text-lg font-semibold">{t("offseason.outlook.faTitle")}</h3>
+          <div className="mt-2 grid gap-4 lg:grid-cols-2">
+            <div>
+              <p className="eyebrow mb-1">{t("offseason.outlook.faMine")}</p>
+              {outlook.myExpiring.length === 0 ? (
+                <p className="text-sm text-muted">{t("offseason.outlook.faMineNone")}</p>
+              ) : (
+                <>
+                  <ul className="space-y-1 text-sm">
+                    {outlook.myExpiring.map((e) => (
+                      <li key={e.playerId}>
+                        <Link href={playerHref(e.playerId, m.teamId)} className="font-medium hover:underline">
+                          {e.name}
+                        </Link>{" "}
+                        <span className="text-xs text-muted">
+                          {e.position} · {t("offseason.outlook.ageShort", { age: e.age })} · {e.overall} · {formatSalary(e.salary, locale)}
+                        </span>
+                        {e.option && <span className="ml-2 text-xs text-warn">{t(`offseason.outlook.option.${e.option}` as DictionaryKey)}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-xs text-soft">{t("offseason.outlook.faMineHint")}</p>
+                </>
+              )}
+            </div>
+            <div>
+              <p className="eyebrow mb-1">{t("offseason.outlook.faLeague", { count: outlook.expiringCount })}</p>
+              <ul className="space-y-1 text-sm">
+                {outlook.leagueExpiring.map((e) => (
+                  <li key={e.playerId}>
+                    <Link href={playerHref(e.playerId, e.teamId)} className="hover:underline">
+                      {e.name}
+                    </Link>{" "}
+                    <span className="text-xs text-muted">
+                      {e.teamId ? abbr(e.teamId) : ""} · {e.position} · {t("offseason.outlook.ageShort", { age: e.age })} · <span className="font-semibold">{e.overall}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Classe de draft */}
+        <div className="card p-4" data-testid="outlook-draft">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="text-lg font-semibold">{t("offseason.outlook.draftTitle", { season: outlook.draftSeason })}</h3>
+            <Link href="/draft" className="text-sm text-accent hover:underline">
+              {t("offseason.outlook.draftLink")}
+            </Link>
+          </div>
+          <p className="mt-1 text-xs text-soft">{t("offseason.outlook.draftHint")}</p>
+          <div className="mt-2 overflow-x-auto">
+            <table className="data-table w-full min-w-[560px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-line text-muted">
+                  <th className="py-1.5 pr-3">#</th>
+                  <th className="py-1.5 pr-3">{t("offseason.outlook.col.player")}</th>
+                  <th className="py-1.5 pr-3">{t("offseason.outlook.col.age")}</th>
+                  <th className="py-1.5 pr-3">{t("offseason.outlook.col.origin")}</th>
+                  <th className="py-1.5 pr-3">{t("offseason.outlook.col.current")}</th>
+                  <th className="py-1.5">{t("offseason.outlook.col.potential")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {outlook.draftClass.map((p, i) => (
+                  <tr key={p.id} className="border-b border-line-soft">
+                    <td className="py-1.5 pr-3 text-faint tabular">{i + 1}</td>
+                    <td className="py-1.5 pr-3 font-medium">
+                      {p.name} <span className="text-xs text-muted">{p.position}</span>
+                    </td>
+                    <td className="py-1.5 pr-3 tabular">{p.age}</td>
+                    <td className="py-1.5 pr-3 text-xs text-soft">{p.origin ?? p.nationality}</td>
+                    <td className="py-1.5 pr-3 tabular">
+                      {p.current.low}-{p.current.high}
+                    </td>
+                    <td className="py-1.5 tabular font-semibold">
+                      {p.potential.low}-{p.potential.high}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Demandes de transfert */}
+        <div className="card p-4" data-testid="outlook-requests">
+          <h3 className="text-lg font-semibold">{t("offseason.outlook.requestsTitle")}</h3>
+          <div className="mt-2 grid gap-4 lg:grid-cols-2">
+            {([
+              ["offseason.outlook.requestsMine", "offseason.outlook.requestsMineNone", outlook.myRequests],
+              ["offseason.outlook.requestsOthers", "offseason.outlook.requestsOthersNone", outlook.otherRequests],
+            ] as const).map(([title, none, list]) => (
+              <div key={title}>
+                <p className="eyebrow mb-1">{t(title)}</p>
+                {list.length === 0 ? (
+                  <p className="text-sm text-muted">{t(none)}</p>
+                ) : (
+                  <ul className="space-y-1.5 text-sm">
+                    {list.map((r) => (
+                      <li key={r.playerId}>
+                        <Link href={playerHref(r.playerId, r.teamId)} className="font-medium hover:underline">
+                          {r.name}
+                        </Link>{" "}
+                        <span className="text-xs text-muted">
+                          {r.teamId ? abbr(r.teamId) : ""} · {r.position} · {t("offseason.outlook.ageShort", { age: r.age })} · {r.overall}
+                        </span>
+                        <span className="block text-xs text-soft">
+                          {r.reasons.map((reason) => t(`domain.tradeReason.${reason}` as DictionaryKey)).join(" · ")}
+                          {r.promised && <span className="ml-1 text-faint">({t("offseason.outlook.promised")})</span>}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 7. Réunion avec la direction */}
       {gm && (
         <section className="card p-6" data-testid="board-meeting">
           <h2 className="text-xl font-semibold">{t("offseason.boardTitle")}</h2>
@@ -362,7 +518,7 @@ export default async function OffseasonPage() {
         </section>
       )}
 
-      {/* 7. Suite */}
+      {/* 8. Suite */}
       <section className="card bg-surface-2 p-6">
         <h2 className="text-xl font-semibold">{t("offseason.nextTitle")}</h2>
         <p className="mt-2 text-sm text-soft">{t("offseason.nextText")}</p>

@@ -167,3 +167,17 @@ test("fin de saison : MVP des Finales, cap annoncé, humeur de la direction", ()
   assert.equal(ownerMood("fired", false), "furious");
   assert.equal(ownerMood("met", false, true), "lenient"); // sauvé par la confiance de la direction
 });
+
+import { retirementPlanned } from "../../src/lib/careers/aging-rules";
+
+test("retraites : 40 ans au plus tard, vétérans en déclin avant, décision stable", () => {
+  assert.equal(retirementPlanned({ age: 39, overallRating: 90 }, "a"), true);
+  assert.equal(retirementPlanned({ age: 30, overallRating: 40 }, "a"), false);
+  assert.equal(retirementPlanned({ age: 36, overallRating: 65 }, "a"), true); // 37 ans, plus le niveau
+  assert.equal(retirementPlanned({ age: 34, overallRating: 55 }, "a"), true);
+  // Stable pour une même graine.
+  assert.equal(retirementPlanned({ age: 36, overallRating: 80 }, "x:y"), retirementPlanned({ age: 36, overallRating: 80 }, "x:y"));
+  // Un vétéran encore fort de 37 ans continue le plus souvent.
+  const keepGoing = Array.from({ length: 200 }, (_, i) => retirementPlanned({ age: 36, overallRating: 80 }, `s${i}`)).filter((r) => !r).length;
+  assert.ok(keepGoing > 110 && keepGoing < 170, String(keepGoing));
+});

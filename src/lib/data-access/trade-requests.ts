@@ -130,7 +130,7 @@ export async function maybeFlagTradeRequest(
 // - sinon (compétitivité, marché) : promesse d'échange (réalisé ensuite par
 //   l'IA, voir ai-trades.ts), ou rien.
 // Les stars font l'actualité de la ligue.
-async function aiRespondToTradeRequest(p: {
+export async function aiRespondToTradeRequest(p: {
   careerId: string;
   teamId: string;
   leagueId: string;

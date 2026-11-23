@@ -9,7 +9,6 @@ import { getScheduleForCareer } from "@/lib/data-access/schedule";
 import { getStandings } from "@/lib/data-access/standings";
 import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
 import { generateCareerPreseasonSchedule, generateCareerSchedule } from "@/lib/careers/generate-schedule";
-import { generateProspectClass } from "@/lib/careers/generate-prospects";
 import {
   createUnresolvedPicksForSeason,
   FUTURE_PICK_WINDOW,
@@ -17,7 +16,7 @@ import {
 } from "@/lib/careers/generate-draft-picks";
 import { nextSeasonLabel } from "@/lib/careers/season-format";
 import { preseasonSeasonLabel, seasonCalendar } from "@/lib/careers/schedule-rules";
-import { ageOneSeason, RETIREMENT_AGE } from "@/lib/careers/aging-rules";
+import { ageOneSeason, RETIREMENT_AGE, retirementPlanned } from "@/lib/careers/aging-rules";
 import { isHallOfFameWorthy } from "@/lib/careers/hall-of-fame-rules";
 import { toDomainLeague } from "@/lib/data-access/mappers";
 import { getTeamsByLeague } from "@/lib/data-access/teams";
@@ -32,7 +31,7 @@ import { poachOfferMessageText } from "@/lib/careers/inbox-rules";
 import { getTranslator, translatorFor } from "@/lib/i18n/translate";
 import { maybeAiFacilityProjects } from "@/lib/data-access/ai-facilities";
 import { europeOffseason } from "@/lib/data-access/europe";
-import { maybeChampionCeremony } from "@/lib/data-access/offseason";
+import { ensureDraftClass, maybeChampionCeremony } from "@/lib/data-access/offseason";
 import { ensureGmContract, pointsOf, seasonStyle, standingParts } from "@/lib/data-access/gm-career";
 import {
   attributeEvolution,
@@ -186,7 +185,8 @@ export async function advanceSeason(): Promise<void> {
     const teamId = teamIdByPlayerId.get(state.playerId);
     const trainingStaffLevel = teamId ? (trainingStaffByTeamId.get(teamId) ?? 50) : 50;
     const aged = ageOneSeason(state, trainingStaffLevel);
-    const retiring = aged.age >= RETIREMENT_AGE;
+    // Même décision que celle annoncée à la cérémonie de fin de saison.
+    const retiring = aged.age >= RETIREMENT_AGE || retirementPlanned(state, `${career.id}:${state.playerId}:${career.season}:retire`);
     // Pics de carrière : basés sur les meilleures valeurs jamais atteintes
     // (avant le déclin de fin de carrière), déterminent l'éligibilité au
     // Hall of Fame à la retraite.
@@ -453,8 +453,8 @@ export async function advanceSeason(): Promise<void> {
   // 4. Nouvelle classe de prospects (l'ancienne, non draftée, disparaît).
   // 2 tours × nb d'équipes de la ligue : toujours assez de prospects pour
   // que chaque pick ait un candidat disponible.
-  await prisma.prospect.deleteMany({ where: { careerId: career.id } });
-  await generateProspectClass(career.id, career.leagueId, draftOrderTeamIds.length * 2, newSeason);
+  // (Déjà révélée à la cérémonie de fin de saison : on la garde.)
+  await ensureDraftClass(career.id, career.leagueId, newSeason, draftOrderTeamIds.length * 2);
 
   // 4bis. Résout les picks de la nouvelle saison (déjà créés à l'avance, non
   // résolus, à la création de la carrière ou lors d'un rollover précédent —
