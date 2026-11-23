@@ -70,7 +70,9 @@ export async function getFreeAgents(
     include: { playerStates: { where: { careerId } } },
   });
   return rows
-    .filter((row) => !row.playerStates[0]?.retired)
+    // Joueurs sous contrat en Europe ou dont une équipe détient les droits
+    // (draft-and-stash, rachat payé) : pas des agents libres ordinaires.
+    .filter((row) => !row.playerStates[0]?.retired && !row.playerStates[0]?.abroadClub && !row.playerStates[0]?.rightsTeamId)
     .map((row) => toDomainPlayerWithState(row, row.playerStates[0]))
     .sort((a, b) => b.overallRating - a.overallRating);
 }

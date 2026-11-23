@@ -290,7 +290,10 @@ async function notifyHumanTeamNews(
     });
   }
 
-  if (conferenceRankChanged(teamState.lastKnownConferenceRank, currentRank)) {
+  // Classement : seulement en saison régulière (figé pendant les playoffs,
+  // la NBA Cup et la pré-saison).
+  const regularSeason = /^\d{4}-\d{4}$/.test(season);
+  if (regularSeason && conferenceRankChanged(teamState.lastKnownConferenceRank, currentRank)) {
     const team = await getTeamById(teamId);
     if (team) {
       const { title, body } = standingsMessageText(
@@ -302,7 +305,7 @@ async function notifyHumanTeamNews(
       await createInboxMessage(careerId, teamId, season, "standings", title, body, "/standings", { gameDate });
     }
   }
-  if (teamState.lastKnownConferenceRank !== currentRank) {
+  if (regularSeason && teamState.lastKnownConferenceRank !== currentRank) {
     await prisma.teamState.update({ where: { id: teamState.id }, data: { lastKnownConferenceRank: currentRank } });
   }
 
@@ -939,7 +942,9 @@ export async function simulateAndResolveGame(
   // transfert et boîte de réception ne concernent que les GM humains).
   if (!homeManager && !awayManager) return updated;
 
-  const standings = await getStandings(careerId, game.leagueId, game.season.replace(/-cup$/, ""));
+  // Classement de la saison régulière (figé pendant les playoffs : les
+  // matchs de playoffs ne le modifient pas).
+  const standings = await getStandings(careerId, game.leagueId, game.season.slice(0, 9));
   const homeStandingsRow = standings.find((s) => s.teamId === game.homeTeamId);
   const awayStandingsRow = standings.find((s) => s.teamId === game.awayTeamId);
 

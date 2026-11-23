@@ -1,6 +1,7 @@
 "use server";
 
 import { maybeSnapshotRatings } from "@/lib/data-access/rating-history";
+import { applyEuropeStates } from "@/lib/data-access/europe";
 import { gmSalary, HIRE_CONTRACT_YEARS } from "@/lib/careers/gm-career-rules";
 import {
   MAX_CAREERS_PER_USER,
@@ -242,6 +243,8 @@ export async function createCareer(
   // contrats sont filtrés (playersUnderContract, calculé plus haut).
   await generateCareerContracts(career.id, leagueId, playersUnderContract, developmentPlayerIds);
   await generateCareerPlayerStates(career.id, domainPlayers);
+  // Joueurs d'Europe : sous contrat dans leur club (voir europe.ts).
+  if (leagueId === "nba") await applyEuropeStates(career.id);
   // Argent mort réel de départ (NBA) : sans lui, les masses salariales de
   // départ seraient sous-estimées (ex. Milwaukee paie encore Lillard).
   if (leagueId === "nba") {

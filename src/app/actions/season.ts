@@ -30,6 +30,7 @@ import { createInboxMessage } from "@/lib/data-access/inbox";
 import { poachOfferMessageText } from "@/lib/careers/inbox-rules";
 import { getTranslator, translatorFor } from "@/lib/i18n/translate";
 import { maybeAiFacilityProjects } from "@/lib/data-access/ai-facilities";
+import { europeOffseason } from "@/lib/data-access/europe";
 import { ensureGmContract, pointsOf, seasonStyle, standingParts } from "@/lib/data-access/gm-career";
 import {
   attributeEvolution,
@@ -418,6 +419,8 @@ export async function advanceSeason(): Promise<void> {
   // haut (teamStates = infrastructures AVANT la dégradation annuelle de
   // l'étape 2bis) et AVANT l'écrasement de career.season juste en dessous.
   await evaluatePendingPromises(career.id, career.season, finishedStandings, teamStates);
+  // Europe : une saison de plus dans les clubs européens, droits non signés éteints.
+  await europeOffseason(career.id);
 
   // 3. Nouvelle saison (label déjà calculé plus haut, dans newSeason).
   await prisma.career.update({

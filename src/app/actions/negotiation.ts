@@ -81,7 +81,10 @@ export async function negotiateContract(
   } else {
     const rosterSize = await prisma.contract.count({ where: { careerId, teamId, contractType: "standard" } });
     if (rosterSize >= (MAX_ROSTER_SIZE[leagueId] ?? MAX_ROSTER_SIZE.nba)) return { error: t("nego.rosterFull") };
-    if (!(await isFreeAgencyOpen(careerId, season))) return { error: t("nego.closed") };
+    // Joueur dont j'ai les droits (rachat européen, draft-and-stash) : à
+    // tout moment ; sinon, pendant la période des agents libres.
+    const rights = (await prisma.playerState.findUnique({ where: { careerId_playerId: { careerId, playerId } }, select: { rightsTeamId: true } }))?.rightsTeamId;
+    if (rights !== teamId && !(await isFreeAgencyOpen(careerId, season))) return { error: t("nego.closed") };
   }
 
   let offer: Offer;
@@ -105,7 +108,7 @@ export async function negotiateContract(
   const capVerdict =
     view.kind === "extension"
       ? checkSalaryMove(leagueId, salaryCap, "extend", payroll - (contract?.salary ?? 0) + offer.salary, offer.salary)
-      : checkSalaryMove(leagueId, salaryCap, "sign", payroll + offer.salary, offer.salary);
+      : checkSalaryMove(leagueId, salaryCap, view.international ? "international" : "sign", payroll + offer.salary, offer.salary);
   if (!capVerdict.ok) return { error: capError(capVerdict, tr) };
 
   // Une offre (quelle qu'elle soit) répond à sa demande sur son contrat.
@@ -179,6 +182,8 @@ export async function negotiateContract(
       throw err;
     }
     await recordTeamStint(careerId, playerId, teamId, season, "signed");
+    // Droits soldés : il est sous contrat.
+    await prisma.playerState.updateMany({ where: { careerId, playerId }, data: { rightsTeamId: null, abroadClub: null } });
   }
   await clearNegotiation(careerId, playerId, teamId);
 

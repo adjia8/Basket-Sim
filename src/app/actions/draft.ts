@@ -1,6 +1,7 @@
 "use server";
 
 import { activeMembershipWhere } from "@/lib/auth/active-membership";
+import { aiShouldStash } from "@/lib/careers/europe-rules";
 import { revalidatePath } from "next/cache";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
@@ -13,6 +14,7 @@ import { performDraftPick } from "@/lib/data-access/draft-execution";
 export async function draftProspect(formData: FormData): Promise<void> {
   const { userId } = await verifySession();
   const prospectId = String(formData.get("prospectId") ?? "");
+  const stash = formData.get("stash") === "1";
 
   const membership = await prisma.membership.findFirst({
     where: await activeMembershipWhere(userId),
@@ -36,7 +38,7 @@ export async function draftProspect(formData: FormData): Promise<void> {
   );
   if (!currentPick || currentPick.teamId !== membership.teamId) return; // pas mon tour
 
-  await performDraftPick(currentPick, prospect, teams.length, membership.career.leagueId);
+  await performDraftPick(currentPick, prospect, teams.length, membership.career.leagueId, stash);
   // Sans ça, la page Draft restait figée sur « à toi de choisir » après le
   // choix (les clics suivants ne faisaient plus rien).
   revalidatePath("/", "layout");
@@ -76,6 +78,6 @@ export async function draftForAiTeam(): Promise<void> {
   const best = [...prospects].sort((a, b) => b.overallRating - a.overallRating)[0];
   if (!best) return;
 
-  await performDraftPick(currentPick, best, teams.length, membership.career.leagueId);
+  await performDraftPick(currentPick, best, teams.length, membership.career.leagueId, aiShouldStash(best, currentPick.pickNumber));
   revalidatePath("/", "layout");
 }

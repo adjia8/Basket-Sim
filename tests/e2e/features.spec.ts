@@ -301,6 +301,29 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       await expect(page.getByTestId("scouting-results")).toContainText("Agent libre");
     });
 
+    await test.step("Europe : scouting, rachat de contrat, négociation", async () => {
+      await expectPageOk(page, "/scouting?status=abroad&ovrMin=70&sort=overall");
+      const rows = page.getByTestId("scouting-row");
+      expect(await rows.count()).toBeGreaterThan(10);
+      await expect(page.getByTestId("scouting-results")).toContainText("Rachat");
+      // Joueur européen le moins cher à racheter, pour rester dans le budget.
+      const cheapest = await prisma.playerState.findFirstOrThrow({ where: { careerId, abroadClub: { not: null }, overallRating: { gte: 70 } }, orderBy: { buyout: "asc" } });
+      await expectPageOk(page, `/teams/lal/players/${cheapest.playerId}`);
+      const box = page.getByTestId("europe-status");
+      await expect(box).toContainText("Joue en Europe");
+      await box.getByRole("button", { name: /Racheter son contrat/ }).click();
+      // La fiche se met à jour : droits détenus, bouton de rachat disparu.
+      await expect(page.getByTestId("europe-status")).toContainText("Tu détiens ses droits", { timeout: 30_000 });
+      const after = await prisma.playerState.findFirstOrThrow({ where: { id: cheapest.id } });
+      expect(after.abroadClub).toBeNull();
+      expect(after.rightsTeamId).toBe("lal");
+      // Droits détenus : la négociation est ouverte (hors période des agents libres).
+      await expect(page.getByTestId("negotiation")).toBeVisible();
+      // Une autre équipe ne peut pas négocier avec lui : il n'apparaît pas chez les agents libres.
+      await expectPageOk(page, "/free-agents");
+      await expect(page.getByText(after.playerId)).toHaveCount(0);
+    });
+
     await test.step("mettre un joueur sur le marché : offres de l'IA", async () => {
       await expectPageOk(page, "/trades");
       const section = page.getByTestId("trade-block-section");

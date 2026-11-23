@@ -1,4 +1,5 @@
 import "server-only";
+import { aiShouldStash } from "@/lib/careers/europe-rules";
 import { prisma } from "@/lib/prisma";
 import { getCurrentDraftPick } from "@/lib/data-access/draft-picks";
 import { performDraftPick } from "@/lib/data-access/draft-execution";
@@ -54,7 +55,7 @@ export async function runAiDraft(careerId: string, season: string, leagueId: str
     const draftValue = (p: (typeof prospects)[number]) => p.overallRating * 0.6 + (p.potential || p.overallRating) * 0.4;
     const best = prospects.sort((a, b) => draftValue(b) - draftValue(a))[0];
     if (!best) return { picked, humanTeamOnTheClock: null, done: true };
-    if (await performDraftPick(pick, best, teams.length, leagueId)) picked++;
+    if (await performDraftPick(pick, best, teams.length, leagueId, aiShouldStash(best, pick.pickNumber))) picked++;
   }
 }
 
@@ -184,7 +185,7 @@ export async function runAiFreeAgency(
 // si ce n'est pas possible — même logique que la signature par un manager
 // humain (voir signFreeAgent) : exigence du joueur, puis exception minimum
 // au-dessus du plafond en NBA.
-function signingTerms(
+export function signingTerms(
   player: { overallRating: number; renown: number },
   payroll: number,
   leagueId: string,

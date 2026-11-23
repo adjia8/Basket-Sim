@@ -1,4 +1,5 @@
 import "server-only";
+import { buyoutFor, europeanClubOf, STASH_YEARS } from "@/lib/careers/europe-rules";
 import { revalidatePath } from "next/cache";
 import type { Prospect } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -13,8 +14,12 @@ export async function performDraftPick(
   currentPick: ResolvedDraftPick,
   prospect: Prospect,
   picksPerRound: number,
-  leagueId: string
+  leagueId: string,
+  // Draft-and-stash : un prospect qui joue en Europe peut y rester (pas de
+  // contrat NBA, droits conservés par l'équipe — voir europe-rules.ts).
+  stash = false
 ): Promise<boolean> {
+  const stashClub = stash ? europeanClubOf(prospect.scoutingNote) : null;
   const terms = rookieScaleContract(currentPick.pickNumber, picksPerRound, leagueId);
   // Le joueur garde l'identifiant du prospect : sa personnalité (dérivée de
   // l'identifiant, voir personality-rules.ts) est donc la même avant et après
@@ -57,15 +62,17 @@ export async function performDraftPick(
           nationality: prospect.nationality,
         },
       });
-      await tx.contract.create({
-        data: {
-          careerId: currentPick.careerId,
-          playerId: newPlayerId,
-          teamId: currentPick.teamId,
-          ...terms,
-          isRookieScale: true,
-        },
-      });
+      if (!stashClub) {
+        await tx.contract.create({
+          data: {
+            careerId: currentPick.careerId,
+            playerId: newPlayerId,
+            teamId: currentPick.teamId,
+            ...terms,
+            isRookieScale: true,
+          },
+        });
+      }
       await tx.playerTeamStint.create({
         data: {
           careerId: currentPick.careerId,
@@ -100,6 +107,14 @@ export async function performDraftPick(
           renown: initialRenown(prospect.overallRating),
           peakOverallRating: prospect.overallRating,
           peakRenown: initialRenown(prospect.overallRating),
+          ...(stashClub
+            ? {
+                abroadClub: stashClub,
+                abroadYears: STASH_YEARS,
+                buyout: buyoutFor(prospect.overallRating, prospect.age, STASH_YEARS),
+                rightsTeamId: currentPick.teamId,
+              }
+            : {}),
         },
       });
 

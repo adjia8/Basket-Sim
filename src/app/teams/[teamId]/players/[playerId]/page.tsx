@@ -20,6 +20,7 @@ import { PlayerConversation } from "@/components/team/PlayerConversation";
 import { getConversationSetup } from "@/lib/data-access/player-conversations";
 import type { DictionaryKey } from "@/lib/i18n/dictionary";
 import { TradeBlockButton } from "@/components/trades/TradeBlockButton";
+import { BuyoutButton } from "@/components/europe/BuyoutButton";
 import { CONVERSATION_TONES } from "@/lib/careers/player-conversation-rules";
 import {
   PERSONALITY_TRAITS,
@@ -292,8 +293,16 @@ export default async function PlayerDetailPage({
     : minAcceptableSalary(player.renown, player.overallRating, leagueId);
   // Négociation (prolongation de mon joueur, ou agent libre pendant la
   // période des agents libres) — voir contract-negotiation-rules.ts.
+  // Droits détenus (rachat européen, draft-and-stash) : négociation à tout moment.
+  const europe = await prisma.playerState.findUnique({
+    where: { careerId_playerId: { careerId: membership.careerId, playerId } },
+    select: { abroadClub: true, abroadYears: true, buyout: true, rightsTeamId: true },
+  });
+  const myRights = europe?.rightsTeamId === membership.teamId;
+  const rightsTeamName =
+    europe?.rightsTeamId && !myRights ? (await getTeamById(europe.rightsTeamId).then((tm) => (tm ? `${tm.city} ${tm.name}` : null))) : null;
   const canNegotiateFreeAgent =
-    !contract && !retired && (await isFreeAgencyOpen(membership.careerId, membership.season));
+    !contract && !retired && !europe?.abroadClub && (myRights || (await isFreeAgencyOpen(membership.careerId, membership.season)));
   const negotiation =
     canExtend || canNegotiateFreeAgent
       ? await getNegotiationView({
@@ -414,6 +423,10 @@ export default async function PlayerDetailPage({
               </Link>
             ) : retired ? (
               <span>{t("player.retired")}</span>
+            ) : europe?.abroadClub ? (
+              <span className="text-info">{europe.abroadClub}</span>
+            ) : europe?.rightsTeamId ? (
+              <span className="text-warn">{t("scouting.rights")}</span>
             ) : (
               <Link href="/free-agents" className="text-accent-text hover:underline">
                 {t("player.freeAgent")}
@@ -424,6 +437,38 @@ export default async function PlayerDetailPage({
           </p>
         </div>
       </div>
+
+      {/* En Europe (club, contrat, clause de rachat) ou droits détenus par une équipe NBA. */}
+      {!contract && (europe?.abroadClub || europe?.rightsTeamId) && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-info/40 bg-info/5 p-3 text-sm" data-testid="europe-status">
+          <div className="min-w-0 flex-1">
+            {europe.abroadClub ? (
+              <p>
+                <span className="font-semibold">{t("europe.playsAt", { club: europe.abroadClub })}</span>{" "}
+                <span className="text-soft">
+                  · {t("europe.contract", { years: europe.abroadYears })} · {t("europe.buyout", { amount: formatSalary(europe.buyout, locale) })}
+                </span>
+              </p>
+            ) : null}
+            <p className="mt-0.5 text-xs text-muted">
+              {europe.rightsTeamId === membership.teamId
+                ? europe.abroadClub
+                  ? t("europe.myStash")
+                  : t("europe.myRights")
+                : europe.rightsTeamId
+                  ? t("europe.otherRights", { team: rightsTeamName ?? europe.rightsTeamId })
+                  : t("europe.howTo")}
+            </p>
+          </div>
+          {europe.abroadClub && (!europe.rightsTeamId || europe.rightsTeamId === membership.teamId) && (
+            <BuyoutButton
+              playerId={player.id}
+              label={europe.rightsTeamId === membership.teamId ? t("europe.bringOver", { amount: formatSalary(europe.buyout, locale) }) : t("europe.buy", { amount: formatSalary(europe.buyout, locale) })}
+              pendingLabel={t("europe.pending")}
+            />
+          )}
+        </div>
+      )}
 
       {isMyTeam && contract && (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-line bg-surface-2 p-3 text-sm" data-testid="trade-block">

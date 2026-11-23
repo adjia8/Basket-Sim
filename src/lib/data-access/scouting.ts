@@ -14,6 +14,8 @@ export interface ScoutResult extends ScoutCandidate {
   teamAbbr: string | null;
   contractType: string | null;
   onTradeBlock: boolean;
+  buyout: number;
+  rightsTeamId: string | null;
 }
 
 export const SCOUT_LIMIT = 60;
@@ -64,6 +66,9 @@ export async function searchPlayers(
       yearsRemaining: c?.yearsRemaining ?? 0,
       contractType: c?.contractType ?? null,
       onTradeBlock: st.onTradeBlock,
+      abroadClub: c ? null : st.abroadClub,
+      buyout: st.buyout,
+      rightsTeamId: c ? null : st.rightsTeamId,
     });
   }
   const matching = sortCandidates(all.filter((c) => matchesFilters(c, filters)), filters);

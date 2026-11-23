@@ -1,4 +1,7 @@
 import "server-only";
+import { getPayrollForTeam } from "@/lib/data-access/contracts";
+import { midLevelLimit } from "@/lib/careers/cap-rules";
+import { canNegotiateWith } from "@/lib/careers/europe-rules";
 import { prisma } from "@/lib/prisma";
 import { getStandings } from "@/lib/data-access/standings";
 import { getTeamById } from "@/lib/data-access/teams";
@@ -36,6 +39,7 @@ export interface NegotiationView {
   lockedDays: number | null;
   // Star non convaincue par le projet (bilan, marché, installations).
   refuses: boolean;
+  international: boolean; // joueur venu d'Europe (exception de mi-niveau)
   rookieScale: boolean;
   // Objectifs du joueur (voir player-status-rules.ts).
   status: PlayerStatus;
@@ -79,6 +83,8 @@ export async function getNegotiationView(params: {
     currentGameDate(careerId, season),
   ]);
   if (!player || player.leagueId !== leagueId || !team || state?.retired) return null;
+  // Joueur en Europe (rachat d'abord) ou droits détenus par une autre équipe.
+  if (!contract && !canNegotiateWith(state, teamId)) return null;
   if (contract && (contract.teamId !== teamId || contract.contractType !== "standard")) return null;
   const kind = contract ? "extension" : "free_agent";
 
@@ -118,7 +124,18 @@ export async function getNegotiationView(params: {
     traits: negotiationTraits(personality, kind === "extension"),
     marketOverall,
   });
+  // Joueur venu d'Europe (droits détenus par cette équipe) : il veut venir
+  // en NBA — pas de refus, exigences plafonnées à l'exception de mi-niveau
+  // (signable au-dessus du plafond, voir cap-rules.ts).
+  const international = !contract && state?.rightsTeamId === teamId;
+  if (international && leagueId === "nba") {
+    const payroll = await getPayrollForTeam(careerId, teamId);
+    const mle = midLevelLimit(payroll + stance.minSalary);
+    stance.minSalary = Math.min(stance.minSalary, mle);
+    stance.askSalary = Math.min(stance.askSalary, mle);
+  }
   const refuses =
+    !international &&
     !rookieScale &&
     !teamMeetsPlayerDemands({
       renown,
@@ -139,6 +156,7 @@ export async function getNegotiationView(params: {
 
   return {
     kind,
+    international,
     stance,
     patienceLeft: active?.status === "open" ? active.patienceLeft : stance.patience,
     rounds: active?.status === "open" ? active.rounds : 0,

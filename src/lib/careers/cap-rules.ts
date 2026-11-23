@@ -20,6 +20,16 @@ export const NBA_SECOND_APRON = 221_686_000;
 // Plus haut salaire minimum (vétéran 10+ ans) : seule signature possible
 // d'un agent libre une fois au-dessus du plafond.
 export const NBA_MINIMUM_EXCEPTION = 3_876_529;
+// Exception de mi-niveau (mid-level exception, ordres de grandeur 2026-27) :
+// au-dessus du plafond, elle permet de signer un joueur venu de l'étranger
+// (rachat européen, joueur drafté laissé en Europe) — réduite au-delà du
+// 1er apron.
+export const NBA_FIRST_APRON = 209_500_000;
+export const NBA_MID_LEVEL = 14_900_000;
+export const NBA_TAXPAYER_MID_LEVEL = 6_000_000;
+export function midLevelLimit(payrollAfter: number): number {
+  return payrollAfter <= NBA_FIRST_APRON ? NBA_MID_LEVEL : NBA_TAXPAYER_MID_LEVEL;
+}
 const TRADE_MATCHING_RATIO = 1.25;
 const TRADE_MATCHING_CUSHION = 250_000;
 // Taux unique simplifié (la vraie taxe est progressive, de 1,5 à 3,75 $
@@ -32,7 +42,7 @@ export const LUXURY_TAX_RATE = 1.5;
 // environ un quart d'une saison de revenus.
 const TAX_BUDGET_SCALE = 1 / 30;
 
-export type SalaryMove = "sign" | "promote" | "extend" | "draft";
+export type SalaryMove = "sign" | "promote" | "extend" | "draft" | "international";
 
 export type CapVerdict =
   | { ok: true }
@@ -61,6 +71,10 @@ export function checkSalaryMove(
   if (payrollAfter > NBA_SECOND_APRON) return { ok: false, reason: "apron", limit: NBA_SECOND_APRON };
   if (payrollAfter <= salaryCap) return { ok: true };
   if (move === "extend" || move === "draft") return { ok: true };
+  if (move === "international") {
+    const mle = midLevelLimit(payrollAfter);
+    return salary <= mle ? { ok: true } : { ok: false, reason: "minimum_only", limit: mle };
+  }
   return salary <= NBA_MINIMUM_EXCEPTION
     ? { ok: true }
     : { ok: false, reason: "minimum_only", limit: NBA_MINIMUM_EXCEPTION };

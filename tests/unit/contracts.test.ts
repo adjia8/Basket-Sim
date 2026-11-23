@@ -236,3 +236,55 @@ test("réactions : chouchou cédé = fans mécontents ; star reçue = fans ravis
   const tax = tradeReactions({ ...base, payrollBefore: 198_000_000, incoming: [rp("s", 80, 27, { salary: 40_000_000 })], outgoing: [rp("t", 80, 27, { salary: 20_000_000 })] });
   assert.equal(tax.board.reason, "tax");
 });
+
+import { aiShouldStash, buyoutFor, canNegotiateWith, europeAfterSeason, europeanClubOf } from "../../src/lib/careers/europe-rules";
+import { playersEurope, EUROPE_CONTRACTS } from "../../src/lib/mock-data/players-europe";
+import { playersNba } from "../../src/lib/mock-data/players-nba";
+
+test("Europe : catalogue sans doublon avec la NBA, contrat pour chacun", () => {
+  const nbaIds = new Set(playersNba.map((p) => p.id));
+  const nbaNames = new Set(playersNba.map((p) => `${p.firstName} ${p.lastName}`));
+  for (const p of playersEurope) {
+    assert.ok(!nbaIds.has(p.id), `doublon d'identifiant ${p.id}`);
+    assert.ok(!nbaNames.has(`${p.firstName} ${p.lastName}`), `homonyme ${p.firstName} ${p.lastName}`);
+    assert.ok(EUROPE_CONTRACTS[p.id], `club manquant ${p.id}`);
+  }
+  assert.ok(playersEurope.length >= 50);
+});
+
+test("Europe : clause de rachat, droits, draft-and-stash", () => {
+  // Plus cher pour un bon joueur, un jeune, un long contrat ; 0 en fin de contrat.
+  assert.ok(buyoutFor(79, 30, 2) > buyoutFor(70, 30, 2));
+  assert.ok(buyoutFor(70, 20, 2) > buyoutFor(70, 28, 2));
+  assert.ok(buyoutFor(75, 28, 3) > buyoutFor(75, 28, 1));
+  assert.equal(buyoutFor(80, 28, 0), 0);
+  assert.ok(buyoutFor(90, 20, 3) <= 6_000_000);
+  // Fin de contrat : renouvellement dans son club.
+  assert.deepEqual(europeAfterSeason({ overall: 75, age: 28, years: 1 }).years, 2);
+  assert.equal(europeAfterSeason({ overall: 75, age: 28, years: 3 }).years, 2);
+  // Qui peut négocier ?
+  assert.equal(canNegotiateWith({ abroadClub: "Real Madrid (Espagne)", rightsTeamId: null }, "phi"), false);
+  assert.equal(canNegotiateWith({ abroadClub: null, rightsTeamId: "phi" }, "phi"), true);
+  assert.equal(canNegotiateWith({ abroadClub: null, rightsTeamId: "bos" }, "phi"), false);
+  assert.equal(canNegotiateWith({ abroadClub: null, rightsTeamId: null }, "phi"), true);
+  // Prospects européens (pas NCAA).
+  assert.equal(europeanClubOf("Real Madrid (Espagne)"), "Real Madrid (Espagne)");
+  assert.equal(europeanClubOf("Duke (NCAA)"), null);
+  assert.equal(aiShouldStash({ scoutingNote: "Partizan (Serbie)", age: 19 }, 35, () => 0.1), true);
+  assert.equal(aiShouldStash({ scoutingNote: "Partizan (Serbie)", age: 19 }, 5, () => 0.1), false); // top pick : il vient tout de suite
+  assert.equal(aiShouldStash({ scoutingNote: "Duke (NCAA)", age: 19 }, 35, () => 0.1), false);
+});
+
+import { checkSalaryMove as capCheck, midLevelLimit as mle } from "../../src/lib/careers/cap-rules";
+
+test("exception de mi-niveau : signature d'un joueur venu d'Europe au-dessus du plafond", () => {
+  const cap = 165_000_000;
+  // Agent libre ordinaire au-dessus du plafond : minimum seulement.
+  assert.equal(capCheck("nba", cap, "sign", 190_000_000, 10_000_000).ok, false);
+  // Joueur venu d'Europe : jusqu'à la mid-level (pleine sous le 1er apron, réduite au-delà).
+  assert.equal(capCheck("nba", cap, "international", 190_000_000, 10_000_000).ok, true);
+  assert.equal(capCheck("nba", cap, "international", 190_000_000, 16_000_000).ok, false);
+  assert.ok(mle(215_000_000) < mle(190_000_000));
+  // 2e apron : interdit dans tous les cas.
+  assert.equal(capCheck("nba", cap, "international", 230_000_000, 5_000_000).ok, false);
+});

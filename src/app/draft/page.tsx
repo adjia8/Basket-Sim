@@ -16,6 +16,8 @@ import { estimateError, estimateRating, ratingStars } from "@/lib/careers/potent
 import { Stars } from "@/components/ui/Stars";
 import { DraftInterviewForm } from "@/components/draft/DraftInterviewForm";
 import { MyDraftPicks } from "@/components/draft/MyDraftPicks";
+import { MyEuropeRights } from "@/components/europe/MyEuropeRights";
+import { europeanClubOf } from "@/lib/careers/europe-rules";
 import {
   INTERVIEWS_PER_DRAFT,
   INTERVIEW_QUESTIONS,
@@ -60,6 +62,7 @@ export default async function DraftPage() {
           {hasDraftPicks > 0 ? t("draft.overForSeason") : t("draft.noneInProgress")}
         </p>
         <MyDraftPicks careerId={membership.careerId} teamId={membership.teamId} season={membership.season} t={t} />
+      <MyEuropeRights careerId={membership.careerId} teamId={membership.teamId} t={t} locale={locale} />
       </div>
     );
   }
@@ -138,6 +141,7 @@ export default async function DraftPage() {
       )}
 
       <MyDraftPicks careerId={membership.careerId} teamId={membership.teamId} season={membership.season} t={t} />
+      <MyEuropeRights careerId={membership.careerId} teamId={membership.teamId} t={t} locale={locale} />
 
       {prospects.length > 0 && (
         <section className="mt-6 card p-4" data-testid="draft-interviews">
@@ -234,15 +238,32 @@ export default async function DraftPage() {
                   <td className="py-2 pr-4">{prospect.age}</td>
                   {isMyTurn && (
                     <td className="py-2">
-                      <form action={draftProspect}>
-                        <input type="hidden" name="prospectId" value={prospect.id} />
-                        <button
-                          type="submit"
-                          className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-accent-fg transition hover:bg-accent-hover"
-                        >
-                          {t("draft.draftButton")}
-                        </button>
-                      </form>
+                      <div className="flex flex-wrap gap-1.5">
+                        <form action={draftProspect}>
+                          <input type="hidden" name="prospectId" value={prospect.id} />
+                          <button
+                            type="submit"
+                            className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-accent-fg transition hover:bg-accent-hover"
+                          >
+                            {t("draft.draftButton")}
+                          </button>
+                        </form>
+                        {/* Prospect qui joue en Europe : peut y rester (draft-and-stash). */}
+                        {europeanClubOf(prospect.scoutingNote) && (
+                          <form action={draftProspect}>
+                            <input type="hidden" name="prospectId" value={prospect.id} />
+                            <input type="hidden" name="stash" value="1" />
+                            <button
+                              type="submit"
+                              title={t("europe.stashHint")}
+                              className="whitespace-nowrap rounded-md border border-info/60 px-3 py-1 text-xs font-medium text-info transition hover:bg-info/10"
+                              data-testid="draft-stash"
+                            >
+                              {t("europe.stash")}
+                            </button>
+                          </form>
+                        )}
+                      </div>
                     </td>
                   )}
                 </tr>

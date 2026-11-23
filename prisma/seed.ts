@@ -2,6 +2,7 @@ import { prisma } from "../src/lib/prisma";
 import { conferences, leagues } from "../src/lib/mock-data/leagues";
 import { teams } from "../src/lib/mock-data/teams";
 import { playersNba } from "../src/lib/mock-data/players-nba";
+import { playersEurope } from "../src/lib/mock-data/players-europe";
 import { playersWnba } from "../src/lib/mock-data/players-wnba";
 
 async function main() {
@@ -54,7 +55,7 @@ async function main() {
     });
   }
 
-  for (const player of [...playersNba, ...playersWnba]) {
+  for (const player of [...playersNba, ...playersEurope, ...playersWnba]) {
     // `update` reprend les mêmes champs que `create` (plutôt que `{}`) : le
     // catalogue Player est statique côté gameplay (l'évolution en cours de
     // carrière passe par PlayerState, jamais par ces colonnes), donc un
@@ -94,7 +95,7 @@ async function main() {
 
   console.log(
     `Seed OK: ${leagues.length} ligues, ${teams.length} équipes, ${
-      playersNba.length + playersWnba.length
+      playersNba.length + playersEurope.length + playersWnba.length
     } joueurs.`
   );
 }

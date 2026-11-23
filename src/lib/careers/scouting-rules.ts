@@ -3,7 +3,7 @@
 
 export type Strength = "shooting" | "inside" | "playmaking" | "defense" | "rebounding" | "athleticism";
 export const STRENGTHS: Strength[] = ["shooting", "inside", "playmaking", "defense", "rebounding", "athleticism"];
-export type ContractStatus = "any" | "contract" | "expiring" | "free_agent";
+export type ContractStatus = "any" | "contract" | "expiring" | "free_agent" | "abroad";
 export type ScoutSort = "overall" | "potential" | "age" | "salary" | "strength";
 
 export interface ScoutFilters {
@@ -82,6 +82,7 @@ export interface ScoutCandidate {
   ratings: ScoutRatings;
   salary: number;
   yearsRemaining: number;
+  abroadClub?: string | null; // joue en Europe (sous contrat dans son club)
 }
 
 export function matchesFilters(c: ScoutCandidate, f: ScoutFilters): boolean {
@@ -91,11 +92,13 @@ export function matchesFilters(c: ScoutCandidate, f: ScoutFilters): boolean {
   if (c.potential < f.potMin) return false;
   if (f.strength && strengthValue(c.ratings, f.strength) < f.strengthMin) return false;
   if (f.excludeTeamId && c.teamId === f.excludeTeamId) return false;
-  const fa = c.teamId === null;
+  const abroad = !!c.abroadClub;
+  const fa = c.teamId === null && !abroad;
   if (f.status === "free_agent" && !fa) return false;
-  if (f.status === "contract" && fa) return false;
-  if (f.status === "expiring" && (fa || c.yearsRemaining > 1)) return false;
-  if (!fa) {
+  if (f.status === "abroad" && !abroad) return false;
+  if (f.status === "contract" && c.teamId === null) return false;
+  if (f.status === "expiring" && (c.teamId === null || c.yearsRemaining > 1)) return false;
+  if (c.teamId !== null) {
     if (f.salaryMin > 0 && c.salary < f.salaryMin) return false;
     if (f.salaryMax > 0 && c.salary > f.salaryMax) return false;
     if (f.yearsMax > 0 && c.yearsRemaining > f.yearsMax) return false;
@@ -130,7 +133,7 @@ const num = (v: string | undefined, d: number, lo: number, hi: number) => {
 export function parseFilters(q: Record<string, string | undefined>, myTeamId: string): ScoutFilters {
   const pos = q.pos && ["PG", "SG", "SF", "PF", "C"].includes(q.pos) ? q.pos : null;
   const strength = q.str && (STRENGTHS as string[]).includes(q.str) ? (q.str as Strength) : null;
-  const status = q.status && ["any", "contract", "expiring", "free_agent"].includes(q.status) ? (q.status as ContractStatus) : "any";
+  const status = q.status && ["any", "contract", "expiring", "free_agent", "abroad"].includes(q.status) ? (q.status as ContractStatus) : "any";
   const sort = q.sort && ["overall", "potential", "age", "salary", "strength"].includes(q.sort) ? (q.sort as ScoutSort) : "overall";
   return {
     position: pos,

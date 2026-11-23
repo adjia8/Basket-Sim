@@ -549,6 +549,10 @@ model PlayerState {
   facilityPromiseBy    DateTime? // promesse du GM : à livrer (ou en chantier) avant cette date
   onTradeBlock         Boolean   @default(false) // mis sur le marché par son GM (offres de l'IA)
   tradeBlockSince      DateTime?
+  abroadClub           String? // joue en Europe : club (ex. "Real Madrid (Espagne)") — voir europe-rules.ts
+  abroadYears          Int       @default(0) // années de contrat restantes en Europe
+  buyout               Int       @default(0) // clause de rachat (dollars) à payer au club européen
+  rightsTeamId         String? // équipe NBA qui détient ses droits (draft-and-stash, ou rachat payé)
   requestAt            DateTime? // date de jeu de la demande en attente
   lastRequestAt        DateTime? // date de jeu de sa dernière demande (délai entre deux)
   morale               Int     @default(60) // 0-99, moral individuel (conférences de presse, résultats) — voir morale-rules.ts

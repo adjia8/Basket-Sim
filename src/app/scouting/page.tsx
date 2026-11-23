@@ -90,7 +90,7 @@ export default async function ScoutingPage({ searchParams }: { searchParams: Pro
         <label className={label}>
           {t("scouting.status")}
           <select name="status" defaultValue={filters.status} className={input}>
-            {(["any", "contract", "expiring", "free_agent"] as const).map((s) => (
+            {(["any", "contract", "expiring", "free_agent", "abroad"] as const).map((s) => (
               <option key={s} value={s}>
                 {t(`scouting.statusOpt.${s}` as DictionaryKey)}
               </option>
@@ -153,7 +153,18 @@ export default async function ScoutingPage({ searchParams }: { searchParams: Pro
                       </Link>
                       {r.onTradeBlock && <span className="ml-1.5 rounded bg-warn/15 px-1 text-2xs font-semibold text-warn">{t("scouting.onBlock")}</span>}
                     </td>
-                    <td className="px-3 py-2">{r.teamAbbr ?? <span className="text-good">{t("scouting.freeAgent")}</span>}</td>
+                    <td className="px-3 py-2">
+                      {r.teamAbbr ??
+                        (r.abroadClub ? (
+                          <span className="text-info" title={r.abroadClub}>
+                            {r.abroadClub.replace(/ \(.*\)$/, "")}
+                          </span>
+                        ) : r.rightsTeamId ? (
+                          <span className="text-warn">{t("scouting.rights")}</span>
+                        ) : (
+                          <span className="text-good">{t("scouting.freeAgent")}</span>
+                        ))}
+                    </td>
                     <td className="px-3 py-2">{r.position}</td>
                     <td className="px-3 py-2 tabular">{r.age}</td>
                     <td className="px-3 py-2 font-semibold tabular">{r.overall}</td>
@@ -166,7 +177,11 @@ export default async function ScoutingPage({ searchParams }: { searchParams: Pro
                         .join(" · ")}
                     </td>
                     <td className="px-3 py-2 text-xs tabular">
-                      {r.teamId ? `${money(r.salary)} · ${t("scouting.yearsLeft", { n: r.yearsRemaining })}` : "—"}
+                      {r.teamId
+                        ? `${money(r.salary)} · ${t("scouting.yearsLeft", { n: r.yearsRemaining })}`
+                        : r.abroadClub
+                          ? t("scouting.buyoutShort", { amount: money(r.buyout) })
+                          : "—"}
                     </td>
                     <td className="px-3 py-2 text-right">
                       {mine ? null : r.teamId ? (
@@ -176,6 +191,14 @@ export default async function ScoutingPage({ searchParams }: { searchParams: Pro
                           data-testid="scouting-trade"
                         >
                           {t("scouting.proposeTrade")}
+                        </Link>
+                      ) : r.abroadClub ? (
+                        <Link
+                          href={`/teams/${membership.teamId}/players/${r.id}`}
+                          className="whitespace-nowrap rounded-md border border-info/60 px-2.5 py-1 text-xs text-info hover:bg-info/10"
+                          data-testid="scouting-europe"
+                        >
+                          {t("scouting.recruitEurope")}
                         </Link>
                       ) : (
                         <Link href="/free-agents" className="rounded-md border border-line-strong px-2.5 py-1 text-xs hover:bg-surface-2">

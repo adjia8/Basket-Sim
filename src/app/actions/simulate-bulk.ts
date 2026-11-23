@@ -13,6 +13,7 @@ import { maybeLeagueMilestones } from "@/lib/data-access/awards";
 import { advanceNbaCup, cupBarrier, maybePlayAllStarGame } from "@/lib/data-access/nba-cup";
 import { maybeAiTradeOffers } from "@/lib/data-access/ai-trades";
 import { maybeAiFacilityProjects } from "@/lib/data-access/ai-facilities";
+import { aiEuropeSignings } from "@/lib/data-access/europe";
 import { getTranslator } from "@/lib/i18n/translate";
 import { endOfGameDay } from "@/lib/data-access/game-clock";
 import { getOrAdvancePlayoffs } from "@/lib/data-access/playoffs";
@@ -392,6 +393,10 @@ export async function continueGame(options: { acknowledgeInbox?: boolean } = {})
     const regularSeasonStarted = await prisma.game.count({
       where: { careerId, season: career.season, status: "final" },
     });
+    // Recrues venues d'Europe (rachat de contrat) avant le marché des agents libres.
+    if (career.leagueId === "nba") {
+      await aiEuropeSignings(careerId, career.leagueId, career.season, aiRosterTarget(career.leagueId, regularSeasonStarted > 0), locale);
+    }
     await runAiFreeAgency(
       careerId,
       career.leagueId,
