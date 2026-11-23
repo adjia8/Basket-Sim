@@ -284,6 +284,46 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       }
     });
 
+    await test.step("scouting : recherche par critères, proposer un échange", async () => {
+      await expectPageOk(page, "/scouting?pos=C&ovrMin=75&str=rebounding&strMin=60&status=contract&sort=overall");
+      const rows = page.getByTestId("scouting-row");
+      expect(await rows.count()).toBeGreaterThan(0);
+      await expect(page.getByTestId("scouting-results")).not.toContainText("Agent libre");
+      // Le premier pivot trouvé : « Proposer un échange » ouvre le centre des transferts, joueur déjà coché.
+      const link = rows.first().getByTestId("scouting-trade");
+      const href = await link.getAttribute("href");
+      const wanted = new URL(href!, "http://x").searchParams.get("want")!;
+      await link.click();
+      await page.waitForURL(/tab=trade&want=/);
+      await expect(page.locator(`input[name="theirPlayerIds"][value="${wanted}"]`)).toBeChecked();
+      // Agents libres seulement.
+      await expectPageOk(page, "/scouting?status=free_agent&ovrMin=60");
+      await expect(page.getByTestId("scouting-results")).toContainText("Agent libre");
+    });
+
+    await test.step("mettre un joueur sur le marché : offres de l'IA", async () => {
+      await expectPageOk(page, "/trades");
+      const section = page.getByTestId("trade-block-section");
+      // Un joueur solide mais pas la star (7e de l'effectif).
+      const option = section.locator('select[name="playerId"] option').nth(7);
+      const playerId = await option.getAttribute("value");
+      await section.locator('select[name="playerId"]').selectOption(playerId!);
+      await section.getByRole("button", { name: "Mettre sur le marché" }).click();
+      await expect(section.getByTestId("trade-block-result")).toBeVisible({ timeout: 60_000 });
+      const st = await prisma.playerState.findFirstOrThrow({ where: { careerId, playerId: playerId! } });
+      expect(st.onTradeBlock).toBe(true);
+      const offers = await prisma.tradeOffer.count({ where: { careerId, toTeamId: "lal", status: "pending", items: { some: { playerId: playerId!, side: "to" } } } });
+      expect(offers).toBeGreaterThan(0);
+      await page.reload();
+      await expect(page.getByTestId("trade-block-row")).toHaveCount(1);
+      await expect(page.getByTestId("received-offer").first()).toBeVisible();
+      // Retirer du marché.
+      await page.getByTestId("trade-block-row").getByRole("button", { name: "Retirer du marché" }).click();
+      await expect(page.getByTestId("trade-block-row")).toHaveCount(0, { timeout: 30_000 });
+      // Ménage : ces offres ne doivent pas gêner les étapes suivantes.
+      await prisma.tradeOffer.updateMany({ where: { careerId, toTeamId: "lal", status: "pending" }, data: { status: "rejected" } });
+    });
+
     await test.step("centre des transferts : partenaires, analyse en direct, intérêt de l'IA", async () => {
       await expectPageOk(page, "/trades");
       await expect(page.getByTestId("trade-partners")).toBeVisible();

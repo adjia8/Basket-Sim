@@ -19,6 +19,7 @@ import { promisePlayingTime } from "@/app/actions/promise";
 import { PlayerConversation } from "@/components/team/PlayerConversation";
 import { getConversationSetup } from "@/lib/data-access/player-conversations";
 import type { DictionaryKey } from "@/lib/i18n/dictionary";
+import { TradeBlockButton } from "@/components/trades/TradeBlockButton";
 import { CONVERSATION_TONES } from "@/lib/careers/player-conversation-rules";
 import {
   PERSONALITY_TRAITS,
@@ -258,6 +259,13 @@ export default async function PlayerDetailPage({
   // informatif, n'affecte aucune mécanique par lui-même (seule la promesse
   // en réponse a un effet, voir plus bas).
   const reasons = demandState?.reasons ?? [];
+  // Sur le marché (offres de l'IA, voir solicitOffersForBlock).
+  const onTradeBlock = isMyTeam
+    ? !!(await prisma.playerState.findUnique({
+        where: { careerId_playerId: { careerId: membership.careerId, playerId } },
+        select: { onTradeBlock: true },
+      }))?.onTradeBlock
+    : false;
   const tradeReasonLabels: Record<(typeof reasons)[number], string> = {
     competitiveness: t("domain.tradeReason.competitiveness"),
     market: t("domain.tradeReason.market"),
@@ -416,6 +424,17 @@ export default async function PlayerDetailPage({
           </p>
         </div>
       </div>
+
+      {isMyTeam && contract && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-line bg-surface-2 p-3 text-sm" data-testid="trade-block">
+          <p className="min-w-0 flex-1 text-soft">{onTradeBlock ? t("tradeBlock.onBlockHint") : t("tradeBlock.hint")}</p>
+          <TradeBlockButton
+            playerId={player.id}
+            onBlock={onTradeBlock}
+            labels={{ add: t("tradeBlock.add"), remove: t("tradeBlock.remove"), pending: t("tradeBlock.pending") }}
+          />
+        </div>
+      )}
 
       {reasons.length > 0 && (
         <div className="mt-4 rounded-lg border border-warn/30 bg-warn/5 p-3 text-sm text-warn">

@@ -16,6 +16,7 @@ import { winPctForStandings } from "@/lib/careers/player-demands";
 import type { DictionaryKey } from "@/lib/i18n/dictionary";
 import { getOfferDetails } from "@/lib/data-access/trade-review";
 import { TradeOfferDetail } from "@/components/trades/TradeOfferDetail";
+import { TradeBlockButton, TradeBlockPicker } from "@/components/trades/TradeBlockButton";
 
 const OUTLOOK_TONE: Record<string, string> = {
   rebuild: "bg-info/15 text-info",
@@ -107,6 +108,33 @@ export default async function TradesPage() {
     ));
   }
 
+  // Mes joueurs, et ceux que j'ai mis sur le marché (avec le nombre d'offres).
+  const myContracts = await prisma.contract.findMany({
+    where: { careerId: membership.careerId, teamId: membership.teamId },
+    select: { playerId: true, player: { select: { firstName: true, lastName: true, position: true } } },
+  });
+  const myStates = await prisma.playerState.findMany({
+    where: { careerId: membership.careerId, playerId: { in: myContracts.map((c) => c.playerId) } },
+    select: { playerId: true, overallRating: true, age: true, onTradeBlock: true },
+  });
+  const myStateById = new Map(myStates.map((s) => [s.playerId, s]));
+  const myPlayers = myContracts
+    .map((c) => {
+      const st = myStateById.get(c.playerId);
+      return {
+        id: c.playerId,
+        name: `${c.player.firstName} ${c.player.lastName}`,
+        position: c.player.position,
+        overall: st?.overallRating ?? 0,
+        age: st?.age ?? 0,
+        onBlock: !!st?.onTradeBlock,
+      };
+    })
+    .sort((a, b) => b.overall - a.overall);
+  const blockPlayers = myPlayers
+    .filter((p) => p.onBlock)
+    .map((p) => ({ ...p, offers: received.filter((o) => o.items.some((i) => i.side === "to" && i.playerId === p.id)).length }));
+
   // Partenaires possibles (autres équipes) avec leur profil d'échange.
   const [leagueTeams, standings, expectations] = await Promise.all([
     getTeamsByLeague(membership.leagueId),
@@ -161,6 +189,43 @@ export default async function TradesPage() {
           </div>
         </section>
       )}
+
+      {/* Mes joueurs sur le marché : les équipes IA intéressées font des offres. */}
+      <section className="mt-8 card p-4" data-testid="trade-block-section">
+        <h2 className="text-lg font-semibold">{t("tradeBlock.title")}</h2>
+        <p className="mt-1 text-sm text-muted">{t("tradeBlock.intro")}</p>
+        {blockPlayers.length > 0 && (
+          <ul className="mt-3 divide-y divide-line">
+            {blockPlayers.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm" data-testid="trade-block-row">
+                <span>
+                  <Link href={`/teams/${membership.teamId}/players/${p.id}`} className="font-medium hover:underline">
+                    {p.name}
+                  </Link>{" "}
+                  <span className="text-muted">
+                    ({p.position}, {p.overall}, {t("tradeReview.age", { age: p.age })})
+                  </span>{" "}
+                  <span className={p.offers > 0 ? "text-good" : "text-muted"}>· {t("tradeBlock.offers", { count: p.offers })}</span>
+                </span>
+                <TradeBlockButton
+                  playerId={p.id}
+                  onBlock
+                  compact
+                  labels={{ add: t("tradeBlock.add"), remove: t("tradeBlock.remove"), pending: t("tradeBlock.pending") }}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+        {!tradeDeadlinePassed && (
+          <div className="mt-3">
+            <TradeBlockPicker
+              players={myPlayers.filter((p) => !p.onBlock).map((p) => ({ id: p.id, label: `${p.name} (${p.position}, ${p.overall})` }))}
+              labels={{ choose: t("tradeBlock.choose"), add: t("tradeBlock.add"), pending: t("tradeBlock.pending") }}
+            />
+          </div>
+        )}
+      </section>
 
       <section className="mt-8">
         <h2 className="text-lg font-semibold">{t("tradeOffers.received")}</h2>

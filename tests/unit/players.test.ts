@@ -178,3 +178,25 @@ test("rapport d'équipe : rangs, points forts / faibles, postes en manque, piste
   assert.ok(advice.some((a) => a.kind === "tactic" && a.tactic === "perimeter"));
   assert.ok(advice.length <= 4);
 });
+
+import { matchesFilters, parseFilters, sortCandidates, strengthValue, topStrengths } from "../../src/lib/careers/scouting-rules";
+
+test("scouting : filtres poste / âge / note / point fort / contrat, tri", () => {
+  const r = { scoringInside: 60, scoringOutside: 88, playmaking: 70, defenseInside: 50, defenseOutside: 70, rebounding: 40, athleticism: 75 };
+  const shooter = { id: "a", teamId: "bos", position: "SG", age: 24, overall: 80, potential: 86, ratings: r, salary: 12_000_000, yearsRemaining: 1 };
+  const fa = { ...shooter, id: "b", teamId: null, salary: 0, yearsRemaining: 0 };
+  const f = parseFilters({ pos: "SG", ageMax: "26", ovrMin: "78", str: "shooting", strMin: "85", salMax: "15", status: "expiring" }, "lal");
+  assert.equal(f.salaryMax, 15_000_000);
+  assert.ok(matchesFilters(shooter, f));
+  assert.ok(!matchesFilters({ ...shooter, position: "C" }, f));
+  assert.ok(!matchesFilters({ ...shooter, age: 30 }, f));
+  assert.ok(!matchesFilters({ ...shooter, salary: 20_000_000 }, f));
+  assert.ok(!matchesFilters({ ...shooter, yearsRemaining: 3 }, f)); // pas en fin de contrat
+  assert.ok(!matchesFilters(fa, f)); // agent libre exclu de « fin de contrat »
+  assert.ok(matchesFilters(fa, { ...f, status: "free_agent" }));
+  assert.ok(!matchesFilters({ ...shooter, teamId: "lal" }, f)); // mon équipe exclue par défaut
+  assert.equal(strengthValue(r, "defense"), 60);
+  assert.deepEqual(topStrengths(r), ["shooting", "athleticism"]);
+  const sorted = sortCandidates([{ ...shooter, age: 30 }, { ...shooter, id: "y", age: 21 }], { ...f, sort: "age" });
+  assert.equal(sorted[0].id, "y");
+});

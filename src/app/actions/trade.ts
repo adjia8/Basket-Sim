@@ -26,6 +26,7 @@ import type { Locale } from "@/lib/i18n/locale";
 import { analyzeTrade, type TradeSelection, type TradeSide } from "@/lib/data-access/trade-analysis";
 import { formatSalary } from "@/lib/utils";
 import { applyTradeReactions } from "@/lib/data-access/trade-review";
+import { clearTradeBlock, solicitOffersForBlock } from "@/lib/data-access/ai-trades";
 import { currentGameDate, resolveHonoredPromises } from "@/lib/data-access/trade-requests";
 import type { DictionaryKey } from "@/lib/i18n/dictionary";
 
@@ -204,6 +205,7 @@ export async function proposeTrade(
       myPlayerIds,
       locale
     );
+    await clearTradeBlock(membership.careerId, [...myPlayerIds, ...theirPlayerIds]);
     // Promesse d'échange faite à un joueur cédé : tenue tout de suite.
     await resolveHonoredPromises(membership.careerId, membership.teamId, membership.career.season, await currentGameDate(membership.careerId), locale);
     // Réactions des fans et de la direction (opinion, confiance, message).
@@ -425,6 +427,7 @@ export async function respondToTradeOffer(formData: FormData): Promise<void> {
     toPlayerIds,
     await getLocale()
   );
+  await clearTradeBlock(membership.careerId, [...fromPlayerIds, ...toPlayerIds]);
   for (const id of [offer.toTeamId, offer.fromTeamId]) {
     await resolveHonoredPromises(membership.careerId, id, membership.career.season, await currentGameDate(membership.careerId), await getLocale());
   }
@@ -470,4 +473,36 @@ export async function cancelTradeOffer(formData: FormData): Promise<void> {
 
   await prisma.tradeOffer.update({ where: { id: offer.id }, data: { status: "cancelled" } });
   revalidatePath("/trades");
+}
+
+export interface TradeBlockState {
+  error?: string;
+  success?: string;
+}
+
+// Mettre un de mes joueurs sur le marché (ou l'en retirer) : les équipes IA
+// intéressées font aussitôt des offres (voir solicitOffersForBlock).
+export async function toggleTradeBlock(_prev: TradeBlockState | undefined, formData: FormData): Promise<TradeBlockState> {
+  const { userId } = await verifySession();
+  const { t, locale } = await getTranslator();
+  const playerId = String(formData.get("playerId") ?? "");
+  const membership = await prisma.membership.findFirst({ where: await activeMembershipWhere(userId), include: { career: true } });
+  if (!membership) return { error: t("tradeAction.noCareer") };
+  const contract = await prisma.contract.findUnique({ where: { careerId_playerId: { careerId: membership.careerId, playerId } } });
+  if (!contract || contract.teamId !== membership.teamId) return { error: t("tradeBlock.error.notMine") };
+  const state = await prisma.playerState.findUnique({ where: { careerId_playerId: { careerId: membership.careerId, playerId } } });
+  if (!state) return { error: t("tradeBlock.error.notMine") };
+  if (state.onTradeBlock) {
+    await prisma.playerState.update({ where: { id: state.id }, data: { onTradeBlock: false, tradeBlockSince: null } });
+    revalidatePath("/trades");
+    revalidatePath("/teams/[teamId]/players/[playerId]", "page");
+    return { success: t("tradeBlock.removed") };
+  }
+  if (await isTradeDeadlinePassed(membership.careerId, membership.career.season)) return { error: t("tradeAction.deadlinePassed") };
+  await prisma.playerState.update({ where: { id: state.id }, data: { onTradeBlock: true, tradeBlockSince: await currentGameDate(membership.careerId) } });
+  const offers = await solicitOffersForBlock(membership.careerId, membership.career.leagueId, membership.career.season, membership.teamId, playerId, locale);
+  revalidatePath("/trades");
+  revalidatePath("/inbox");
+  revalidatePath("/teams/[teamId]/players/[playerId]", "page");
+  return { success: offers > 0 ? t("tradeBlock.listedWithOffers", { count: offers }) : t("tradeBlock.listedNoOffer") };
 }

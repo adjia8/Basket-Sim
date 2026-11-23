@@ -78,11 +78,11 @@ export default async function TeamRosterPage({
   searchParams,
 }: {
   params: Promise<{ teamId: string }>;
-  searchParams: Promise<{ tab?: string; counter?: string }>;
+  searchParams: Promise<{ tab?: string; counter?: string; want?: string }>;
 }) {
   const membership = await getCurrentMembership();
   const { teamId } = await params;
-  const { tab: requestedTab, counter: counterOfferId } = await searchParams;
+  const { tab: requestedTab, counter: counterOfferId, want: wantedPlayerId } = await searchParams;
   const team = await getTeamById(teamId);
   if (!team) notFound();
   const { t, locale } = await getTranslator();
@@ -623,8 +623,14 @@ export default async function TeamRosterPage({
 
       {activeTab === "trade" && isOpponentInMyLeague && !tradeDeadlinePassed && (
         <TradeProposalForm
-          key={counterOffer?.id ?? "new"}
-          initialSelection={counterOffer?.selection}
+          key={counterOffer?.id ?? wantedPlayerId ?? "new"}
+          initialSelection={
+            counterOffer?.selection ??
+            // Depuis le scouting : le joueur visé est déjà coché.
+            (wantedPlayerId && roster.some((p) => p.id === wantedPlayerId)
+              ? { myPlayerIds: [], theirPlayerIds: [wantedPlayerId], myPickIds: [], theirPickIds: [] }
+              : undefined)
+          }
           counter={
             counterOffer
               ? {

@@ -70,6 +70,7 @@ export async function NavBar() {
     {
       label: t("common.nav.groupTransactions"),
       items: [
+        { href: "/scouting", label: t("scouting.nav") },
         { href: "/free-agents", label: t("common.nav.freeAgents") },
         { href: "/draft", label: t("common.nav.draft") },
         { href: "/trades", label: t("common.nav.trades"), alert: hasPendingTrade },

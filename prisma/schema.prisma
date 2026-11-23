@@ -547,6 +547,8 @@ model PlayerState {
   facilityRequestKey   String? // installation réclamée (clé de projet) — voir facility-request-rules.ts
   facilityRequestTier  Int? // palier voulu
   facilityPromiseBy    DateTime? // promesse du GM : à livrer (ou en chantier) avant cette date
+  onTradeBlock         Boolean   @default(false) // mis sur le marché par son GM (offres de l'IA)
+  tradeBlockSince      DateTime?
   requestAt            DateTime? // date de jeu de la demande en attente
   lastRequestAt        DateTime? // date de jeu de sa dernière demande (délai entre deux)
   morale               Int     @default(60) // 0-99, moral individuel (conférences de presse, résultats) — voir morale-rules.ts

@@ -248,6 +248,7 @@ async function executeTrade(
       prisma.playerTeamStint.create({ data: { careerId, playerId, teamId: sellerTeamId, season, reason: "traded" } })
     ),
   ]);
+  await clearTradeBlock(careerId, [target.id, ...players]);
 }
 
 async function maybeAiAiTrade(
@@ -329,6 +330,93 @@ async function maybePromisedTrade(
 }
 
 // ---------------------------------------------------------------------------
+// Joueur mis sur le marché par un GM humain : les équipes IA intéressées
+// (selon leur profil) font des offres, un peu sous la valeur du joueur
+// (le vendeur est demandeur). Une offre par équipe et par joueur.
+
+export const BLOCK_MAX_PENDING = 3;
+
+export async function solicitOffersForBlock(
+  careerId: string,
+  leagueId: string,
+  season: string,
+  teamId: string,
+  playerId: string,
+  locale: Locale,
+  max = BLOCK_MAX_PENDING
+): Promise<number> {
+  const [memberships, pending] = await Promise.all([
+    prisma.membership.findMany({ where: { careerId }, select: { teamId: true } }),
+    prisma.tradeOffer.findMany({
+      where: { careerId, toTeamId: teamId, status: "pending", items: { some: { playerId, side: "to" } } },
+      select: { fromTeamId: true },
+    }),
+  ]);
+  const wanted = max - pending.length;
+  if (wanted <= 0) return 0;
+  const humanTeamIds = new Set(memberships.map((m) => m.teamId));
+  const already = new Set(pending.map((o) => o.fromTeamId));
+  const market = await loadMarket(careerId, leagueId, season, locale);
+  const target = (market.byTeam.get(teamId) ?? []).find((a) => a.id === playerId);
+  if (!target) return 0;
+  let created = 0;
+  const lastPlayed = await prisma.game.findFirst({ where: { careerId, status: "final" }, orderBy: { gameDate: "desc" }, select: { gameDate: true } });
+  for (const row of shuffle(market.standings.filter((r) => !humanTeamIds.has(r.teamId) && !already.has(r.teamId)))) {
+    if (created >= wanted) break;
+    const profile = market.profiles.get(row.teamId) ?? "middle";
+    // Intérêt selon le profil : un prétendant veut du niveau tout de suite,
+    // une équipe en reconstruction de la jeunesse.
+    if (profile === "contender" && target.overall < 72) continue;
+    if (profile === "rebuild" && target.age > 26) continue;
+    const assets = await packageFor(careerId, market, row.teamId, target, {
+      allowPicks: true,
+      minRatio: 0.85,
+      assetFilter: profile === "rebuild" ? (a) => a.age >= 25 : undefined,
+    });
+    if (!assets) continue;
+    await prisma.tradeOffer.create({
+      data: {
+        careerId,
+        fromTeamId: row.teamId,
+        toTeamId: teamId,
+        items: {
+          create: [
+            ...assets.map((a) => (a.kind === "player" ? { playerId: a.id, side: "from" } : { draftPickId: a.id, side: "from" })),
+            { playerId: target.id, side: "to" },
+          ],
+        },
+      },
+    });
+    created++;
+  }
+  if (created > 0) {
+    const fr = locale === "fr";
+    await createInboxMessage(
+      careerId,
+      teamId,
+      season,
+      "trade_offer",
+      fr ? `${created} offre(s) pour ${target.label}` : `${created} offer(s) for ${target.label}`,
+      fr
+        ? `${target.label} est sur le marché : ${created} équipe(s) viennent de faire une offre. Compare-les (détail et avis de ton adjoint) dans la page Échanges.`
+        : `${target.label} is on the trade block: ${created} team(s) just made an offer. Compare them (details and your assistant's view) on the Trades page.`,
+      "/trades",
+      { gameDate: lastPlayed?.gameDate ?? null, playerId: target.id, priority: "important" }
+    );
+  }
+  return created;
+}
+
+// Joueurs échangés : plus sur le marché.
+export async function clearTradeBlock(careerId: string, playerIds: string[]): Promise<void> {
+  if (playerIds.length === 0) return;
+  await prisma.playerState.updateMany({
+    where: { careerId, playerId: { in: playerIds }, onTradeBlock: true },
+    data: { onTradeBlock: false, tradeBlockSince: null },
+  });
+}
+
+// ---------------------------------------------------------------------------
 
 // Appelée après les lots de matchs : offres de l'IA aux GM humains (offre en
 // attente dans la page Échanges, message dans la boîte de réception ;
@@ -361,6 +449,17 @@ export async function maybeAiTradeOffers(careerId: string, leagueId: string, sea
       const traded = await maybeAiAiTrade(careerId, await getMarket(), season, humanTeamIds, locale);
       if (traded) market = null; // effectifs modifiés : recharger avant une offre au GM
     }
+  }
+
+  // Joueurs mis sur le marché : de nouvelles offres arrivent au fil des jours.
+  const blocked = await prisma.playerState.findMany({
+    where: { careerId, onTradeBlock: true, player: { contracts: { some: { careerId, teamId: { in: [...humanTeamIds] } } } } },
+    select: { playerId: true, player: { select: { contracts: { where: { careerId }, select: { teamId: true } } } } },
+  });
+  for (const b of blocked) {
+    const owner = b.player.contracts[0]?.teamId;
+    if (!owner || Math.random() >= 0.3) continue;
+    if (await solicitOffersForBlock(careerId, leagueId, season, owner, b.playerId, locale, BLOCK_MAX_PENDING)) market = null;
   }
 
   // Offres aux GM humains.
