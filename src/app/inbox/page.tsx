@@ -193,13 +193,20 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const todo = inbox.messages.filter(actionRequired);
   const todoIds = new Set(todo.map((m) => m.id));
   const days: { key: string; label: string; rows: InboxRow<InboxMessageView>[] }[] = [];
-  for (const r of withDigests(inbox.messages.filter((m) => !todoIds.has(m.id)))) {
+  // Tri par date de jeu (les messages arrivent par date de création) : un
+  // seul bloc par journée.
+  const byDate = inbox.messages.filter((m) => !todoIds.has(m.id)).sort((a, b) => b.date.localeCompare(a.date));
+  const dayIndex = new Map<string, (typeof days)[number]>();
+  for (const r of withDigests(byDate)) {
     const first = r.kind === "message" ? r.message : r.messages[0];
     const key = first.gameDate ? first.date.slice(0, 10) : "offseason";
-    const label = first.gameDate ? formatGameDate(first.gameDate, locale) : t("inbox.offseason");
-    const last = days.at(-1);
-    if (last?.key === key) last.rows.push(r);
-    else days.push({ key, label, rows: [r] });
+    let day = dayIndex.get(key);
+    if (!day) {
+      day = { key, label: first.gameDate ? formatGameDate(first.gameDate, locale) : t("inbox.offseason"), rows: [] };
+      dayIndex.set(key, day);
+      days.push(day);
+    }
+    day.rows.push(r);
   }
 
   const row = (m: InboxMessageView, pinned = false) => {
