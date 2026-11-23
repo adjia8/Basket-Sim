@@ -17,11 +17,15 @@ export const FOUL_CHECKS_PER_QUARTER = 3;
 // FOUL_CHECKS_PER_QUARTER) pour ~2-3 fautes/joueur/match en moyenne, avec une
 // probabilité non négligeable mais pas dominante d'atteindre 6 en cas de
 // malchance/agressivité ("foul trouble").
-export function rollsPersonalFoul(defenseInside: number, defenseOutside: number): boolean {
+// `foulsSoFar` : un joueur chargé de fautes défend avec prudence (moins de
+// risques à 3 fautes, beaucoup moins à 4-5), comme en vrai — ce qui garde
+// les sorties pour six fautes rares malgré un total de fautes plus élevé.
+export function rollsPersonalFoul(defenseInside: number, defenseOutside: number, foulsSoFar = 0): boolean {
   const aggression = (defenseInside + defenseOutside) / 2 / 99;
   // ≈ 21 fautes par équipe et par match (un peu au-dessus de la moyenne
-  // NBA, ~19-20) et ≈ 0,2 sortie pour six fautes par match.
-  const chance = 0.115 + aggression * 0.08;
+  // NBA, ~19-20) et ≈ 0,1-0,15 sortie pour six fautes par match.
+  const caution = foulsSoFar >= 4 ? 0.65 : foulsSoFar === 3 ? 0.85 : 1;
+  const chance = (0.115 + aggression * 0.08) * caution;
   return Math.random() < chance;
 }
 

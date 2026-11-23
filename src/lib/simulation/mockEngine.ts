@@ -557,7 +557,7 @@ function applyQuarterFouls(
     totals.set(player.id, entry);
 
     for (let check = 0; check < FOUL_CHECKS_PER_QUARTER; check++) {
-      if (rollsPersonalFoul(player.ratings.defenseInside, player.ratings.defenseOutside)) {
+      if (rollsPersonalFoul(player.ratings.defenseInside, player.ratings.defenseOutside, entry.personalFouls)) {
         entry.personalFouls += 1;
         if (entry.personalFouls >= FOUL_OUT_LIMIT) {
           entry.disqualifiedReason = "fouled_out";

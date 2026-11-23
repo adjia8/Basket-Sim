@@ -157,7 +157,7 @@ test("feuilles de stats proches de la NBA (tirs, rebonds, passes, grosses soiré
   const N = 1200;
   let fortyPoint = 0;
   let foulOuts = 0;
-  const per = { tpa: 0, reb: 0, ast: 0, tov: 0, fgm: 0, fga: 0, teams: 0 };
+  const per = { tpa: 0, reb: 0, ast: 0, tov: 0, fgm: 0, fga: 0, pf: 0, teams: 0 };
   for (let g = 0; g < N; g++) {
     const r = engine.simulateGame(team("h"), realistic("h"), team("a"), realistic("a"));
     for (const e of r.boxScore) {
@@ -165,6 +165,7 @@ test("feuilles de stats proches de la NBA (tirs, rebonds, passes, grosses soiré
       per.reb += e.rebounds;
       per.ast += e.assists;
       per.tov += e.turnovers;
+      per.pf += e.personalFouls;
       per.fgm += e.fieldGoalsMade;
       per.fga += e.fieldGoalsAttempted;
       if (e.points >= 40) fortyPoint++;
@@ -173,6 +174,7 @@ test("feuilles de stats proches de la NBA (tirs, rebonds, passes, grosses soiré
     per.teams += 2;
   }
   const avg = (v: number) => v / per.teams;
+  if (process.env.DEBUG_STATS) console.log("fautes/équipe", avg(per.pf), "sorties/match", foulOuts / N);
   assert.ok(avg(per.tpa) > 30 && avg(per.tpa) < 44, `3PA ${avg(per.tpa)}`);
   assert.ok(avg(per.reb) > 40 && avg(per.reb) < 48, `rebonds ${avg(per.reb)}`);
   assert.ok(avg(per.ast) > 23 && avg(per.ast) < 30, `passes ${avg(per.ast)}`);
@@ -181,7 +183,8 @@ test("feuilles de stats proches de la NBA (tirs, rebonds, passes, grosses soiré
   assert.ok(fgPct > 0.44 && fgPct < 0.5, `FG% ${fgPct}`);
   // Grosses soirées et sorties pour six fautes : rares mais présentes.
   assert.ok(fortyPoint / N > 0.01 && fortyPoint / N < 0.15, `40 pts+ par match ${fortyPoint / N}`);
-  assert.ok(foulOuts / N > 0.04 && foulOuts / N < 0.3, `six fautes par match ${foulOuts / N}`);
+  assert.ok(foulOuts / N > 0.04 && foulOuts / N < 0.25, `six fautes par match ${foulOuts / N}`);
+  assert.ok(avg(per.pf) > 18 && avg(per.pf) < 24, `fautes par équipe ${avg(per.pf)}`);
 });
 
 test("retour progressif : minutes plafonnées, box score toujours cohérent", () => {
