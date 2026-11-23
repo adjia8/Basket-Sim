@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getCurrentMembership } from "@/lib/auth/dal";
 import { getInbox, getInboxMessage, markInboxMessageRead } from "@/lib/data-access/inbox";
-import { INBOX_CATEGORIES, withDigests, type InboxCategory, type InboxPriority } from "@/lib/careers/inbox-priority-rules";
+import { INBOX_CATEGORIES, withDigests, type InboxCategory, type InboxPriority, type InboxRow } from "@/lib/careers/inbox-priority-rules";
 import type { DictionaryKey } from "@/lib/i18n/dictionary";
 import { markMessageRead, markAllMessagesRead, openInboxMessage, openMessage, respondToPoachFromInbox } from "@/app/actions/inbox";
 import { prisma } from "@/lib/prisma";
@@ -101,6 +101,16 @@ function actionsFor(message: InboxMessageView, teamId: string, t: Translator): M
   }
 }
 
+const CATEGORY_ICON: Record<InboxCategory, string> = {
+  team: "🏀",
+  medical: "🩺",
+  transfers: "🔁",
+  press: "🎙️",
+  board: "🏢",
+  competitions: "🏆",
+  league: "📰",
+};
+
 const PRIORITY_DOT: Record<InboxPriority, string> = {
   urgent: "bg-bad",
   important: "bg-warn",
@@ -177,10 +187,24 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const selected = opened ? { ...opened, unread: false } : null;
   const totalUnread = Object.values(inbox.unreadByCategory).reduce((s, n) => s + (n ?? 0), 0);
   const base = { cat: category ?? undefined, season: season === membership.season ? undefined : season };
-  const rows = withDigests(inbox.messages);
 
-  const row = (m: InboxMessageView) => {
+  // Messages qui attendent une décision : épinglés en tête (« À traiter »),
+  // le reste est classé par jour, du plus récent au plus ancien.
+  const todo = inbox.messages.filter(actionRequired);
+  const todoIds = new Set(todo.map((m) => m.id));
+  const days: { key: string; label: string; rows: InboxRow<InboxMessageView>[] }[] = [];
+  for (const r of withDigests(inbox.messages.filter((m) => !todoIds.has(m.id)))) {
+    const first = r.kind === "message" ? r.message : r.messages[0];
+    const key = first.gameDate ? first.date.slice(0, 10) : "offseason";
+    const label = first.gameDate ? formatGameDate(first.gameDate, locale) : t("inbox.offseason");
+    const last = days.at(-1);
+    if (last?.key === key) last.rows.push(r);
+    else days.push({ key, label, rows: [r] });
+  }
+
+  const row = (m: InboxMessageView, pinned = false) => {
     const active = selected?.id === m.id;
+    const preview = m.body.replace(/\s+/g, " ").trim();
     return (
       <form key={m.id} action={openInboxMessage}>
         <input type="hidden" name="messageId" value={m.id} />
@@ -188,31 +212,43 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         <button
           type="submit"
           data-testid="inbox-row"
-          className={`flex w-full items-start gap-3 px-3 py-2.5 text-left transition hover:bg-surface-2 ${active ? "bg-surface-2" : ""}`}
+          className={`relative flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-surface-2 ${active ? "bg-surface-2" : ""}`}
         >
-        <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${PRIORITY_DOT[m.priority]}`} title={t(`inbox.priority.${m.priority}` as DictionaryKey)} />
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2 text-2xs text-faint">
-            <span className="uppercase tracking-wide">{typeLabel(m.type, t)}</span>
-            <span>{m.gameDate ? formatGameDate(m.gameDate, locale) : t("inbox.offseason")}</span>
-            {actionRequired(m) && <span className="rounded bg-accent/15 px-1.5 font-semibold text-accent-text">{t("inbox.actionRequired")}</span>}
+          {/* Liseré : urgent (rouge) / important (orange) — rien pour une simple info. */}
+          {m.priority !== "info" && <span className={`absolute inset-y-2 left-0 w-1 rounded-r ${PRIORITY_DOT[m.priority]}`} aria-hidden />}
+          <span className="mt-0.5 text-lg leading-none" aria-hidden>
+            {CATEGORY_ICON[m.category]}
           </span>
-          <span className={`block truncate text-sm ${m.unread ? "font-semibold" : "text-soft"}`}>{m.title}</span>
-        </span>
+          <span className="min-w-0 flex-1">
+            <span className={`line-clamp-2 text-[0.95rem] leading-snug ${m.unread ? "font-semibold text-fg" : "text-soft"}`}>{m.title}</span>
+            {preview && <span className="mt-0.5 block truncate text-xs text-muted">{preview}</span>}
+            <span className="mt-1 flex flex-wrap items-center gap-2 text-2xs text-faint">
+              <span>{typeLabel(m.type, t)}</span>
+              {pinned && <span>· {m.gameDate ? formatGameDate(m.gameDate, locale) : t("inbox.offseason")}</span>}
+              {actionRequired(m) && <span className="rounded bg-accent/15 px-1.5 py-px font-semibold text-accent-text">{t("inbox.actionRequired")}</span>}
+            </span>
+          </span>
+          {m.unread && <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-accent" title={t("inbox.unread")} />}
         </button>
       </form>
     );
   };
 
-  const tabs: { key: InboxCategory | null; label: string }[] = [
-    { key: null, label: t("inbox.category.all") },
-    ...INBOX_CATEGORIES.map((c) => ({ key: c, label: t(`inbox.category.${c}` as DictionaryKey) })),
+  const tabs: { key: InboxCategory | null; label: string; icon: string }[] = [
+    { key: null, label: t("inbox.category.all"), icon: "📥" },
+    ...INBOX_CATEGORIES.map((c) => ({ key: c, label: t(`inbox.category.${c}` as DictionaryKey), icon: CATEGORY_ICON[c] })),
   ];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">{t("inbox.title")}</h1>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{t("inbox.title")}</h1>
+          <p className="mt-1 text-sm text-muted">
+            {totalUnread > 0 ? t("inbox.summaryUnread", { count: totalUnread }) : t("inbox.summaryNone")}
+            {todo.length > 0 && <> · <span className="font-semibold text-accent-text">{t("inbox.summaryTodo", { count: todo.length })}</span></>}
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           {inbox.seasons.length > 1 && (
             <nav className="flex gap-1 text-xs" aria-label={t("inbox.season")}>
@@ -229,7 +265,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
           )}
           {totalUnread > 0 && (
             <form action={markAllMessagesRead}>
-              <button type="submit" className="rounded-md bg-surface-2 px-3 py-1.5 text-sm transition hover:bg-surface-3">
+              <button type="submit" className="rounded-md border border-line px-3 py-1.5 text-sm transition hover:bg-surface-2">
                 {t("inbox.markAllRead")}
               </button>
             </form>
@@ -252,7 +288,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         </div>
       )}
 
-      <nav className="mt-5 flex gap-1 overflow-x-auto border-b border-line-soft pb-px text-sm" data-testid="inbox-tabs">
+      <nav className="mt-5 flex flex-wrap gap-2 text-sm" data-testid="inbox-tabs">
         {tabs.map((tab) => {
           const count = tab.key ? inbox.unreadByCategory[tab.key] ?? 0 : totalUnread;
           const active = tab.key === category;
@@ -260,76 +296,101 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
             <Link
               key={tab.key ?? "all"}
               href={inboxHref({ cat: tab.key ?? undefined, season: base.season })}
-              className={`shrink-0 border-b-2 px-3 py-2 ${active ? "border-accent font-semibold" : "border-transparent text-muted hover:text-fg"}`}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 transition ${
+                active ? "border-accent bg-accent/10 font-semibold text-fg" : "border-line text-muted hover:border-line-strong hover:text-fg"
+              }`}
             >
+              <span aria-hidden>{tab.icon}</span>
               {tab.label}
-              {count > 0 && <span className="ml-1.5 rounded-full bg-accent px-1.5 text-2xs font-bold text-accent-fg">{count}</span>}
+              {count > 0 && <span className="rounded-full bg-accent px-1.5 text-2xs font-bold text-accent-fg">{count}</span>}
             </Link>
           );
         })}
       </nav>
 
       {category === "league" ? (
-        <section className="mt-4 space-y-3" data-testid="inbox-league">
+        <section className="mt-5 space-y-3" data-testid="inbox-league">
           {inbox.leagueNews.length === 0 ? (
             <p className="text-sm text-muted">{t("inbox.leagueEmpty")}</p>
           ) : (
             inbox.leagueNews.map((n) => (
               <div key={n.id} className="card p-4">
-                <p className="text-2xs text-faint">{formatGameDate(n.date, locale)}</p>
-                <p className="mt-1 font-semibold">{n.title}</p>
-                <p className="mt-1 whitespace-pre-line text-sm text-soft">{n.body}</p>
+                <p className="text-xs text-faint">{formatGameDate(n.date, locale)}</p>
+                <p className="mt-1 text-base font-semibold">{n.title}</p>
+                <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-soft">{n.body}</p>
               </div>
             ))
           )}
         </section>
       ) : (
-        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-          <section className={`card overflow-hidden ${selected ? "hidden lg:block" : ""}`} data-testid="inbox-list">
-            {rows.length === 0 ? (
-              <p className="p-4 text-sm text-muted">{t("inbox.empty")}</p>
-            ) : (
-              <div className="divide-y divide-line-soft">
-                {rows.map((r) =>
-                  r.kind === "message" ? (
-                    row(r.message)
-                  ) : (
-                    <details key={`digest-${r.day}`} className="group" open={r.messages.some((m) => m.id === selected?.id)}>
-                      <summary className="flex cursor-pointer list-none items-center gap-3 px-3 py-2.5 text-sm text-muted hover:bg-surface-2">
-                        <span className={`h-2 w-2 shrink-0 rounded-full ${PRIORITY_DOT.info}`} />
-                        <span className="flex-1">
-                          {t("inbox.digest", { count: r.messages.length })} · {formatGameDate(r.messages[0].date, locale)}
-                          {r.messages.some((m) => m.unread) && <span className="ml-2 text-accent-text">●</span>}
-                        </span>
-                        <span className="transition group-open:rotate-90">›</span>
-                      </summary>
-                      <div className="divide-y divide-line-soft bg-surface/40 pl-3">{r.messages.map(row)}</div>
-                    </details>
-                  )
-                )}
-              </div>
+        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+          <div className={`space-y-4 ${selected ? "hidden lg:block" : ""}`} data-testid="inbox-list">
+            {todo.length > 0 && (
+              <section className="card overflow-hidden border-accent/50" data-testid="inbox-todo">
+                <h2 className="border-b border-line-soft bg-accent/10 px-4 py-2 text-sm font-semibold">
+                  {t("inbox.todoHeading", { count: todo.length })}
+                </h2>
+                <div className="divide-y divide-line-soft">{todo.map((m) => row(m, true))}</div>
+              </section>
             )}
-          </section>
+            {days.length === 0 && todo.length === 0 ? (
+              <p className="card p-4 text-sm text-muted">{t("inbox.empty")}</p>
+            ) : (
+              days.map((d) => (
+                <section key={d.key} className="card overflow-hidden">
+                  <h2 className="border-b border-line-soft bg-surface-2 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted">{d.label}</h2>
+                  <div className="divide-y divide-line-soft">
+                    {d.rows.map((r) =>
+                      r.kind === "message" ? (
+                        row(r.message)
+                      ) : (
+                        <details key={`digest-${r.day}`} className="group" open={r.messages.some((m) => m.id === selected?.id)}>
+                          <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 text-sm text-muted hover:bg-surface-2">
+                            <span className="text-lg leading-none" aria-hidden>
+                              🗂️
+                            </span>
+                            <span className="flex-1">
+                              {t("inbox.digest", { count: r.messages.length })}
+                              {r.messages.some((m) => m.unread) && <span className="ml-2 inline-block h-2 w-2 rounded-full bg-accent align-middle" />}
+                            </span>
+                            <span className="transition group-open:rotate-90">›</span>
+                          </summary>
+                          <div className="divide-y divide-line-soft border-t border-line-soft bg-surface/40 pl-4">{r.messages.map((m) => row(m))}</div>
+                        </details>
+                      )
+                    )}
+                  </div>
+                </section>
+              ))
+            )}
+          </div>
 
           <section className={selected ? "" : "hidden lg:block"}>
-            {selected ? (
-              <div className="space-y-3">
-                <Link href={inboxHref(base)} scroll={false} className="text-sm text-muted hover:text-fg lg:hidden">
-                  ← {t("inbox.back")}
-                </Link>
-                <MessageCard
-                  message={selected}
-                  isUnread={false}
-                  locale={locale}
-                  t={t}
-                  actions={actionsFor(selected, membership.teamId, t)}
-                  poachDecision={selected.type === "poach_offer" && hasPendingPoachOffer}
-                  actionRequired={actionRequired(selected)}
-                />
-              </div>
-            ) : (
-              <div className="card flex h-40 items-center justify-center p-4 text-sm text-muted">{t("inbox.selectMessage")}</div>
-            )}
+            <div className="lg:sticky lg:top-20">
+              {selected ? (
+                <div className="space-y-3">
+                  <Link href={inboxHref(base)} scroll={false} className="text-sm text-muted hover:text-fg lg:hidden">
+                    ← {t("inbox.back")}
+                  </Link>
+                  <MessageCard
+                    message={selected}
+                    isUnread={false}
+                    locale={locale}
+                    t={t}
+                    actions={actionsFor(selected, membership.teamId, t)}
+                    poachDecision={selected.type === "poach_offer" && hasPendingPoachOffer}
+                    actionRequired={actionRequired(selected)}
+                  />
+                </div>
+              ) : (
+                <div className="card flex h-48 flex-col items-center justify-center gap-2 p-4 text-sm text-muted">
+                  <span className="text-3xl" aria-hidden>
+                    ✉️
+                  </span>
+                  {t("inbox.selectMessage")}
+                </div>
+              )}
+            </div>
           </section>
         </div>
       )}
@@ -361,25 +422,23 @@ function MessageCard({
   actionRequired: boolean;
 }) {
   return (
-    <div className="card relative overflow-hidden p-4" data-testid="inbox-message">
-      {isUnread && <span className="absolute inset-y-0 left-0 w-1 bg-accent" aria-hidden />}
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className={`rounded px-2 py-0.5 font-semibold uppercase tracking-wide ${TYPE_TONE[message.type] ?? "bg-surface-3 text-soft"}`}>
-          {typeLabel(message.type, t)}
-        </span>
-        <span className="flex items-center gap-1 text-faint">
-          <span className={`h-2 w-2 rounded-full ${PRIORITY_DOT[message.priority]}`} />
-          {t(`inbox.priority.${message.priority}` as DictionaryKey)}
-        </span>
-        {actionRequired && <span className="rounded bg-accent/15 px-1.5 py-0.5 font-semibold text-accent-text">{t("inbox.actionRequired")}</span>}
-        <span className="text-faint">
-          {message.gameDate ? formatGameDate(message.gameDate, locale) : t("inbox.offseason")}
-        </span>
+    <div className="card relative overflow-hidden" data-testid="inbox-message">
+      {message.priority !== "info" && <span className={`absolute inset-x-0 top-0 h-1 ${PRIORITY_DOT[message.priority]}`} aria-hidden />}
+      <div className="p-5">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className={`rounded px-2 py-0.5 font-semibold uppercase tracking-wide ${TYPE_TONE[message.type] ?? "bg-surface-3 text-soft"}`}>
+            {CATEGORY_ICON[message.category]} {typeLabel(message.type, t)}
+          </span>
+          {message.priority !== "info" && (
+            <span className={`font-semibold ${message.priority === "urgent" ? "text-bad" : "text-warn"}`}>{t(`inbox.priority.${message.priority}` as DictionaryKey)}</span>
+          )}
+          {actionRequired && <span className="rounded bg-accent/15 px-1.5 py-0.5 font-semibold text-accent-text">{t("inbox.actionRequired")}</span>}
+          <span className="ml-auto text-faint">{message.gameDate ? formatGameDate(message.gameDate, locale) : t("inbox.offseason")}</span>
+        </div>
+        <h2 className="mt-3 text-xl font-bold leading-snug">{message.title}</h2>
+        <p className="mt-3 whitespace-pre-line text-[0.95rem] leading-relaxed text-soft">{message.body}</p>
       </div>
-      <p className={`mt-2 ${isUnread ? "font-semibold" : "font-medium"}`}>{message.title}</p>
-      <p className="mt-1 whitespace-pre-line text-sm text-soft">{message.body}</p>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 border-t border-line-soft bg-surface-2/50 px-5 py-3">
         {poachDecision && (
           <>
             <form action={respondToPoachFromInbox}>
@@ -412,8 +471,8 @@ function MessageCard({
               type="submit"
               className={
                 action.primary && !poachDecision
-                  ? "rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-accent-fg hover:bg-accent-hover"
-                  : "rounded-md border border-line px-3 py-1.5 text-xs font-medium hover:bg-surface-2"
+                  ? "rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-fg hover:bg-accent-hover"
+                  : "rounded-md border border-line px-4 py-2 text-sm font-medium hover:bg-surface-2"
               }
             >
               {action.label}
