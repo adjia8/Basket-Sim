@@ -24,6 +24,7 @@ const AWARD_NAMES: Record<AwardType, { fr: string; frWomen: string; en: string }
   all_star_mvp: { fr: "MVP du All-Star Game", frWomen: "MVP du All-Star Game", en: "All-Star Game MVP" },
   nba_cup: { fr: "Vainqueur de la NBA Cup", frWomen: "Vainqueur de la Commissioner's Cup", en: "NBA Cup champion" },
   cup_mvp: { fr: "MVP de la NBA Cup", frWomen: "MVP de la Commissioner's Cup", en: "NBA Cup MVP" },
+  finals_mvp: { fr: "MVP des Finales", frWomen: "MVP des Finales", en: "Finals MVP" },
 };
 
 export function awardName(type: AwardType, locale: Locale, women = false): string {
@@ -52,6 +53,39 @@ export function awardNews(
   return {
     title: `${winner} (${teamName}) named ${award}`,
     body: [line ? `Season line: ${line}.` : null, runnersUp.length ? `Also in the running: ${runnersUp.join(", ")}.` : null]
+      .filter(Boolean)
+      .join(" "),
+  };
+}
+
+// Titre de champion (fin des Finales).
+export function championNews(
+  locale: Locale,
+  champion: string,
+  opponent: string,
+  score: string,
+  finalsMvp: string | null,
+  mvpLine: string | null,
+  women = false
+): NewsText {
+  const league = women ? "WNBA" : "NBA";
+  if (locale === "fr") {
+    return {
+      title: `${champion}, champions ${league} !`,
+      body: [
+        `${champion} remportent les Finales ${score} face à ${opponent}.`,
+        finalsMvp ? `${finalsMvp} est ${women ? "élue" : "élu"} MVP des Finales${mvpLine ? ` (${mvpLine})` : ""}.` : null,
+      ]
+        .filter(Boolean)
+        .join(" "),
+    };
+  }
+  return {
+    title: `${champion} are ${league} champions!`,
+    body: [
+      `${champion} win the Finals ${score} over ${opponent}.`,
+      finalsMvp ? `${finalsMvp} is named Finals MVP${mvpLine ? ` (${mvpLine})` : ""}.` : null,
+    ]
       .filter(Boolean)
       .join(" "),
   };

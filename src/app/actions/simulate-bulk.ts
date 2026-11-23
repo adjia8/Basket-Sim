@@ -10,6 +10,7 @@ import { toDomainGame } from "@/lib/data-access/mappers";
 import { simulateAndResolveGame } from "@/lib/data-access/simulate";
 import { calendarDay } from "@/lib/careers/schedule-rules";
 import { maybeLeagueMilestones } from "@/lib/data-access/awards";
+import { maybeChampionCeremony } from "@/lib/data-access/offseason";
 import { advanceNbaCup, cupBarrier, maybePlayAllStarGame } from "@/lib/data-access/nba-cup";
 import { maybeAiTradeOffers } from "@/lib/data-access/ai-trades";
 import { maybeAiFacilityProjects } from "@/lib/data-access/ai-facilities";
@@ -407,7 +408,9 @@ export async function continueGame(options: { acknowledgeInbox?: boolean } = {})
 
   // Saison régulière terminée : crée les matchs de playoffs à venir (match
   // suivant d'une série, tour suivant) — sans effet avant.
-  await getOrAdvancePlayoffs(careerId, career.season, career.leagueId);
+  const playoffs = await getOrAdvancePlayoffs(careerId, career.season, career.leagueId);
+  // Champion connu : MVP des Finales et annonce (une seule fois).
+  if (playoffs?.champion) await maybeChampionCeremony(careerId, career.leagueId, career.season, locale);
 
   // Avant le premier match de la saison (pré-saison comprise) : retour aux
   // bornes de saison. L'IA coupe ou complète d'elle-même ; le manager doit

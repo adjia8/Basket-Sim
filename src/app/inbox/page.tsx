@@ -79,6 +79,8 @@ function actionsFor(message: InboxMessageView, teamId: string, t: Translator): M
       return [{ label: t("inbox.action.staffPage"), href: "/staff", primary: true }];
     case "cup":
       return [{ label: t("cup.title"), href: "/cup", primary: true }];
+    case "season_end":
+      return [{ label: t("offseason.title"), href: "/offseason", primary: true }];
     case "board":
       return [{ label: t("board.title"), href: "/gm", primary: true }];
     case "press_review":
@@ -339,7 +341,7 @@ function typeLabel(type: string, t: Translator): string {
   return KNOWN_TYPES.includes(type) ? t(`inbox.type.${type}` as DictionaryKey) : type;
 }
 
-const KNOWN_TYPES = ["roster", "league_injury", "press", "injury", "trade_request", "free_agent", "free_agency", "standings", "poach_offer", "press_review", "player_reaction", "fine", "staff", "trade_offer", "award", "contract", "cup", "board", "player_request"];
+const KNOWN_TYPES = ["roster", "league_injury", "press", "injury", "trade_request", "free_agent", "free_agency", "standings", "poach_offer", "press_review", "player_reaction", "fine", "staff", "trade_offer", "award", "contract", "cup", "board", "player_request", "season_end"];
 
 function MessageCard({
   message,

@@ -142,3 +142,28 @@ test("playoffs : la série crédite le vainqueur réel, à domicile comme à l'e
   // Matchs de trop après la décision : ignorés.
   assert.equal(seriesTally(series, [...four, g("phi", 100, "bkn", 90)]).extraGames, 1);
 });
+
+import { finalsTotals, ownerMood, pickFinalsMvp, planEffects, shiftTier } from "../../src/lib/careers/offseason-rules";
+
+test("fin de saison : MVP des Finales, cap annoncé, humeur de la direction", () => {
+  const e = (playerId: string, teamId: string, points: number, rebounds = 5, assists = 3) => ({
+    playerId, teamId, points, rebounds, assists, steals: 1, blocks: 0, turnovers: 2, minutesPlayed: 35,
+  });
+  const games = [
+    [e("star", "phi", 30), e("big", "phi", 14, 14), e("opp", "bkn", 45)],
+    [e("star", "phi", 28), e("big", "phi", 16, 12), e("opp", "bkn", 40)],
+  ];
+  const totals = finalsTotals(games, "phi");
+  assert.equal(totals.length, 2); // joueurs du champion seulement
+  assert.equal(pickFinalsMvp(totals)?.playerId, "star");
+  assert.equal(pickFinalsMvp([]), null);
+  assert.equal(shiftTier("rebuild", -1), "rebuild");
+  assert.equal(shiftTier("playoffs", 1), "conf_semis");
+  assert.equal(shiftTier("champion", 1), "champion");
+  assert.deepEqual(planEffects("contend", "met"), { tierShift: 1, approval: 4 });
+  assert.ok(planEffects("rebuild", "warning").approval > planEffects("rebuild", "met").approval);
+  assert.equal(ownerMood("met", true), "delighted");
+  assert.equal(ownerMood("warning", false), "concerned");
+  assert.equal(ownerMood("fired", false), "furious");
+  assert.equal(ownerMood("met", false, true), "lenient"); // sauvé par la confiance de la direction
+});

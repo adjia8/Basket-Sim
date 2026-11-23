@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { advanceSeason } from "@/app/actions/season";
 import type { Locale } from "@/lib/i18n/locale";
 import { formatGameDate, formatSalary, teamFullName } from "@/lib/utils";
 import { TeamColorSwatch } from "@/components/team/TeamColorSwatch";
@@ -125,14 +124,12 @@ export function DashboardClient({
           <p className="text-sm font-medium">
             {labels.seasonOverChampionPrefix} {championTeamName ?? "-"}
           </p>
-          <form action={advanceSeason}>
-            <button
-              type="submit"
-              className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-fg transition hover:bg-accent-hover"
-            >
-              {labels.advanceSeason}
-            </button>
-          </form>
+          <Link
+            href="/offseason"
+            className="rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-accent-fg transition hover:bg-accent-hover"
+          >
+            {labels.advanceSeason}
+          </Link>
         </div>
       )}
 

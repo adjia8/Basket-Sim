@@ -58,10 +58,20 @@ export default async function AwardsPage() {
     const asgMvp = list.find((a) => a.type === "all_star_mvp");
     const cupWinner = list.find((a) => a.type === "nba_cup");
     const cupMvp = list.find((a) => a.type === "cup_mvp");
+    const finalsMvp = list.find((a) => a.type === "finals_mvp");
     return (
       <section key={season} className="mt-8">
         <h2 className="text-lg font-semibold">{t("league.awards.season", { season })}</h2>
         {season === m.season && !currentHasAwards && <p className="mt-1 text-sm text-muted">{t("league.awards.pending")}</p>}
+        {finalsMvp && (
+          <div className="card mt-3 p-4 text-sm">
+            <p className="eyebrow">{awardName("finals_mvp", locale, women)}</p>
+            <p className="mt-1 text-base">
+              🏆 {who(finalsMvp)} <span className="text-xs text-muted">{abbr.get(finalsMvp.teamId)}</span>
+            </p>
+            {finalsMvp.statLine && <p className="text-xs text-muted">{finalsMvp.statLine}</p>}
+          </div>
+        )}
         {winners.length > 0 && (
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {winners.map(({ type, winner, podium }) => (

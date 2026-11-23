@@ -18,7 +18,8 @@ export type AwardType =
   | "all_star"
   | "all_star_mvp"
   | "nba_cup"
-  | "cup_mvp";
+  | "cup_mvp"
+  | "finals_mvp";
 
 export const MAJOR_AWARDS: AwardType[] = ["mvp", "dpoy", "roy", "sixth_man", "mip", "coach"];
 export const ALL_NBA: AwardType[] = ["all_nba_1", "all_nba_2", "all_nba_3"];
@@ -96,6 +97,7 @@ export const AWARD_EFFECTS: Record<AwardType, { renown: number; morale: number }
   all_star_mvp: { renown: 3, morale: 3 },
   nba_cup: { renown: 0, morale: 0 }, // trophée d'équipe : moral de tout l'effectif, voir nba-cup.ts
   cup_mvp: { renown: 3, morale: 4 },
+  finals_mvp: { renown: 7, morale: 6 },
 };
 
 export function statLine(l: AwardLine, locale: Locale): string {

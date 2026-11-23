@@ -38,6 +38,7 @@ const CATEGORY_BY_TYPE: Record<string, InboxCategory> = {
   standings: "competitions",
   cup: "competitions",
   award: "competitions",
+  season_end: "competitions",
 };
 
 export function categoryOf(type: string): InboxCategory {

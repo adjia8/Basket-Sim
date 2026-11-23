@@ -100,7 +100,8 @@ export function ContinueButton({
         continue;
       }
       setStatus(null);
-      goTo(res.kind === "matchDay" ? `/game/${res.gameId}` : "/");
+      // Saison finie : cérémonie de fin de saison (champion, trophées, direction).
+      goTo(res.kind === "matchDay" ? `/game/${res.gameId}` : res.kind === "seasonOver" ? "/offseason" : "/");
       return;
     }
   }

@@ -57,7 +57,7 @@ export default async function DashboardPage() {
         regularSeasonOverPlayoffs: t("dashboard.regularSeasonOverPlayoffs"),
         viewPlayoffs: t("dashboard.viewPlayoffs"),
         seasonOverChampionPrefix: t("dashboard.seasonOverChampionPrefix"),
-        advanceSeason: t("dashboard.advanceSeason"),
+        advanceSeason: t("offseason.dashboardLink"),
         inviteCode: t("dashboard.inviteCode"),
         conferenceRank: t("dashboard.conferenceRank"),
         record: t("dashboard.record"),

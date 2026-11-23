@@ -264,6 +264,7 @@ model GmProfile {
   personalCash           Int              @default(250000) // fortune personnelle du GM (dollars)
   lifestyleJson          String? // achats personnels (logement, voitures, garde-robe…)
   lastSeasonChangesJson  String? // évolution de fin de saison (attributs, réputation) pour l'affichage
+  seasonReviewJson       String? // réunion de fin de saison avec la direction (verdict figé + cap choisi) — voir offseason-rules.ts
   seasonRecords          GmSeasonRecord[]
 }
 

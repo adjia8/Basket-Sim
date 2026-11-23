@@ -2,6 +2,7 @@
 
 import { activeMembershipWhere } from "@/lib/auth/active-membership";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { verifySession } from "@/lib/auth/dal";
 import { prisma } from "@/lib/prisma";
 import { getScheduleForCareer } from "@/lib/data-access/schedule";
@@ -31,6 +32,7 @@ import { poachOfferMessageText } from "@/lib/careers/inbox-rules";
 import { getTranslator, translatorFor } from "@/lib/i18n/translate";
 import { maybeAiFacilityProjects } from "@/lib/data-access/ai-facilities";
 import { europeOffseason } from "@/lib/data-access/europe";
+import { maybeChampionCeremony } from "@/lib/data-access/offseason";
 import { ensureGmContract, pointsOf, seasonStyle, standingParts } from "@/lib/data-access/gm-career";
 import {
   attributeEvolution,
@@ -50,6 +52,7 @@ import { ensureCareerStaff, getStaffProfiles, processStaffOffseason } from "@/li
 import { moraleAfterSummer } from "@/lib/careers/morale-rules";
 import { resolveContractOptions } from "@/lib/data-access/negotiations";
 import { nbaScheduleExtras } from "@/lib/careers/nba-cup-rules";
+import { parseSeasonReview, planEffects, shiftTier } from "@/lib/careers/offseason-rules";
 
 // Patch PlayerState de l'intersaison côté santé : énergie pleine, blessures
 // guéries d'environ 50 matchs, statut de blessure effacé si rétabli.
@@ -86,6 +89,8 @@ export async function advanceSeason(): Promise<void> {
   // de playoffs soit désigné (avance/crée le bracket au passage si besoin).
   const playoffs = await getOrAdvancePlayoffs(career.id, career.season, career.leagueId);
   if (!playoffs?.champion) return;
+  // MVP des Finales et annonce du champion, si personne n'est passé par « Continuer ».
+  await maybeChampionCeremony(career.id, career.leagueId, career.season, locale);
 
   // Ordre du draft basé sur le classement de la saison qui vient de se
   // terminer (la pire équipe choisit en premier) — calculé maintenant, avant
@@ -259,13 +264,19 @@ export async function advanceSeason(): Promise<void> {
       getPlayoffResultTier(career.id, career.season, member.teamId),
       getOrCreateTeamState(career.id, member.teamId, career.leagueId),
     ]);
-    const { outcome } = evaluateGmSeason(
-      gmProfile.currentExpectationTier as ExpectationTier,
-      resultTier,
-      teamState.finances < 0,
-      gmProfile.warningsAtCurrentTeam,
-      gmProfile.frontOfficeApproval
-    );
+    // Verdict de la réunion de fin de saison (page /offseason) s'il a eu
+    // lieu : figé à ce moment-là — sinon, calculé maintenant.
+    const review = parseSeasonReview(gmProfile.seasonReviewJson);
+    const meeting = review?.season === career.season ? review : null;
+    const outcome =
+      meeting?.outcome ??
+      evaluateGmSeason(
+        gmProfile.currentExpectationTier as ExpectationTier,
+        resultTier,
+        teamState.finances < 0,
+        gmProfile.warningsAtCurrentTeam,
+        gmProfile.frontOfficeApproval
+      ).outcome;
 
     await prisma.gmSeasonRecord.create({
       data: {
@@ -409,7 +420,11 @@ export async function advanceSeason(): Promise<void> {
         warningsAtCurrentTeam: nextWarnings,
         pendingOfferTeamId,
         pendingOfferJson,
-        currentExpectationTier: nextExpectations.get(member.teamId) ?? "playoffs",
+        // Cap annoncé à la direction : objectif relevé ou abaissé d'un cran.
+        currentExpectationTier: shiftTier(
+          (nextExpectations.get(member.teamId) ?? "playoffs") as ExpectationTier,
+          meeting?.plan ? planEffects(meeting.plan, outcome).tierShift : 0
+        ),
       },
     });
   }
@@ -486,4 +501,6 @@ export async function advanceSeason(): Promise<void> {
   });
 
   revalidatePath("/", "layout");
+  // Depuis la page de fin de saison : retour au tableau de bord de la nouvelle saison.
+  redirect("/");
 }
