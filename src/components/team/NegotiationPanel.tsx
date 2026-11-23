@@ -28,6 +28,9 @@ export interface NegotiationLabels {
   basis: string;
   marketHelp: string;
   patienceHelp: string;
+  role: string;
+  roleHint: string;
+  roles: { value: string; label: string }[]; // premier = « sans engagement » (valeur vide)
 }
 
 export function NegotiationPanel({
@@ -39,6 +42,7 @@ export function NegotiationPanel({
   patienceLeft,
   patienceMax,
   hasCounter,
+  suggestedRole,
   labels,
 }: {
   playerId: string;
@@ -49,6 +53,7 @@ export function NegotiationPanel({
   patienceLeft: number;
   patienceMax: number;
   hasCounter: boolean;
+  suggestedRole: string;
   labels: NegotiationLabels;
 }) {
   const [state, action, pending] = useActionState<NegotiationFormState | undefined, FormData>(negotiateContract, undefined);
@@ -138,6 +143,16 @@ export function NegotiationPanel({
                   </option>
                 </select>
               </label>
+              <label className="text-xs text-muted">
+                {labels.role}
+                <select name="role" defaultValue={suggestedRole} className="mt-0.5 block field px-2 py-1 text-sm text-fg" data-testid="nego-role">
+                  {labels.roles.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button
                 type="submit"
                 disabled={pending}
@@ -146,6 +161,7 @@ export function NegotiationPanel({
                 {pending ? labels.submitting : labels.submit}
               </button>
               <p className="w-full text-xs text-muted">{labels.optionHint}</p>
+              <p className="w-full text-xs text-muted">{labels.roleHint}</p>
               {labels.note && <p className="w-full text-xs text-muted">{labels.note}</p>}
             </form>
           </>

@@ -431,6 +431,9 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       await page.goto(`/teams/lal/players/${target.playerId}`);
       const panel = page.getByTestId("negotiation");
       await expect(panel).toBeVisible();
+      // Cinq rôles proposables (+ sans engagement), quel que soit son rôle actuel.
+      await expect(panel.getByTestId("nego-role").locator("option")).toHaveCount(6);
+      await panel.getByTestId("nego-role").selectOption("starter");
       await panel.locator('input[name="salary"]').fill("1400000");
       await panel.locator('button:has-text("Faire l\'offre")').click();
       const accept = panel.locator('form:has(input[name="mode"][value="acceptCounter"]) button');
@@ -440,6 +443,13 @@ test("pages de gestion, négociation et carrières multiples", async ({ page }) 
       await expect
         .poll(async () => (await prisma.contract.findUniqueOrThrow({ where: { id: target.id } })).salary, { timeout: 30_000 })
         .toBe(negotiation.counterSalary);
+      // Le rôle proposé est repris dans la contre-proposition, puis devient une promesse.
+      expect(negotiation.counterRole).toBe("starter");
+      await expect
+        .poll(async () => (await prisma.playerState.findFirstOrThrow({ where: { careerId, playerId: target.playerId } })).promisedStatus)
+        .toBe("starter");
+      await page.reload();
+      await expect(page.getByTestId("playing-time-promise")).toContainText("Promesse en cours : Titulaire");
     });
 
     await test.step("plusieurs carrières sur un même compte", async () => {

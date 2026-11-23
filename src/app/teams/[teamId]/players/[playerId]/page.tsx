@@ -8,6 +8,8 @@ import { NEUTRAL_STAFF_PROFILE } from "@/lib/careers/staff-rules";
 import { estimateRating, ratingStars } from "@/lib/careers/potential-rules";
 import {
   EXPECTED_MINUTES,
+  OFFERABLE_ROLES,
+  roleRank,
   PROMISE_MARGIN,
   promisableStatuses,
   playerStatus,
@@ -331,7 +333,17 @@ export default async function PlayerDetailPage({
       patienceLeft={negotiation.patienceLeft}
       patienceMax={negotiation.stance.patience}
       hasCounter={!!negotiation.counter}
+      suggestedRole={negotiation.counter?.role ?? ""}
       labels={{
+        role: t("nego.role"),
+        roleHint: t("nego.roleHint", { role: t(`status.${negotiation.status}`).toLowerCase(), minutes: negotiation.expectedMinutes }),
+        roles: [
+          { value: "", label: t("nego.roleNone") },
+          ...OFFERABLE_ROLES.map((r) => ({
+            value: r,
+            label: `${t(`status.${r}`)} (≈ ${EXPECTED_MINUTES[r]} min)${roleRank(r) === roleRank(negotiation.status) ? ` · ${t("nego.roleExpected")}` : ""}`,
+          })),
+        ],
         title: t(negotiation.kind === "extension" ? "nego.titleExtension" : "nego.titleFreeAgent"),
         ask:
           t("nego.ask", {
@@ -350,7 +362,7 @@ export default async function PlayerDetailPage({
         submitting: t("nego.submitting"),
         counterHeading: t("nego.counterHeading"),
         counterText: negotiation.counter
-          ? `${formatSalary(negotiation.counter.salary, locale)} · ${t("staff.years", { count: negotiation.counter.years })}${optionSuffix(negotiation.counter.option)}`
+          ? `${formatSalary(negotiation.counter.salary, locale)} · ${t("staff.years", { count: negotiation.counter.years })}${optionSuffix(negotiation.counter.option)}${negotiation.counter.role ? ` · ${t(`status.${negotiation.counter.role}`)}` : ""}`
           : null,
         acceptCounter: t("nego.acceptCounter"),
         note: negotiation.rookieScale ? t("nego.rookieNote") : null,
@@ -631,7 +643,7 @@ export default async function PlayerDetailPage({
                     <select id="ptime-status" name="status" className="field px-2 py-1">
                       {promisable.map((s) => (
                         <option key={s} value={s}>
-                          {t(`status.${s}`)} (≈ {EXPECTED_MINUTES[s]} min)
+                          {t(`status.${s}`)} (≈ {EXPECTED_MINUTES[s]} min){s === currentStatus ? ` · ${t("ptime.keep")}` : ""}
                         </option>
                       ))}
                     </select>

@@ -98,7 +98,7 @@ export async function promisePlayingTime(formData: FormData): Promise<void> {
     prisma.game.findFirst({ where: { careerId: membership.careerId, status: "final" }, orderBy: { gameDate: "desc" }, select: { gameDate: true } }),
   ]);
   if (!contract || contract.teamId !== membership.teamId || !state || state.promisedStatus) return;
-  // Même garde-fou que l'interface : au plus deux crans au-dessus du rôle actuel.
+  // Même garde-fou que l'interface : rôle actuel garanti, ou jusqu'à trois crans au-dessus.
   const mates = await prisma.contract.findMany({
     where: { careerId: membership.careerId, teamId: membership.teamId, playerId: { not: playerId } },
     select: { playerId: true },

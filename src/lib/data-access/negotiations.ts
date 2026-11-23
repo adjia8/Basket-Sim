@@ -124,6 +124,9 @@ export async function getNegotiationView(params: {
     traits: negotiationTraits(personality, kind === "extension"),
     marketOverall,
   });
+  // Rôle qu'il attend chez nous : un rôle promis au-dessus le convainc,
+  // en dessous il demande plus (voir roleValueMultiplier).
+  stance.expectedRole = status;
   // Joueur venu d'Europe (droits détenus par cette équipe) : il veut venir
   // en NBA — pas de refus, exigences plafonnées à l'exception de mi-niveau
   // (signable au-dessus du plafond, voir cap-rules.ts).
@@ -166,6 +169,7 @@ export async function getNegotiationView(params: {
             salary: active.counterSalary,
             years: active.counterYears,
             option: (active.counterOption ?? "none") as ContractOption,
+            role: (active.counterRole as PlayerStatus | null) ?? null,
           }
         : null,
     lockedDays,
@@ -196,6 +200,7 @@ export async function saveNegotiationRound(params: {
     counterSalary: counter.salary,
     counterYears: counter.years,
     counterOption: counter.option,
+    counterRole: counter.role ?? null,
     status: "open",
     walkedGameDate: null,
   };
@@ -214,7 +219,7 @@ export async function recordWalkout(params: {
 }): Promise<void> {
   const { careerId, playerId, teamId, season } = params;
   const walkedGameDate = await currentGameDate(careerId, season);
-  const data = { season, patienceLeft: 0, status: "walked", walkedGameDate, counterSalary: null, counterYears: null, counterOption: null };
+  const data = { season, patienceLeft: 0, status: "walked", walkedGameDate, counterSalary: null, counterYears: null, counterOption: null, counterRole: null };
   await prisma.contractNegotiation.upsert({
     where: { careerId_playerId_teamId: { careerId, playerId, teamId } },
     create: { careerId, playerId, teamId, rounds: 0, ...data },

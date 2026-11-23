@@ -11,6 +11,7 @@ import { SALARY_RANGES } from "./salary-rules";
 import { minAcceptableSalary } from "./player-demands";
 import { EXTENSION_MAX_OFFER_YEARS, EXTENSION_MIN_OFFER_YEARS } from "./contract-type-rules";
 import type { NegotiationTraits } from "./personality-rules";
+import { OFFERABLE_ROLES, roleValueMultiplier, type PlayerStatus } from "./player-status-rules";
 
 export type ContractOption = "none" | "player" | "team";
 export const CONTRACT_OPTIONS: ContractOption[] = ["none", "player", "team"];
@@ -30,6 +31,7 @@ export interface PlayerStance {
   preferredYears: number;
   preferredOption: ContractOption;
   patience: number; // tours de contre-proposition avant de partir
+  expectedRole?: PlayerStatus; // rôle qu'il attend dans l'équipe (voir roleValueMultiplier)
 }
 
 function roundSalary(value: number): number {
@@ -83,6 +85,7 @@ export interface Offer {
   salary: number;
   years: number;
   option: ContractOption;
+  role?: PlayerStatus | null; // rôle promis avec le contrat (null : sans engagement)
 }
 
 // Valeur perçue par le joueur : un salaire, corrigé de l'écart à la durée
@@ -92,7 +95,8 @@ export function perceivedValue(stance: PlayerStance, offer: Offer): number {
   const yearsGap = Math.abs(offer.years - stance.preferredYears);
   const optionMult = offer.option === "player" ? 1.06 : offer.option === "team" ? 0.92 : 1;
   const preferenceMiss = stance.preferredOption === "player" && offer.option !== "player" ? 0.97 : 1;
-  return offer.salary * (1 - 0.04 * yearsGap) * optionMult * preferenceMiss;
+  const roleMult = stance.expectedRole ? roleValueMultiplier(stance.expectedRole, offer.role) : 1;
+  return offer.salary * (1 - 0.04 * yearsGap) * optionMult * preferenceMiss * roleMult;
 }
 
 export type NegotiationVerdict =
@@ -103,10 +107,11 @@ export type NegotiationVerdict =
 // Contre-proposition : sa durée et son option préférées, à un salaire qui
 // descend de la demande d'ouverture vers son plancher à mesure que la
 // patience s'use. Toujours acceptable par lui-même (valeur ≥ plancher).
-export function counterOffer(stance: PlayerStance, patienceLeft: number): Offer {
+// Le rôle proposé par le GM est repris tel quel dans sa contre-proposition.
+export function counterOffer(stance: PlayerStance, patienceLeft: number, role: PlayerStatus | null = null): Offer {
   const share = stance.patience > 0 ? Math.max(0, patienceLeft) / stance.patience : 0;
   const target = stance.minSalary + (stance.askSalary - stance.minSalary) * share;
-  const base: Offer = { salary: 0, years: stance.preferredYears, option: stance.preferredOption };
+  const base: Offer = { salary: 0, years: stance.preferredYears, option: stance.preferredOption, role };
   // Ramène la valeur perçue à `target` (le multiplicateur de sa propre
   // préférence vaut ≥ 1, donc arrondir au-dessus suffit).
   const unit = perceivedValue(stance, { ...base, salary: 1 });
@@ -120,7 +125,7 @@ export function evaluateOffer(stance: PlayerStance, offer: Offer, patienceLeft: 
   const cost = value < stance.minSalary * 0.8 ? 2 : 1;
   const left = patienceLeft - cost;
   if (left < 0) return { kind: "walk" };
-  return { kind: "counter", counter: counterOffer(stance, left), patienceLeft: left };
+  return { kind: "counter", counter: counterOffer(stance, left, offer.role ?? null), patienceLeft: left };
 }
 
 export function validOffer(offer: Offer, leagueId: string): boolean {
@@ -133,7 +138,8 @@ export function validOffer(offer: Offer, leagueId: string): boolean {
     offer.years >= EXTENSION_MIN_OFFER_YEARS &&
     offer.years <= EXTENSION_MAX_OFFER_YEARS &&
     CONTRACT_OPTIONS.includes(offer.option) &&
-    optionAllowed(offer.option, offer.years)
+    optionAllowed(offer.option, offer.years) &&
+    (offer.role == null || OFFERABLE_ROLES.includes(offer.role))
   );
 }
 

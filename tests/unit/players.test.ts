@@ -1,3 +1,4 @@
+import { evaluateOffer } from "../../src/lib/careers/contract-negotiation-rules";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -14,6 +15,7 @@ import {
   playerStatus,
   productionRating,
   promisableStatuses,
+  roleValueMultiplier,
   rankInRoster,
 } from "../../src/lib/careers/player-status-rules";
 import { annualGrowth, estimateRating, growthFactor, initialPotential } from "../../src/lib/careers/potential-rules";
@@ -72,10 +74,26 @@ test("production : échelle large, plafond réservé aux saisons historiques", (
   assert.equal(marketRating(80, 90), 84);
 });
 
-test("promesses : au plus deux crans au-dessus du rôle actuel", () => {
-  assert.deepEqual(promisableStatuses("bench"), ["rotation"]);
-  assert.deepEqual(promisableStatuses("rotation"), ["star", "starter"]);
+test("promesses : rôle actuel garanti ou jusqu'à trois crans au-dessus", () => {
+  assert.deepEqual(promisableStatuses("bench"), ["star", "starter", "rotation"]);
+  assert.deepEqual(promisableStatuses("rotation"), ["franchise", "star", "starter", "rotation"]);
+  assert.deepEqual(promisableStatuses("star"), ["franchise", "star"]);
   assert.ok(!promisableStatuses("bench").includes("franchise"));
+});
+
+test("négociation : le rôle promis pèse sur la valeur de l'offre", () => {
+  assert.equal(roleValueMultiplier("starter", null), 1);
+  assert.ok(roleValueMultiplier("rotation", "starter") > roleValueMultiplier("rotation", "rotation"));
+  assert.ok(roleValueMultiplier("rotation", "star") > roleValueMultiplier("rotation", "starter"));
+  assert.ok(roleValueMultiplier("rotation", "franchise") < roleValueMultiplier("rotation", "star")); // il n'y croit pas
+  assert.ok(roleValueMultiplier("starter", "bench") < 1);
+  const stance = { minSalary: 10_000_000, askSalary: 12_000_000, preferredYears: 3, preferredOption: "none" as const, patience: 3, expectedRole: "rotation" as const };
+  // 9,5 M$ sans engagement : refusé ; avec une place de titulaire : accepté.
+  assert.equal(evaluateOffer(stance, { salary: 9_500_000, years: 3, option: "none" }, 3).kind, "counter");
+  assert.equal(evaluateOffer(stance, { salary: 9_500_000, years: 3, option: "none", role: "starter" }, 3).kind, "accept");
+  // La contre-proposition garde le rôle proposé.
+  const v = evaluateOffer(stance, { salary: 6_000_000, years: 3, option: "none", role: "starter" }, 3);
+  assert.ok(v.kind === "counter" && v.counter.role === "starter");
 });
 
 test("potentiel : jamais sous la note, progression nulle au plafond", () => {

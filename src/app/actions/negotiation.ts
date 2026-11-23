@@ -26,6 +26,7 @@ import {
   type Offer,
 } from "@/lib/careers/contract-negotiation-rules";
 import { getTranslator } from "@/lib/i18n/translate";
+import { OFFERABLE_ROLES, PROMISABLE_STATUSES, type PlayerStatus } from "@/lib/careers/player-status-rules";
 import { currentGameDate, resolveHonoredPromises } from "@/lib/data-access/trade-requests";
 import { formatSalary } from "@/lib/utils";
 
@@ -93,10 +94,12 @@ export async function negotiateContract(
     offer = view.counter;
   } else {
     const option = String(formData.get("option") ?? "none") as ContractOption;
+    const role = String(formData.get("role") ?? "") as PlayerStatus;
     offer = {
       salary: Math.round(Number(formData.get("salary"))),
       years: Math.round(Number(formData.get("years"))),
       option: CONTRACT_OPTIONS.includes(option) ? option : "none",
+      role: OFFERABLE_ROLES.includes(role) ? role : null,
     };
   }
   if (!validOffer(offer, leagueId)) return { error: t("rosterAction.invalidOffer") };
@@ -138,7 +141,7 @@ export async function negotiateContract(
         amount: formatSalary(verdict.counter.salary, locale),
         years: verdict.counter.years,
         option: optionSuffix(verdict.counter.option, tr),
-      }),
+      }) + (verdict.counter.role ? ` ${t("nego.counterRole", { role: t(`status.${verdict.counter.role}`) })}` : ""),
     };
   }
   if (verdict.kind === "walk") {
@@ -186,18 +189,27 @@ export async function negotiateContract(
     await prisma.playerState.updateMany({ where: { careerId, playerId }, data: { rightsTeamId: null, abroadClub: null } });
   }
   await clearNegotiation(careerId, playerId, teamId);
+  // Rôle promis avec le contrat : devient une promesse de temps de jeu,
+  // jugée sur les 15 matchs suivants (voir playing-time-promises.ts).
+  if (offer.role && PROMISABLE_STATUSES.includes(offer.role)) {
+    await prisma.playerState.updateMany({
+      where: { careerId, playerId },
+      data: { promisedStatus: offer.role, promiseSince: await currentGameDate(careerId) },
+    });
+  }
 
   revalidatePath("/");
   revalidatePath(`/teams/${teamId}`);
   revalidatePath("/free-agents");
   revalidatePath(path, "page");
   return {
-    success: t(view.kind === "extension" ? "nego.extended" : "nego.signed", {
-      player: name,
-      amount: formatSalary(offer.salary, locale),
-      years: offer.years,
-      option: optionSuffix(offer.option, tr),
-    }),
+    success:
+      t(view.kind === "extension" ? "nego.extended" : "nego.signed", {
+        player: name,
+        amount: formatSalary(offer.salary, locale),
+        years: offer.years,
+        option: optionSuffix(offer.option, tr),
+      }) + (offer.role && offer.role !== "bench" ? ` ${t("nego.rolePromised", { role: t(`status.${offer.role}`) })}` : ""),
   };
 }
 

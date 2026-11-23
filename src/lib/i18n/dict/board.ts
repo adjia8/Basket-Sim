@@ -11,6 +11,7 @@ export const keys = [
   "ptime.button",
   "ptime.active",
   "ptime.none",
+  "ptime.keep",
 ] as const;
 
 export type BoardKey = (typeof keys)[number];
@@ -28,6 +29,7 @@ export const fr: Record<BoardKey, string> = {
   "ptime.button": "Promettre",
   "ptime.active": "Promesse en cours : {status} · {games}/15 matchs · {mpg} min par match (il en faut ≈ {needed})",
   "ptime.none": "Aucun rôle supérieur à promettre.",
+  "ptime.keep": "garantir son rôle actuel",
 };
 
 export const en: Record<BoardKey, string> = {
@@ -43,4 +45,5 @@ export const en: Record<BoardKey, string> = {
   "ptime.button": "Promise",
   "ptime.active": "Active promise: {status} · {games}/15 games · {mpg} min per game (≈ {needed} needed)",
   "ptime.none": "No higher role to promise.",
+  "ptime.keep": "guarantee his current role",
 };

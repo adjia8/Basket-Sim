@@ -92,13 +92,32 @@ export function promiseHonored(minutesPerGame: number, promised: PlayerStatus): 
   return minutesPerGame >= EXPECTED_MINUTES[promised] - PROMISE_MARGIN;
 }
 
-// Rôles qu'on peut promettre de façon crédible : au plus deux crans
-// au-dessus du rôle actuel (un fin de banc ne devient pas joueur franchise).
-const STATUS_LADDER: PlayerStatus[] = ["bench", "prospect", "rotation", "starter", "star", "franchise"];
+// Échelle des rôles (un espoir se situe au niveau d'un fin de banc : il
+// attend des minutes, pas un rôle établi).
+const ROLE_RANK: Record<PlayerStatus, number> = { bench: 0, prospect: 0, rotation: 1, starter: 2, star: 3, franchise: 4 };
+export function roleRank(s: PlayerStatus): number {
+  return ROLE_RANK[s];
+}
+
+// Promesse de temps de jeu en cours de contrat : garantir son rôle actuel
+// ou promettre jusqu'à trois crans au-dessus.
 export function promisableStatuses(current: PlayerStatus): PlayerStatus[] {
-  const i = STATUS_LADDER.indexOf(current);
-  return PROMISABLE_STATUSES.filter((s) => {
-    const j = STATUS_LADDER.indexOf(s);
-    return j > i && j <= i + 2;
-  });
+  const r = ROLE_RANK[current];
+  return PROMISABLE_STATUSES.filter((s) => ROLE_RANK[s] >= r && ROLE_RANK[s] <= r + 3);
+}
+
+// Négociation de contrat : rôle proposé avec l'offre (du plus grand au
+// plus petit). « bench » = aucun temps de jeu garanti.
+export const OFFERABLE_ROLES: PlayerStatus[] = ["franchise", "star", "starter", "rotation", "bench"];
+
+// Poids du rôle proposé dans la valeur perçue d'une offre, par rapport au
+// rôle qu'il attend : un rôle plus grand le convainc (jusqu'à deux crans,
+// au-delà il n'y croit pas), un rôle plus petit se paie.
+export function roleValueMultiplier(expected: PlayerStatus, offered: PlayerStatus | null | undefined): number {
+  if (!offered) return 1;
+  const d = ROLE_RANK[offered] - ROLE_RANK[expected];
+  if (d < 0) return 1 + 0.07 * d;
+  if (d === 0) return 1.02;
+  if (d <= 2) return 1.03 + 0.03 * d;
+  return 1.02;
 }

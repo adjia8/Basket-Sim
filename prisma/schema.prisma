@@ -756,6 +756,7 @@ model ContractNegotiation {
   counterSalary  Int?
   counterYears   Int?
   counterOption  String?
+  counterRole    String? // rôle promis repris dans la contre-proposition (voir OFFERABLE_ROLES)
   status         String    @default("open") // "open" | "walked"
   walkedGameDate DateTime?
   updatedAt      DateTime  @updatedAt
