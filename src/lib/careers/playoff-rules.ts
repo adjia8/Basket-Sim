@@ -73,3 +73,30 @@ export function higherSeedHostsGame(gameNumber: number, bestOf: number): boolean
       throw new Error(`Format de série non pris en charge : bestOf=${bestOf}`);
   }
 }
+
+// Score d'une série à partir de ses matchs joués (dans l'ordre), en
+// créditant le vainqueur réel de chaque match. Les matchs joués après la
+// décision (ne devraient pas exister) sont ignorés et signalés.
+export function seriesTally(
+  series: { homeTeamId: string; awayTeamId: string; bestOf: number },
+  games: { homeTeamId: string; awayTeamId: string; homeScore: number | null; awayScore: number | null }[]
+): { homeWins: number; awayWins: number; winnerTeamId: string | null; extraGames: number } {
+  const needed = winsNeeded(series.bestOf);
+  let homeWins = 0;
+  let awayWins = 0;
+  let winnerTeamId: string | null = null;
+  let extraGames = 0;
+  for (const g of games) {
+    if (g.homeScore === null || g.awayScore === null) continue;
+    if (winnerTeamId) {
+      extraGames++;
+      continue;
+    }
+    const winner = g.homeScore > g.awayScore ? g.homeTeamId : g.awayTeamId;
+    if (winner === series.homeTeamId) homeWins++;
+    else if (winner === series.awayTeamId) awayWins++;
+    if (homeWins >= needed) winnerTeamId = series.homeTeamId;
+    else if (awayWins >= needed) winnerTeamId = series.awayTeamId;
+  }
+  return { homeWins, awayWins, winnerTeamId, extraGames };
+}

@@ -863,9 +863,6 @@ export async function simulateAndResolveGame(
 
   // Toutes les autres écritures du match en une seule vague parallèle.
   await Promise.all([
-    game.playoffSeriesId
-      ? recordPlayoffGameResult(game.playoffSeriesId, result.homeScore, result.awayScore)
-      : Promise.resolve(),
     developmentPlayerIds.length > 0
       ? prisma.contract.updateMany({
           where: { id: { in: developmentPlayerIds } },
@@ -895,6 +892,9 @@ export async function simulateAndResolveGame(
     teamStateUpdate(homeTeamState, homeWinPct, homeRoster, chemistryTrainingBonus(homeFocus, homeIntensity), homeTeam.marketAppeal, game.homeTeamId, true, awayRoster),
     teamStateUpdate(awayTeamState, awayWinPct, awayRoster, chemistryTrainingBonus(awayFocus, awayIntensity), awayTeam.marketAppeal, game.awayTeamId, false, homeRoster),
   ]);
+
+  // Playoffs : score de la série recompté d'après les vainqueurs réels.
+  if (game.playoffSeriesId) await recordPlayoffGameResult(game.playoffSeriesId);
 
   // Salaire des GM humains, versé match après match en saison régulière.
   if (/^\d{4}-\d{4}$/.test(game.season)) {

@@ -127,3 +127,18 @@ test("carrière du GM : contrat, marché de l'emploi, train de vie", () => {
   assert.deepEqual(purchase(["city_car", "sedan", "electric_suv", "sports_car"], "supercar", 1e9), { ok: false, error: "garage" });
   assert.equal(sell(["villa"], "villa")?.cashDelta, 3_600_000);
 });
+
+import { seriesTally } from "../../src/lib/careers/playoff-rules";
+
+test("playoffs : la série crédite le vainqueur réel, à domicile comme à l'extérieur", () => {
+  const series = { homeTeamId: "phi", awayTeamId: "bkn", bestOf: 7 };
+  const g = (home: string, hs: number, away: string, as: number) => ({ homeTeamId: home, homeScore: hs, awayTeamId: away, awayScore: as });
+  // 2-2-1-1-1 : les 76ers gagnent les 4 premiers, dont 2 à Brooklyn.
+  const four = [g("phi", 110, "bkn", 100), g("phi", 105, "bkn", 99), g("bkn", 98, "phi", 112), g("bkn", 101, "phi", 120)];
+  assert.deepEqual(seriesTally(series, four), { homeWins: 4, awayWins: 0, winnerTeamId: "phi", extraGames: 0 });
+  // Victoires partagées.
+  const split = [g("phi", 90, "bkn", 100), g("phi", 105, "bkn", 99), g("bkn", 98, "phi", 112), g("bkn", 121, "phi", 120)];
+  assert.deepEqual(seriesTally(series, split), { homeWins: 2, awayWins: 2, winnerTeamId: null, extraGames: 0 });
+  // Matchs de trop après la décision : ignorés.
+  assert.equal(seriesTally(series, [...four, g("phi", 100, "bkn", 90)]).extraGames, 1);
+});

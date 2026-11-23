@@ -12,6 +12,7 @@ import {
   nextRoundPairs,
   seedingPairs,
   winsNeeded,
+  seriesTally,
   type RoundSpec,
 } from "@/lib/careers/playoff-rules";
 import type { ExpectationTier } from "@/lib/careers/gm-rules";
@@ -325,24 +326,23 @@ async function seedWnbaIfNeeded(
 // clôt la série dès qu'il atteint la majorité requise par bestOf. Le
 // prochain match (s'il en faut un) est créé au prochain appel de
 // getOrAdvancePlayoffs, pas ici — garde cette route simple.
-export async function recordPlayoffGameResult(
-  playoffSeriesId: string,
-  homeScore: number,
-  awayScore: number
-): Promise<void> {
+// Après chaque match de playoffs : recompte la série à partir des matchs
+// joués, en créditant le VAINQUEUR RÉEL de chaque match (l'équipe qui
+// reçoit change d'un match à l'autre : un 2-2-1-1-1 ne doit pas inverser
+// les victoires à l'extérieur). Idempotent ; s'arrête dès qu'une équipe
+// atteint le nombre de victoires requis.
+export async function recordPlayoffGameResult(playoffSeriesId: string): Promise<void> {
   const series = await prisma.playoffSeries.findUnique({ where: { id: playoffSeriesId } });
   if (!series || series.winnerTeamId) return;
-
-  const homeWon = homeScore > awayScore;
-  const homeWins = series.homeWins + (homeWon ? 1 : 0);
-  const awayWins = series.awayWins + (homeWon ? 0 : 1);
-  const needed = winsNeeded(series.bestOf);
-  const winnerTeamId =
-    homeWins >= needed ? series.homeTeamId : awayWins >= needed ? series.awayTeamId : null;
-
+  const games = await prisma.game.findMany({
+    where: { playoffSeriesId, status: "final" },
+    orderBy: [{ gameNumber: "asc" }, { gameDate: "asc" }],
+    select: { homeTeamId: true, homeScore: true, awayScore: true, awayTeamId: true },
+  });
+  const tally = seriesTally(series, games);
   await prisma.playoffSeries.update({
     where: { id: playoffSeriesId },
-    data: { homeWins, awayWins, winnerTeamId },
+    data: { homeWins: tally.homeWins, awayWins: tally.awayWins, winnerTeamId: tally.winnerTeamId },
   });
 }
 
