@@ -78,7 +78,7 @@ export async function advanceRosterFatigue(
       fitness.fatigueRecoveryFactor
     );
     if (playedIds.has(player.id)) {
-      newFatigue += fatigueGainForGame(player.ratings.stamina) * (fitness.gainFactor ?? 1);
+      newFatigue += fatigueGainForGame(player.ratings.stamina, minutes) * (fitness.gainFactor ?? 1);
     }
     // L'entraînement a lieu entre les matchs, pour tout l'effectif (pas
     // seulement ceux qui ont joué ce match précis).

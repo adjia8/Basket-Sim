@@ -92,14 +92,19 @@ test("plan de charge : repos sur back-to-back et au-delà d'une usure, plafond l
 import { fatigueAtTipOff, fatigueGainForGame } from "../../src/lib/careers/fatigue-rules";
 import { clampWear as clampWearT, wearGainForGame as wearGainT, wearRecovery as wearRecoveryT } from "../../src/lib/careers/wear-rules";
 
-test("énergie au coup d'envoi : le repos compte avant le match", () => {
-  // Fin de match à 40 de fatigue, 2 jours de repos : bien récupéré avant le suivant.
-  assert.ok(fatigueAtTipOff(40, 2, 80) <= 10);
-  // Back-to-back : récupère moins, jamais négatif.
-  assert.ok(fatigueAtTipOff(40, 1, 80) > fatigueAtTipOff(40, 2, 80));
-  assert.equal(fatigueAtTipOff(5, 3, 80), 0);
-  // Usure élevée : récupération ralentie.
+test("énergie au coup d'envoi : le repos compte avant le match, sans tout effacer", () => {
+  // Fin de match à 40 de fatigue, 2 jours de repos : bien récupéré, pas totalement.
+  const twoDays = fatigueAtTipOff(40, 2, 80);
+  assert.ok(twoDays > 5 && twoDays < 25, `2 jours ${twoDays}`);
+  // Back-to-back : récupère moins ; jamais négatif.
+  assert.ok(fatigueAtTipOff(40, 1, 80) > twoDays);
+  assert.ok(fatigueAtTipOff(5, 3, 80) <= 2);
+  // Usure élevée : récupération ralentie ; endurance : plus rapide.
   assert.ok(fatigueAtTipOff(40, 1, 80, 50, 90) > fatigueAtTipOff(40, 1, 80, 50, 0));
+  assert.ok(fatigueAtTipOff(40, 2, 99) < fatigueAtTipOff(40, 2, 30));
+  // Fatigue d'un match selon les minutes.
+  assert.ok(fatigueGainForGame(80, 36) > 2 * fatigueGainForGame(80, 15));
+  assert.equal(fatigueGainForGame(80, 0), 0);
 });
 
 test("usure d'une star sur une saison : reste sous le seuil de repos", () => {
@@ -108,14 +113,19 @@ test("usure d'une star sur une saison : reste sous le seuil de repos", () => {
   let fatigue = 0;
   let maxWear = 0;
   let minEnergy = 100;
+  let sumEnergy = 0;
   for (let g = 0; g < 82; g++) {
     const rest = g % 6 === 5 ? 1 : 2;
     const tip = fatigueAtTipOff(fatigue, rest, 85, 50, wear);
     minEnergy = Math.min(minEnergy, 100 - tip);
     wear = clampWearT(wear - wearRecoveryT(rest, false, 50, wear) + wearGainT(38, rest, 85, "medium") * 1.12);
-    fatigue = Math.min(99, tip + fatigueGainForGame(85) * 1.12 + 3);
+    fatigue = Math.min(99, tip + fatigueGainForGame(85, 38) * 1.12 + 3);
     maxWear = Math.max(maxWear, wear);
+    sumEnergy += 100 - tip;
   }
   assert.ok(maxWear <= 60, `usure max ${maxWear}`);
-  assert.ok(minEnergy >= 85, `énergie min ${minEnergy}`);
+  // Juste milieu : une star se fatigue (jamais 100 % en continu) sans
+  // s'effondrer.
+  assert.ok(minEnergy >= 65, `énergie min ${minEnergy}`);
+  assert.ok(sumEnergy / 82 > 75 && sumEnergy / 82 < 92, `énergie moyenne ${sumEnergy / 82}`);
 });
